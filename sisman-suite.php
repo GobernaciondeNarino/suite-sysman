@@ -3,7 +3,7 @@
  * Plugin Name: SISMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sisman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SISMAN de la Gobernación de Nariño.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SISMAN_SUITE_VERSION', '1.0.0' );
+define( 'SISMAN_SUITE_VERSION', '1.1.0' );
 define( 'SISMAN_SUITE_FILE', __FILE__ );
 define( 'SISMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SISMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -51,6 +51,7 @@ final class Sisman_Suite {
     public \SismanSuite\Visualizer $visualizer;
     public \SismanSuite\Rest_Api   $rest_api;
     public \SismanSuite\Logger     $logger;
+    public \SismanSuite\Updater    $updater;
 
     public static function instance(): self {
         if ( null === self::$instance ) {
@@ -65,6 +66,7 @@ final class Sisman_Suite {
         $this->importer   = new \SismanSuite\Importer( $this->database, $this->logger );
         $this->visualizer = new \SismanSuite\Visualizer( $this->database );
         $this->rest_api   = new \SismanSuite\Rest_Api( $this->database );
+        $this->updater    = new \SismanSuite\Updater();
 
         $this->register_hooks();
     }

@@ -8,10 +8,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Importer {
 
     private const API_BASE_URL = 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar';
-    private const TIMEOUT      = 60;
+    private const TIMEOUT      = 120;
 
     private Database $database;
     private Logger   $logger;
+
+    private const REPORT_LABELS = [
+        'ejecucion' => 'Ejecución Presupuestal de Gastos',
+        'auxiliar'   => 'Auxiliar Presupuestal por Cuentas',
+        'plan'       => 'Plan Presupuestal',
+    ];
 
     public function __construct( Database $database, Logger $logger ) {
         $this->database = $database;
@@ -40,6 +46,7 @@ class Importer {
      */
     private function fetch_api( string $url ): array {
         $this->logger->log( "Consultando API: {$url}" );
+        $start = microtime( true );
 
         $response = wp_remote_get( $url, [
             'timeout'   => self::TIMEOUT,
@@ -49,9 +56,11 @@ class Importer {
             ],
         ] );
 
+        $elapsed = round( microtime( true ) - $start, 2 );
+
         if ( is_wp_error( $response ) ) {
             $error = $response->get_error_message();
-            $this->logger->log( "Error de conexión: {$error}" );
+            $this->logger->log( "ERROR de conexión ({$elapsed}s): {$error}", 'error' );
             return [ 'success' => false, 'error' => $error, 'data' => [] ];
         }
 
@@ -59,28 +68,41 @@ class Importer {
         $body = wp_remote_retrieve_body( $response );
 
         if ( 200 !== $code ) {
-            $this->logger->log( "Respuesta HTTP {$code}" );
+            $this->logger->log( "ERROR: Respuesta HTTP {$code} ({$elapsed}s)", 'error' );
             return [ 'success' => false, 'error' => "HTTP {$code}", 'data' => [] ];
         }
 
         $data = json_decode( $body, true );
 
         if ( json_last_error() !== JSON_ERROR_NONE ) {
-            $this->logger->log( 'Error al decodificar JSON: ' . json_last_error_msg() );
+            $this->logger->log( 'ERROR al decodificar JSON: ' . json_last_error_msg(), 'error' );
             return [ 'success' => false, 'error' => 'JSON inválido', 'data' => [] ];
         }
 
         // SISMAN API returns { codigo: 0, mensaje: "OK", cuerpo: [...] }
         if ( ! isset( $data['codigo'] ) || (int) $data['codigo'] !== 0 ) {
             $msg = $data['mensaje'] ?? 'Error desconocido';
-            $this->logger->log( "Error API SISMAN: {$msg}" );
+            $this->logger->log( "ERROR API SISMAN: {$msg}", 'error' );
             return [ 'success' => false, 'error' => $msg, 'data' => [] ];
         }
 
         $records = $data['cuerpo'] ?? [];
-        $this->logger->log( 'Registros obtenidos: ' . count( $records ) );
+        $this->logger->log( "Registros obtenidos: " . count( $records ) . " ({$elapsed}s)" );
 
         return [ 'success' => true, 'error' => '', 'data' => $records ];
+    }
+
+    /**
+     * Update the import status transient.
+     */
+    private function update_status( int $step, int $total, string $message, string $report_key = '' ): void {
+        set_transient( 'sisman_import_status', [
+            'running'      => true,
+            'step'         => $step,
+            'total'        => $total,
+            'message'      => $message,
+            'report_label' => self::REPORT_LABELS[ $report_key ] ?? '',
+        ], HOUR_IN_SECONDS );
     }
 
     /**
@@ -88,6 +110,8 @@ class Importer {
      */
     public function import_ejecucion( string $compania, int $anio, int $mes ): array {
         global $wpdb;
+
+        $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['ejecucion'] . ' ---' );
 
         $url    = $this->build_url( $compania, $anio, $mes, 1 );
         $result = $this->fetch_api( $url );
@@ -98,6 +122,8 @@ class Importer {
 
         $table    = $wpdb->prefix . 'sisman_ejecucion_gastos';
         $inserted = $this->database->insert_ejecucion_records( $result['data'], $table, $anio, $mes, $compania );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en ejecución." );
 
         return [
             'success'  => true,
@@ -111,6 +137,8 @@ class Importer {
      * Import Auxiliar Presupuestal (numinforme=2).
      */
     public function import_auxiliar( string $compania, int $anio, int $mes, string $tipo_cpte = 'RES' ): array {
+        $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['auxiliar'] . " (tipo_cpte={$tipo_cpte}) ---" );
+
         $url    = $this->build_url( $compania, $anio, $mes, 2, [ 'tipo_cpte' => $tipo_cpte ] );
         $result = $this->fetch_api( $url );
 
@@ -119,6 +147,8 @@ class Importer {
         }
 
         $inserted = $this->database->insert_auxiliar_records( $result['data'], $anio, $mes, $compania, $tipo_cpte );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en auxiliar." );
 
         return [
             'success'  => true,
@@ -134,6 +164,8 @@ class Importer {
     public function import_plan( string $compania, int $anio, int $mes ): array {
         global $wpdb;
 
+        $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['plan'] . ' ---' );
+
         $url    = $this->build_url( $compania, $anio, $mes, 4 );
         $result = $this->fetch_api( $url );
 
@@ -143,6 +175,8 @@ class Importer {
 
         $table    = $wpdb->prefix . 'sisman_plan_presupuestal';
         $inserted = $this->database->insert_ejecucion_records( $result['data'], $table, $anio, $mes, $compania );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en plan." );
 
         return [
             'success'  => true,
@@ -158,31 +192,13 @@ class Importer {
     public function import_all( string $compania, int $anio, int $mes ): array {
         $results = [];
 
-        set_transient( 'sisman_import_status', [
-            'running' => true,
-            'step'    => 1,
-            'total'   => 3,
-            'message' => 'Importando Ejecución Presupuestal de Gastos...',
-        ], HOUR_IN_SECONDS );
-
+        $this->update_status( 1, 3, 'Conectando con API SISMAN...', 'ejecucion' );
         $results['ejecucion'] = $this->import_ejecucion( $compania, $anio, $mes );
 
-        set_transient( 'sisman_import_status', [
-            'running' => true,
-            'step'    => 2,
-            'total'   => 3,
-            'message' => 'Importando Auxiliar Presupuestal por Cuentas...',
-        ], HOUR_IN_SECONDS );
-
+        $this->update_status( 2, 3, 'Conectando con API SISMAN...', 'auxiliar' );
         $results['auxiliar'] = $this->import_auxiliar( $compania, $anio, $mes );
 
-        set_transient( 'sisman_import_status', [
-            'running' => true,
-            'step'    => 3,
-            'total'   => 3,
-            'message' => 'Importando Plan Presupuestal...',
-        ], HOUR_IN_SECONDS );
-
+        $this->update_status( 3, 3, 'Conectando con API SISMAN...', 'plan' );
         $results['plan'] = $this->import_plan( $compania, $anio, $mes );
 
         delete_transient( 'sisman_import_status' );
@@ -195,8 +211,6 @@ class Importer {
             'mes'      => $mes,
             'results'  => $results,
         ] );
-
-        $this->logger->log( 'Importación completa finalizada.' );
 
         return $results;
     }
@@ -224,23 +238,67 @@ class Importer {
             wp_send_json_error( [ 'message' => 'Mes no válido.' ] );
         }
 
-        $this->logger->log( "Iniciando importación: Compañía={$compania}, Año={$anio}, Mes={$mes}, Informe={$report}" );
+        // Log import start
+        $this->logger->log( '======================================================', 'info' );
+        $this->logger->log( 'INICIO DE IMPORTACIÓN', 'info' );
+        $this->logger->log( "Parámetros: Compañía={$compania}, Año={$anio}, Mes={$mes}, Informe={$report}", 'info' );
+        $this->logger->log( 'Usuario: ' . wp_get_current_user()->user_login, 'info' );
+        $this->logger->log( '======================================================', 'info' );
+
+        $start_time = microtime( true );
+        $error_count = 0;
 
         switch ( $report ) {
             case 'ejecucion':
+                $this->update_status( 1, 1, 'Importando...', 'ejecucion' );
                 $results = [ 'ejecucion' => $this->import_ejecucion( $compania, $anio, $mes ) ];
+                if ( ! $results['ejecucion']['success'] ) $error_count++;
                 break;
             case 'auxiliar':
                 $tipo_cpte = sanitize_text_field( $_POST['tipo_cpte'] ?? 'RES' );
+                $this->update_status( 1, 1, 'Importando...', 'auxiliar' );
                 $results = [ 'auxiliar' => $this->import_auxiliar( $compania, $anio, $mes, $tipo_cpte ) ];
+                if ( ! $results['auxiliar']['success'] ) $error_count++;
                 break;
             case 'plan':
+                $this->update_status( 1, 1, 'Importando...', 'plan' );
                 $results = [ 'plan' => $this->import_plan( $compania, $anio, $mes ) ];
+                if ( ! $results['plan']['success'] ) $error_count++;
                 break;
             default:
                 $results = $this->import_all( $compania, $anio, $mes );
+                foreach ( $results as $r ) {
+                    if ( ! $r['success'] ) $error_count++;
+                }
                 break;
         }
+
+        delete_transient( 'sisman_import_status' );
+
+        // Save last import info
+        update_option( 'sisman_last_import', [
+            'date'     => current_time( 'mysql' ),
+            'compania' => $compania,
+            'anio'     => $anio,
+            'mes'      => $mes,
+            'results'  => $results,
+        ] );
+
+        // Log import end
+        $elapsed = round( microtime( true ) - $start_time, 2 );
+        $total_imported = 0;
+        $total_records  = 0;
+        foreach ( $results as $r ) {
+            if ( isset( $r['imported'] ) ) $total_imported += $r['imported'];
+            if ( isset( $r['total'] ) ) $total_records += $r['total'];
+        }
+
+        $this->logger->log( '======================================================', 'info' );
+        $this->logger->log( 'FIN DE IMPORTACIÓN', 'info' );
+        $this->logger->log( "Duración: {$elapsed} segundos", 'info' );
+        $this->logger->log( "Registros importados: {$total_imported} / {$total_records}", 'info' );
+        $this->logger->log( "Errores: {$error_count}", $error_count > 0 ? 'warning' : 'info' );
+        $this->logger->log( '======================================================', 'info' );
 
         wp_send_json_success( [
             'message' => 'Importación completada.',
@@ -274,7 +332,16 @@ class Importer {
         $anio     = (int) get_option( 'sisman_api_anio', date( 'Y' ) );
         $mes      = (int) get_option( 'sisman_api_mes', date( 'n' ) );
 
-        $this->logger->log( 'Iniciando importación programada (cron).' );
-        $this->import_all( $compania, $anio, $mes );
+        $this->logger->log( '======================================================', 'info' );
+        $this->logger->log( 'INICIO DE IMPORTACIÓN PROGRAMADA (CRON)', 'info' );
+        $this->logger->log( '======================================================', 'info' );
+
+        $start = microtime( true );
+        $results = $this->import_all( $compania, $anio, $mes );
+
+        $elapsed = round( microtime( true ) - $start, 2 );
+        $this->logger->log( '======================================================', 'info' );
+        $this->logger->log( "FIN DE IMPORTACIÓN PROGRAMADA - Duración: {$elapsed}s", 'info' );
+        $this->logger->log( '======================================================', 'info' );
     }
 }

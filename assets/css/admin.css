@@ -83,6 +83,14 @@
     border-left-color: var(--sisman-accent);
 }
 
+.sisman-stat-card--error {
+    border-left-color: var(--sisman-danger);
+}
+
+.sisman-stat-card--error .sisman-stat-icon .dashicons {
+    color: var(--sisman-danger);
+}
+
 .sisman-stat-icon {
     background: var(--sisman-gray-100);
     border-radius: 50%;
@@ -154,6 +162,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    margin-bottom: 15px;
 }
 
 .sisman-panel-header .sisman-panel-title {
@@ -235,6 +244,79 @@
 }
 
 /* ========================================
+   Import Steps Indicator
+   ======================================== */
+.sisman-import-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 20px 0 10px;
+    padding: 15px;
+    background: var(--sisman-gray-100);
+    border-radius: var(--sisman-radius);
+}
+
+.sisman-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #fff;
+    border: 2px solid var(--sisman-gray-300);
+    transition: var(--sisman-transition);
+}
+
+.sisman-step.active {
+    border-color: var(--sisman-accent);
+    background: rgba(52, 152, 219, 0.1);
+}
+
+.sisman-step.active .sisman-step-indicator {
+    background: var(--sisman-accent);
+    color: #fff;
+}
+
+.sisman-step.completed {
+    border-color: var(--sisman-success);
+    background: rgba(39, 174, 96, 0.1);
+}
+
+.sisman-step.completed .sisman-step-indicator {
+    background: var(--sisman-success);
+    color: #fff;
+}
+
+.sisman-step-indicator {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--sisman-gray-300);
+    color: var(--sisman-gray-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.sisman-step-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sisman-gray-800);
+    white-space: nowrap;
+}
+
+.sisman-step-connector {
+    width: 30px;
+    height: 2px;
+    background: var(--sisman-gray-300);
+    flex-shrink: 0;
+}
+
+/* ========================================
    Progress Bar
    ======================================== */
 .sisman-progress-container {
@@ -244,25 +326,69 @@
     border-radius: var(--sisman-radius);
 }
 
+.sisman-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
 .sisman-progress-bar {
-    height: 20px;
+    height: 24px;
     background: var(--sisman-gray-200);
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
 }
 
 .sisman-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--sisman-primary), var(--sisman-primary-light));
-    border-radius: 10px;
+    background: linear-gradient(90deg, var(--sisman-primary), var(--sisman-primary-light), var(--sisman-success));
+    border-radius: 12px;
     transition: width 0.5s ease;
+    position: relative;
+}
+
+.sisman-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: sisman-progress-shimmer 2s infinite;
+}
+
+@keyframes sisman-progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 .sisman-progress-text {
-    margin: 10px 0 0;
-    text-align: center;
     color: var(--sisman-gray-600);
+    font-size: 13px;
+}
+
+.sisman-progress-percent {
+    font-weight: 700;
+    color: var(--sisman-primary);
     font-size: 14px;
+}
+
+/* Spin animation for import button */
+@keyframes sisman-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.sisman-spin {
+    animation: sisman-spin 1s linear infinite;
+    display: inline-block;
 }
 
 /* ========================================
@@ -270,7 +396,7 @@
    ======================================== */
 .sisman-results-container {
     margin-top: 20px;
-    padding: 15px;
+    padding: 20px;
     border-radius: var(--sisman-radius);
 }
 
@@ -286,15 +412,85 @@
     color: #721c24;
 }
 
-.sisman-result-item {
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+.sisman-result-header {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 15px;
 }
 
-.sisman-result-item:last-child {
-    border-bottom: none;
+.sisman-result-header .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.sisman-result-header.success .dashicons {
+    color: var(--sisman-success);
+}
+
+.sisman-result-header.error .dashicons {
+    color: var(--sisman-danger);
+}
+
+.sisman-results-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sisman-results-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    font-size: 13px;
+}
+
+.sisman-results-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+}
+
+.sisman-result-total td {
+    border-top: 2px solid rgba(0, 0, 0, 0.15);
+    font-weight: 600;
+}
+
+.sisman-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.sisman-badge.success {
+    background: var(--sisman-success);
+    color: #fff;
+}
+
+.sisman-badge.error {
+    background: var(--sisman-danger);
+    color: #fff;
+}
+
+.sisman-result-note {
+    margin-top: 12px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sisman-result-note a {
+    color: inherit;
+    text-decoration: underline;
 }
 
 /* ========================================
@@ -496,13 +692,35 @@
 }
 
 .sisman-log-content {
-    color: #00ff41;
+    color: #b4b4b4;
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     line-height: 1.6;
     margin: 0;
     white-space: pre-wrap;
     word-break: break-all;
+}
+
+.sisman-log-error {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.sisman-log-warn {
+    color: #ffd93d;
+}
+
+.sisman-log-success {
+    color: #51cf66;
+}
+
+.sisman-log-separator {
+    color: #555;
+}
+
+.sisman-log-header {
+    color: #74c0fc;
+    font-weight: 700;
 }
 
 .sisman-log-size {
@@ -519,19 +737,30 @@
 
 .sisman-config-section {
     margin-bottom: 25px;
-    padding-bottom: 25px;
-    border-bottom: 1px solid var(--sisman-gray-200);
+    padding: 20px;
+    background: var(--sisman-gray-100);
+    border-radius: var(--sisman-radius);
+    border: 1px solid var(--sisman-gray-200);
 }
 
 .sisman-config-section:last-child {
-    border-bottom: none;
     margin-bottom: 0;
 }
 
 .sisman-config-section h3 {
     color: var(--sisman-primary-dark);
     margin: 0 0 15px;
-    font-size: 16px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sisman-config-section h3 .dashicons {
+    color: var(--sisman-primary);
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
 }
 
 /* Chart Type Selector */
@@ -545,30 +774,42 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     padding: 12px 16px;
     border: 2px solid var(--sisman-gray-300);
     border-radius: var(--sisman-radius);
     cursor: pointer;
     transition: var(--sisman-transition);
-    min-width: 90px;
+    min-width: 100px;
+    background: #fff;
 }
 
 .sisman-chart-type-option:hover {
     border-color: var(--sisman-primary-light);
-    background: var(--sisman-gray-100);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .sisman-chart-type-option.active,
 .sisman-chart-type-option:has(input:checked) {
-    border-color: var(--sisman-primary);
-    background: rgba(26, 86, 50, 0.05);
+    border-color: var(--sisman-accent);
+    background: rgba(52, 152, 219, 0.05);
+    box-shadow: 0 0 0 1px var(--sisman-accent);
 }
 
 .sisman-chart-type-option input[type="radio"] {
     position: absolute;
     opacity: 0;
     pointer-events: none;
+}
+
+.sisman-chart-type-icon {
+    width: 48px;
+    height: 48px;
+}
+
+.sisman-chart-type-icon svg {
+    width: 100%;
+    height: 100%;
 }
 
 .sisman-chart-type-option .dashicons {
@@ -582,6 +823,121 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--sisman-gray-800);
+    text-align: center;
+}
+
+/* Appearance table */
+.sisman-appearance-table th {
+    width: 200px;
+    padding: 12px 10px;
+}
+
+.sisman-appearance-table td {
+    padding: 12px 10px;
+}
+
+/* Color palette preview */
+.sisman-color-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.sisman-color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: inline-block;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    cursor: default;
+    transition: transform 0.2s;
+}
+
+.sisman-color-swatch:hover {
+    transform: scale(1.2);
+}
+
+/* Toolbar options */
+.sisman-toolbar-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.sisman-toolbar-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+/* Collapsible section */
+.sisman-collapsible {
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.sisman-collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 15px 20px;
+    cursor: pointer;
+}
+
+.sisman-collapsible-header .dashicons {
+    color: var(--sisman-gray-600);
+}
+
+.sisman-collapsible-header strong {
+    flex: 1;
+    font-size: 14px;
+}
+
+.sisman-collapsible-body {
+    padding: 0 20px 20px;
+}
+
+.sisman-collapsible-body textarea {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+}
+
+/* Chart Preview */
+.sisman-preview-container {
+    text-align: center;
+}
+
+.sisman-preview-container .button-primary {
+    margin-bottom: 15px;
+}
+
+.sisman-chart-preview-area {
+    min-height: 200px;
+    border: 1px dashed var(--sisman-gray-300);
+    border-radius: var(--sisman-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sisman-gray-100);
+}
+
+.sisman-preview-placeholder {
+    color: var(--sisman-gray-600);
+    font-style: italic;
+    padding: 40px;
+}
+
+.sisman-preview-data {
+    width: 100%;
+    padding: 15px;
+    text-align: left;
+}
+
+.sisman-preview-data table {
+    margin-top: 10px;
 }
 
 /* Custom Filters */
@@ -650,9 +1006,27 @@
         justify-content: center;
     }
 
+    .sisman-chart-type-option {
+        min-width: 80px;
+    }
+
     .sisman-modal-content {
         width: 95%;
         max-height: 90vh;
+    }
+
+    .sisman-import-steps {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .sisman-step-connector {
+        width: 2px;
+        height: 15px;
+    }
+
+    .sisman-toolbar-options {
+        flex-direction: column;
     }
 }
 

@@ -155,15 +155,13 @@ class Rest_Api {
             return new \WP_REST_Response( [ 'error' => 'Gráfico no encontrado' ], 404 );
         }
 
-        $plugin    = \Sisman_Suite::instance();
-        $data      = $plugin->visualizer->get_chart_data( $id );
+        $plugin = \Sisman_Suite::instance();
+        $data   = $plugin->visualizer->get_chart_data( $id );
+        $meta   = $plugin->visualizer->get_chart_meta( $id );
 
         return new \WP_REST_Response( [
-            'data'  => $data,
-            'meta'  => [
-                'title'      => get_the_title( $id ),
-                'chart_type' => get_post_meta( $id, '_sisman_chart_type', true ),
-            ],
+            'data' => $data,
+            'meta' => $meta,
         ] );
     }
 

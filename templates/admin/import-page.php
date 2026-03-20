@@ -129,12 +129,33 @@ $meses = [
                 </button>
             </div>
 
+            <!-- Step indicators -->
+            <div id="sisman-import-steps" class="sisman-import-steps" style="display:none;">
+                <div class="sisman-step" data-step="1">
+                    <div class="sisman-step-indicator">1</div>
+                    <span class="sisman-step-label"><?php esc_html_e( 'Ejecución Presupuestal', 'sisman-suite' ); ?></span>
+                </div>
+                <div class="sisman-step-connector"></div>
+                <div class="sisman-step" data-step="2">
+                    <div class="sisman-step-indicator">2</div>
+                    <span class="sisman-step-label"><?php esc_html_e( 'Auxiliar Presupuestal', 'sisman-suite' ); ?></span>
+                </div>
+                <div class="sisman-step-connector"></div>
+                <div class="sisman-step" data-step="3">
+                    <div class="sisman-step-indicator">3</div>
+                    <span class="sisman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sisman-suite' ); ?></span>
+                </div>
+            </div>
+
             <!-- Progress -->
             <div id="sisman-import-progress" class="sisman-progress-container" style="display:none;" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                <div class="sisman-progress-header">
+                    <span class="sisman-progress-text"><?php esc_html_e( 'Preparando importación...', 'sisman-suite' ); ?></span>
+                    <span class="sisman-progress-percent">0%</span>
+                </div>
                 <div class="sisman-progress-bar">
                     <div class="sisman-progress-fill" style="width:0%"></div>
                 </div>
-                <p class="sisman-progress-text"></p>
             </div>
 
             <!-- Results -->

@@ -55,11 +55,20 @@ class Visualizer {
     public function add_meta_boxes(): void {
         add_meta_box(
             'sisman_chart_config',
-            __( 'Configuración del Gráfico', 'sisman-suite' ),
+            __( 'Configuración de la Gráfica', 'sisman-suite' ),
             [ $this, 'render_chart_config' ],
             'sisman_chart',
             'normal',
             'high'
+        );
+
+        add_meta_box(
+            'sisman_chart_preview',
+            __( 'Vista Previa', 'sisman-suite' ),
+            [ $this, 'render_chart_preview' ],
+            'sisman_chart',
+            'normal',
+            'default'
         );
 
         add_meta_box(
@@ -77,6 +86,25 @@ class Visualizer {
      */
     public function render_chart_config( \WP_Post $post ): void {
         include SISMAN_SUITE_PATH . 'templates/admin/chart-config.php';
+    }
+
+    /**
+     * Render chart preview metabox.
+     */
+    public function render_chart_preview( \WP_Post $post ): void {
+        ?>
+        <div class="sisman-preview-container">
+            <button type="button" id="sisman-refresh-preview" class="button button-primary">
+                <span class="dashicons dashicons-update" aria-hidden="true"></span>
+                <?php esc_html_e( 'Actualizar Vista Previa', 'sisman-suite' ); ?>
+            </button>
+            <div id="sisman-chart-preview-area" class="sisman-chart-preview-area">
+                <p class="sisman-preview-placeholder">
+                    <?php esc_html_e( 'Configure la gráfica y haga clic en "Actualizar Vista Previa"', 'sisman-suite' ); ?>
+                </p>
+            </div>
+        </div>
+        <?php
     }
 
     /**
@@ -118,6 +146,15 @@ class Visualizer {
             'show_legend'      => 'sanitize_text_field',
             'show_labels'      => 'sanitize_text_field',
             'number_format'    => 'sanitize_text_field',
+            'y_axis_title'     => 'sanitize_text_field',
+            'x_axis_title'     => 'sanitize_text_field',
+            'show_timeline'    => 'sanitize_text_field',
+            'show_toolbar'     => 'sanitize_text_field',
+            'toolbar_detail'   => 'sanitize_text_field',
+            'toolbar_share'    => 'sanitize_text_field',
+            'toolbar_data'     => 'sanitize_text_field',
+            'toolbar_image'    => 'sanitize_text_field',
+            'toolbar_csv'      => 'sanitize_text_field',
         ];
 
         foreach ( $fields as $field => $sanitize ) {
@@ -126,6 +163,16 @@ class Visualizer {
                 update_post_meta( $post_id, "_sisman_{$field}", $value );
             } else {
                 delete_post_meta( $post_id, "_sisman_{$field}" );
+            }
+        }
+
+        // Handle custom query (sanitize but allow SQL)
+        if ( isset( $_POST['sisman_custom_query'] ) ) {
+            $query = sanitize_textarea_field( $_POST['sisman_custom_query'] );
+            if ( ! empty( $query ) ) {
+                update_post_meta( $post_id, '_sisman_custom_query', $query );
+            } else {
+                delete_post_meta( $post_id, '_sisman_custom_query' );
             }
         }
 
@@ -152,6 +199,12 @@ class Visualizer {
      */
     public function build_chart_query( int $chart_id ): ?string {
         global $wpdb;
+
+        // Check for custom query first
+        $custom_query = get_post_meta( $chart_id, '_sisman_custom_query', true );
+        if ( ! empty( $custom_query ) ) {
+            return $custom_query;
+        }
 
         $table     = get_post_meta( $chart_id, '_sisman_data_table', true );
         $group_col = get_post_meta( $chart_id, '_sisman_group_column', true );
@@ -258,6 +311,30 @@ class Visualizer {
         $results = $wpdb->get_results( $query, ARRAY_A );
 
         return $results ?: [];
+    }
+
+    /**
+     * Get all chart meta for frontend rendering.
+     */
+    public function get_chart_meta( int $chart_id ): array {
+        return [
+            'title'          => get_the_title( $chart_id ),
+            'chart_type'     => get_post_meta( $chart_id, '_sisman_chart_type', true ) ?: 'bar',
+            'chart_height'   => (int) ( get_post_meta( $chart_id, '_sisman_chart_height', true ) ?: 400 ),
+            'chart_colors'   => get_post_meta( $chart_id, '_sisman_chart_colors', true ) ?: '#844e80,#ff7300,#ffc53b,#3eba6a,#0080c3,#e74c3c,#9b59b6,#1abc9c',
+            'show_legend'    => get_post_meta( $chart_id, '_sisman_show_legend', true ) === 'yes',
+            'show_labels'    => get_post_meta( $chart_id, '_sisman_show_labels', true ) !== 'no',
+            'number_format'  => get_post_meta( $chart_id, '_sisman_number_format', true ) ?: 'colombian',
+            'y_axis_title'   => get_post_meta( $chart_id, '_sisman_y_axis_title', true ) ?: '',
+            'x_axis_title'   => get_post_meta( $chart_id, '_sisman_x_axis_title', true ) ?: '',
+            'show_timeline'  => get_post_meta( $chart_id, '_sisman_show_timeline', true ) === 'yes',
+            'show_toolbar'   => get_post_meta( $chart_id, '_sisman_show_toolbar', true ) !== '',
+            'toolbar_detail' => get_post_meta( $chart_id, '_sisman_toolbar_detail', true ) === 'yes',
+            'toolbar_share'  => get_post_meta( $chart_id, '_sisman_toolbar_share', true ) === 'yes',
+            'toolbar_data'   => get_post_meta( $chart_id, '_sisman_toolbar_data', true ) === 'yes',
+            'toolbar_image'  => get_post_meta( $chart_id, '_sisman_toolbar_image', true ) === 'yes',
+            'toolbar_csv'    => get_post_meta( $chart_id, '_sisman_toolbar_csv', true ) === 'yes',
+        ];
     }
 
     /**

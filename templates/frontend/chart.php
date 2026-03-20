@@ -3,12 +3,20 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-$chart_type    = get_post_meta( $id, '_sisman_chart_type', true ) ?: 'bar';
-$chart_height  = (int) ( get_post_meta( $id, '_sisman_chart_height', true ) ?: 400 );
-$show_legend   = get_post_meta( $id, '_sisman_show_legend', true ) !== 'no';
-$show_labels   = get_post_meta( $id, '_sisman_show_labels', true ) !== 'no';
-$number_format = get_post_meta( $id, '_sisman_number_format', true ) ?: 'colombian';
-$title         = get_the_title( $id );
+$plugin = Sisman_Suite::instance();
+$meta   = $plugin->visualizer->get_chart_meta( $id );
+
+$chart_type    = $meta['chart_type'];
+$chart_height  = $meta['chart_height'];
+$chart_colors  = $meta['chart_colors'];
+$show_legend   = $meta['show_legend'];
+$show_labels   = $meta['show_labels'];
+$number_format = $meta['number_format'];
+$y_axis_title  = $meta['y_axis_title'];
+$x_axis_title  = $meta['x_axis_title'];
+$show_timeline = $meta['show_timeline'];
+$show_toolbar  = $meta['show_toolbar'];
+$title         = $meta['title'];
 ?>
 
 <div class="sisman-chart-wrapper"
@@ -16,33 +24,51 @@ $title         = get_the_title( $id );
      data-chart-id="<?php echo esc_attr( $id ); ?>"
      data-chart-type="<?php echo esc_attr( $chart_type ); ?>"
      data-chart-height="<?php echo esc_attr( $chart_height ); ?>"
+     data-chart-colors="<?php echo esc_attr( $chart_colors ); ?>"
      data-show-legend="<?php echo esc_attr( $show_legend ? 'true' : 'false' ); ?>"
      data-show-labels="<?php echo esc_attr( $show_labels ? 'true' : 'false' ); ?>"
      data-number-format="<?php echo esc_attr( $number_format ); ?>"
+     data-y-axis-title="<?php echo esc_attr( $y_axis_title ); ?>"
+     data-x-axis-title="<?php echo esc_attr( $x_axis_title ); ?>"
+     data-show-timeline="<?php echo esc_attr( $show_timeline ? 'true' : 'false' ); ?>"
      role="figure"
      aria-label="<?php echo esc_attr( sprintf( __( 'Gráfico: %s', 'sisman-suite' ), $title ) ); ?>">
 
+    <?php if ( $show_toolbar ) : ?>
     <!-- Toolbar -->
     <div class="sisman-chart-toolbar" role="toolbar" aria-label="<?php esc_attr_e( 'Herramientas del gráfico', 'sisman-suite' ); ?>">
         <h3 class="sisman-chart-title"><?php echo esc_html( $title ); ?></h3>
         <div class="sisman-chart-actions">
+            <?php if ( $meta['toolbar_detail'] ) : ?>
             <button type="button" class="sisman-btn sisman-btn-data" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Ver datos', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Ver datos', 'sisman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-editor-table"></span>
             </button>
+            <?php endif; ?>
+
+            <?php if ( $meta['toolbar_csv'] ) : ?>
             <button type="button" class="sisman-btn sisman-btn-download" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar CSV', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar CSV', 'sisman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-download"></span>
             </button>
+            <?php endif; ?>
+
+            <?php if ( $meta['toolbar_image'] ) : ?>
             <button type="button" class="sisman-btn sisman-btn-image" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar imagen', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar imagen', 'sisman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-format-image"></span>
             </button>
+            <?php endif; ?>
+
+            <?php if ( $meta['toolbar_share'] ) : ?>
             <button type="button" class="sisman-btn sisman-btn-share" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Compartir', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Compartir', 'sisman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-share"></span>
             </button>
+            <?php endif; ?>
+
             <button type="button" class="sisman-btn sisman-btn-fullscreen" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Pantalla completa', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Pantalla completa', 'sisman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-fullscreen-alt"></span>
             </button>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Chart Container -->
     <div class="sisman-chart-container" style="height: <?php echo esc_attr( $chart_height ); ?>px;">

@@ -29,6 +29,7 @@ $options = [
     'sisman_api_mes',
     'sisman_import_frequency',
     'sisman_last_import',
+    'sisman_update_notice_dismissed',
 ];
 
 foreach ( $options as $option ) {
@@ -37,6 +38,7 @@ foreach ( $options as $option ) {
 
 // Delete transients
 delete_transient( 'sisman_import_status' );
+delete_transient( 'sisman_suite_update_info' );
 
 // Delete chart CPT posts
 $charts = get_posts( [

@@ -15,9 +15,23 @@
             this.showLegend = wrapper.dataset.showLegend === 'true';
             this.showLabels = wrapper.dataset.showLabels === 'true';
             this.numberFormat = wrapper.dataset.numberFormat || 'colombian';
+            this.yAxisTitle = wrapper.dataset.yAxisTitle || '';
+            this.xAxisTitle = wrapper.dataset.xAxisTitle || '';
             this.canvas = wrapper.querySelector('.sisman-chart-canvas');
             this.loading = wrapper.querySelector('.sisman-chart-loading');
             this.data = [];
+
+            // Parse custom color palette
+            const colorStr = wrapper.dataset.chartColors || '';
+            this.colors = colorStr
+                ? colorStr.split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c))
+                : [];
+            if (this.colors.length === 0) {
+                this.colors = [
+                    '#844e80', '#ff7300', '#ffc53b', '#3eba6a',
+                    '#0080c3', '#e74c3c', '#9b59b6', '#1abc9c',
+                ];
+            }
 
             this.init();
         }
@@ -64,12 +78,8 @@
                 value: parseFloat(d.value) || 0,
             }));
 
-            // Color palette inspired by Gobernación de Nariño
-            const colors = [
-                '#1a5632', '#2d7a4a', '#3498db', '#c8a415',
-                '#e74c3c', '#9b59b6', '#1abc9c', '#e67e22',
-                '#2c3e50', '#27ae60', '#f39c12', '#8e44ad',
-            ];
+            const colors = this.colors;
+            const formatNumber = (num) => this.formatNumber(num);
 
             const config = {
                 data: chartData,
@@ -77,8 +87,14 @@
                 height: this.chartHeight,
             };
 
-            // Apply number formatting
-            const formatNumber = (num) => this.formatNumber(num);
+            // Add axis titles if provided
+            const axisConfig = {};
+            if (this.yAxisTitle) {
+                axisConfig.yConfig = { title: this.yAxisTitle };
+            }
+            if (this.xAxisTitle) {
+                axisConfig.xConfig = { title: this.xAxisTitle };
+            }
 
             try {
                 switch (this.chartType) {
@@ -87,6 +103,7 @@
                             .select(this.canvas)
                             .config({
                                 ...config,
+                                ...axisConfig,
                                 x: 'label',
                                 y: 'value',
                                 tooltipConfig: {
@@ -104,6 +121,7 @@
                             .select(this.canvas)
                             .config({
                                 ...config,
+                                ...axisConfig,
                                 x: 'label',
                                 y: 'value',
                                 tooltipConfig: {
@@ -118,6 +136,7 @@
                             .select(this.canvas)
                             .config({
                                 ...config,
+                                ...axisConfig,
                                 x: 'label',
                                 y: 'value',
                             })
@@ -164,6 +183,7 @@
                             .select(this.canvas)
                             .config({
                                 ...config,
+                                ...axisConfig,
                                 x: 'label',
                                 y: 'value',
                                 stacked: this.chartType === 'stacked_bar',

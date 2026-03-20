@@ -34,9 +34,14 @@
             }
 
             // Disable button and show progress
-            btn.prop('disabled', true).text(sismanAdmin.strings.importing);
+            btn.prop('disabled', true).html(
+                '<span class="dashicons dashicons-update sisman-spin"></span> ' + sismanAdmin.strings.importing
+            );
             progress.show();
             results.hide().empty();
+
+            // Reset progress bar
+            this.setProgress(0, 'Preparando importación...');
 
             const data = {
                 action: 'sisman_start_import',
@@ -48,15 +53,18 @@
                 tipo_cpte: $('#sisman-tipo-cpte').val(),
             };
 
-            // Show progress animation
-            this.animateProgress(progress);
+            // Start polling for status updates
+            this.statusInterval = setInterval(() => this.pollStatus(), 1500);
 
             $.ajax({
                 url: sismanAdmin.ajaxUrl,
                 type: 'POST',
                 data: data,
-                timeout: 300000, // 5 minutes
+                timeout: 600000, // 10 minutes
                 success: (response) => {
+                    this.stopPolling();
+                    this.setProgress(100, sismanAdmin.strings.complete);
+
                     if (response.success) {
                         this.showResults(response.data.results, 'success');
                     } else {
@@ -67,45 +75,85 @@
                     }
                 },
                 error: (xhr, status, error) => {
-                    this.showResults(
-                        { error: `${sismanAdmin.strings.error}: ${error || status}` },
-                        'error'
-                    );
+                    this.stopPolling();
+
+                    let errorMsg = sismanAdmin.strings.error;
+                    if (status === 'timeout') {
+                        errorMsg = 'La importación excedió el tiempo máximo de espera. Revise los logs para más detalles.';
+                    } else if (error) {
+                        errorMsg += ': ' + error;
+                    }
+
+                    this.showResults({ error: errorMsg }, 'error');
                 },
                 complete: () => {
                     btn.prop('disabled', false).html(
                         '<span class="dashicons dashicons-download"></span> Iniciar Importación'
                     );
-                    this.completeProgress(progress);
+                    setTimeout(() => progress.fadeOut(400), 2500);
                 },
             });
         },
 
-        animateProgress(container) {
-            const fill = container.find('.sisman-progress-fill');
-            const text = container.find('.sisman-progress-text');
-            let width = 0;
+        pollStatus() {
+            $.ajax({
+                url: sismanAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sisman_import_status',
+                    nonce: sismanAdmin.nonce,
+                },
+                success: (response) => {
+                    if (response.success && response.data.running) {
+                        const d = response.data;
+                        const pct = Math.round((d.step / d.total) * 100);
+                        const stepLabel = d.report_label ? ` - ${d.report_label}` : '';
+                        this.setProgress(
+                            Math.min(pct, 95),
+                            `Paso ${d.step} de ${d.total}${stepLabel}: ${d.message}`
+                        );
 
-            this.progressInterval = setInterval(() => {
-                if (width < 90) {
-                    width += Math.random() * 10;
-                    width = Math.min(width, 90);
-                    fill.css('width', width + '%');
-                    container.attr('aria-valuenow', Math.round(width));
-                    text.text(`Importando datos... ${Math.round(width)}%`);
-                }
-            }, 500);
+                        // Update step indicators
+                        this.updateStepIndicators(d);
+                    }
+                },
+            });
         },
 
-        completeProgress(container) {
-            clearInterval(this.progressInterval);
+        stopPolling() {
+            if (this.statusInterval) {
+                clearInterval(this.statusInterval);
+                this.statusInterval = null;
+            }
+        },
+
+        setProgress(percent, message) {
+            const container = $('#sisman-import-progress');
             const fill = container.find('.sisman-progress-fill');
             const text = container.find('.sisman-progress-text');
-            fill.css('width', '100%');
-            container.attr('aria-valuenow', 100);
-            text.text(sismanAdmin.strings.complete);
+            const pctLabel = container.find('.sisman-progress-percent');
 
-            setTimeout(() => container.fadeOut(), 2000);
+            fill.css('width', percent + '%');
+            container.attr('aria-valuenow', Math.round(percent));
+            text.text(message || '');
+            if (pctLabel.length) {
+                pctLabel.text(Math.round(percent) + '%');
+            }
+        },
+
+        updateStepIndicators(data) {
+            const steps = $('#sisman-import-steps');
+            if (steps.length === 0) return;
+
+            steps.find('.sisman-step').each(function (index) {
+                const stepNum = index + 1;
+                $(this).removeClass('active completed');
+                if (stepNum < data.step) {
+                    $(this).addClass('completed');
+                } else if (stepNum === data.step) {
+                    $(this).addClass('active');
+                }
+            });
         },
 
         showResults(data, type) {
@@ -113,36 +161,86 @@
             container.removeClass('success error').addClass(type).empty();
 
             if (type === 'error') {
-                const p = $('<p><strong></strong></p>');
-                p.find('strong').text(data.error);
-                container.append(p);
+                container.append(
+                    $('<div class="sisman-result-header error">').html(
+                        '<span class="dashicons dashicons-warning"></span> ' +
+                        '<strong>Error en la importación</strong>'
+                    )
+                );
+                container.append($('<p>').text(data.error));
             } else {
-                container.append($('<h3>').text('Resultados de la Importación'));
+                container.append(
+                    $('<div class="sisman-result-header success">').html(
+                        '<span class="dashicons dashicons-yes-alt"></span> ' +
+                        '<strong>Importación completada exitosamente</strong>'
+                    )
+                );
+
                 const reportLabels = {
                     ejecucion: 'Ejecución Presupuestal de Gastos',
                     auxiliar: 'Auxiliar Presupuestal por Cuentas',
                     plan: 'Plan Presupuestal',
                 };
 
+                const table = $('<table class="sisman-results-table"><thead><tr>' +
+                    '<th>Informe</th><th>Estado</th><th>Registros</th><th>Detalles</th>' +
+                    '</tr></thead><tbody></tbody></table>');
+
+                let totalImported = 0;
+                let totalRecords = 0;
+                let hasErrors = false;
+
                 for (const [key, result] of Object.entries(data)) {
                     const label = reportLabels[key] || key;
-                    const item = $('<div class="sisman-result-item"></div>');
-                    item.append($('<span>').text(label));
+                    const row = $('<tr>');
+                    row.append($('<td>').text(label));
+
                     if (result.success) {
-                        item.append($('<span>').html(`<strong>${parseInt(result.imported)}</strong> / ${parseInt(result.total)} registros importados`));
+                        const imported = parseInt(result.imported) || 0;
+                        const total = parseInt(result.total) || 0;
+                        totalImported += imported;
+                        totalRecords += total;
+
+                        row.append($('<td>').html('<span class="sisman-badge success">OK</span>'));
+                        row.append($('<td>').html(`<strong>${imported.toLocaleString('es-CO')}</strong> / ${total.toLocaleString('es-CO')}`));
+                        row.append($('<td>').text(imported === total ? 'Todos importados' : `${total - imported} omitidos (duplicados)`));
                     } else {
-                        item.append($('<span style="color:#721c24;">').text('Error: ' + (result.error || 'desconocido')));
+                        hasErrors = true;
+                        row.append($('<td>').html('<span class="sisman-badge error">Error</span>'));
+                        row.append($('<td>').text('-'));
+                        row.append($('<td>').text(result.error || 'Error desconocido'));
                     }
+
+                    table.find('tbody').append(row);
                 }
 
-                    container.append(item);
+                // Summary row
+                if (Object.keys(data).length > 1) {
+                    table.find('tbody').append(
+                        $('<tr class="sisman-result-total">').html(
+                            `<td><strong>Total</strong></td><td></td>` +
+                            `<td><strong>${totalImported.toLocaleString('es-CO')}</strong> / ${totalRecords.toLocaleString('es-CO')}</td>` +
+                            `<td></td>`
+                        )
+                    );
+                }
+
+                container.append(table);
+
+                if (hasErrors) {
+                    container.append(
+                        $('<p class="sisman-result-note">').html(
+                            '<span class="dashicons dashicons-info"></span> ' +
+                            'Algunos informes presentaron errores. Revise los <a href="?page=sisman-logs">logs</a> para más detalles.'
+                        )
+                    );
                 }
             }
 
             container.show();
 
-            // Reload stats after 2s
-            setTimeout(() => location.reload(), 3000);
+            // Reload page after delay to update stats
+            setTimeout(() => location.reload(), 4000);
         },
     };
 
