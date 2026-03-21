@@ -1,5 +1,5 @@
 /**
- * SYSMAN Suite - Admin Styles v1.3.0
+ * SYSMAN Suite - Admin Styles v1.4.0
  * Gobernación de Nariño
  */
 
@@ -1269,6 +1269,43 @@
     color: var(--sysman-danger) !important;
     border-color: var(--sysman-danger) !important;
     min-width: 30px;
+}
+
+/* Field Guidance */
+.sysman-field-guidance {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-left: 4px solid var(--sysman-warning, #f39c12);
+    border-radius: var(--sysman-radius-sm, 6px);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sysman-gray-800, #343a40);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.sysman-field-guidance .dashicons {
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.sysman-column-hint {
+    font-size: 12px !important;
+    margin-top: 4px !important;
+    color: var(--sysman-gray-600, #6c757d) !important;
+    font-style: italic;
+}
+
+/* Chart Preview Area (admin) */
+#sysman-chart-preview-area svg {
+    max-width: 100%;
+}
+
+#sysman-admin-preview-canvas {
+    padding: 10px;
 }
 
 /* ========================================

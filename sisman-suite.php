@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '1.3.0' );
+define( 'SYSMAN_SUITE_VERSION', '1.4.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -239,10 +239,14 @@ final class Sysman_Suite {
         // Chart config assets for CPT edit screen
         $screen = get_current_screen();
         if ( $screen && 'sysman_chart' === $screen->post_type ) {
+            // D3.js and D3plus for live admin preview
+            wp_enqueue_script( 'd3-v5', 'https://d3js.org/d3.v5.min.js', [], '5.16.0', true );
+            wp_enqueue_script( 'd3plus', 'https://d3plus.org/js/d3plus.v2.0.full.min.js', [ 'd3-v5' ], '2.0.0', true );
+
             wp_enqueue_script(
                 'sysman-admin-charts',
                 SYSMAN_SUITE_URL . 'assets/js/admin-charts.js',
-                [ 'jquery' ],
+                [ 'jquery', 'd3-v5', 'd3plus' ],
                 SYSMAN_SUITE_VERSION,
                 true
             );

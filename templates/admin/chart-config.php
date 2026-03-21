@@ -72,6 +72,12 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             <?php esc_html_e( 'Fuente de Datos', 'sysman-suite' ); ?>
         </h3>
 
+        <!-- Field guidance hint -->
+        <div id="sysman-field-guidance" class="sysman-field-guidance" style="display:none;">
+            <span class="dashicons dashicons-lightbulb" aria-hidden="true" style="color:var(--sysman-warning,#f39c12);"></span>
+            <span id="sysman-field-guidance-text"></span>
+        </div>
+
         <div class="sysman-form-row">
             <div class="sysman-form-group">
                 <label for="sysman_data_table"><?php esc_html_e( 'Tabla', 'sysman-suite' ); ?></label>
@@ -90,6 +96,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                 <select id="sysman_group_column" name="sysman_group_column">
                     <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
                 </select>
+                <p class="description sysman-column-hint" id="sysman-group-hint"></p>
             </div>
 
             <div class="sysman-form-group">
@@ -97,6 +104,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                 <select id="sysman_value_column" name="sysman_value_column">
                     <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
                 </select>
+                <p class="description sysman-column-hint" id="sysman-value-hint"></p>
             </div>
 
             <div class="sysman-form-group">

@@ -21,6 +21,10 @@ class Visualizer {
         add_shortcode( 'sysman_chart', [ $this, 'render_shortcode' ] );
 
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_frontend_assets' ] );
+
+        // Custom columns for chart list table
+        add_filter( 'manage_sysman_chart_posts_columns', [ $this, 'set_chart_columns' ] );
+        add_action( 'manage_sysman_chart_posts_custom_column', [ $this, 'render_chart_column' ], 10, 2 );
     }
 
     /**
@@ -94,13 +98,16 @@ class Visualizer {
     public function render_chart_preview( \WP_Post $post ): void {
         ?>
         <div class="sysman-preview-container">
-            <button type="button" id="sysman-refresh-preview" class="button button-primary">
-                <span class="dashicons dashicons-update" aria-hidden="true"></span>
-                <?php esc_html_e( 'Actualizar Vista Previa', 'sysman-suite' ); ?>
-            </button>
-            <div id="sysman-chart-preview-area" class="sysman-chart-preview-area">
-                <p class="sysman-preview-placeholder">
-                    <?php esc_html_e( 'Configure la gráfica y haga clic en "Actualizar Vista Previa"', 'sysman-suite' ); ?>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+                <button type="button" id="sysman-refresh-preview" class="button button-primary">
+                    <span class="dashicons dashicons-update" aria-hidden="true" style="margin-top:3px;"></span>
+                    <?php esc_html_e( 'Actualizar Vista Previa', 'sysman-suite' ); ?>
+                </button>
+                <span id="sysman-preview-status" style="color:var(--sysman-gray-600,#6c757d);font-size:12px;"></span>
+            </div>
+            <div id="sysman-chart-preview-area" class="sysman-chart-preview-area" style="min-height:350px;background:#fff;border:1px solid #e2e4e7;border-radius:6px;overflow:hidden;">
+                <p class="sysman-preview-placeholder" style="text-align:center;padding:80px 20px;color:#999;">
+                    <?php esc_html_e( 'Configure la gráfica y haga clic en "Actualizar Vista Previa" para ver el gráfico D3plus.', 'sysman-suite' ); ?>
                 </p>
             </div>
         </div>
@@ -356,6 +363,52 @@ class Visualizer {
         ob_start();
         include SYSMAN_SUITE_PATH . 'templates/frontend/chart.php';
         return ob_get_clean();
+    }
+
+    /**
+     * Define custom columns for chart list table.
+     */
+    public function set_chart_columns( array $columns ): array {
+        $new = [];
+        $new['cb']             = $columns['cb'];
+        $new['title']          = __( 'Nombre', 'sysman-suite' );
+        $new['chart_type']     = __( 'Tipo', 'sysman-suite' );
+        $new['chart_shortcode'] = __( 'Shortcode', 'sysman-suite' );
+        $new['date']           = __( 'Fecha', 'sysman-suite' );
+        return $new;
+    }
+
+    /**
+     * Render custom column content for chart list table.
+     */
+    public function render_chart_column( string $column, int $post_id ): void {
+        switch ( $column ) {
+            case 'chart_type':
+                $type   = get_post_meta( $post_id, '_sysman_chart_type', true ) ?: 'bar';
+                $labels = [
+                    'bar'         => __( 'Barras', 'sysman-suite' ),
+                    'line'        => __( 'Líneas', 'sysman-suite' ),
+                    'area'        => __( 'Área', 'sysman-suite' ),
+                    'pie'         => __( 'Pie / Torta', 'sysman-suite' ),
+                    'donut'       => __( 'Donut', 'sysman-suite' ),
+                    'treemap'     => __( 'Treemap', 'sysman-suite' ),
+                    'stacked_bar' => __( 'Barras Apiladas', 'sysman-suite' ),
+                    'grouped_bar' => __( 'Barras Agrupadas', 'sysman-suite' ),
+                ];
+                $icons = [
+                    'bar' => 'chart-bar', 'line' => 'chart-line', 'area' => 'chart-area',
+                    'pie' => 'chart-pie', 'donut' => 'chart-pie', 'treemap' => 'screenoptions',
+                    'stacked_bar' => 'chart-bar', 'grouped_bar' => 'chart-bar',
+                ];
+                $icon = $icons[ $type ] ?? 'chart-bar';
+                echo '<span class="dashicons dashicons-' . esc_attr( $icon ) . '" style="color:var(--sysman-primary,#1a5632);vertical-align:middle;margin-right:4px;"></span>';
+                echo esc_html( $labels[ $type ] ?? $type );
+                break;
+
+            case 'chart_shortcode':
+                echo '<code style="background:#f0f0f0;padding:3px 8px;border-radius:3px;font-size:12px;user-select:all;">[sysman_chart id="' . esc_attr( $post_id ) . '"]</code>';
+                break;
+        }
     }
 
     /**
