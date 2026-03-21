@@ -541,10 +541,48 @@
     };
 
     /* ========================================
+       Dashboard Helpers
+       ======================================== */
+    const DashboardManager = {
+        init() {
+            this.bindEvents();
+        },
+
+        bindEvents() {
+            // Collapsible sections (API docs, etc.)
+            $(document).on('click', '.sysman-card-header--collapsible', function () {
+                const card = $(this).closest('.sysman-card');
+                const body = card.find('.sysman-collapsible-content');
+                const btn = $(this).find('.sysman-toggle-btn');
+                body.slideToggle(200);
+                if (body.is(':visible')) {
+                    btn.text('Colapsar');
+                } else {
+                    btn.text('Expandir');
+                }
+            });
+
+            // Show/hide step indicators based on report selection
+            const report = $('#sysman-report');
+            if (report.length) {
+                report.on('change', function () {
+                    const val = $(this).val();
+                    if (val === 'all') {
+                        $('#sysman-import-steps').show();
+                    } else {
+                        $('#sysman-import-steps').hide();
+                    }
+                });
+            }
+        },
+    };
+
+    /* ========================================
        Initialize
        ======================================== */
     $(document).ready(() => {
         ImportManager.init();
         RecordsManager.init();
+        DashboardManager.init();
     });
 })(jQuery);

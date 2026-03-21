@@ -371,6 +371,29 @@ class Database {
     }
 
     /**
+     * Check which tables actually exist in the database.
+     */
+    public function check_tables_status(): array {
+        $result = [
+            'all_exist'      => true,
+            'existing_count' => 0,
+            'tables'         => [],
+        ];
+
+        foreach ( array_keys( $this->get_available_tables() ) as $table ) {
+            $exists = $this->ensure_table_exists( $table );
+            $result['tables'][ $table ] = $exists;
+            if ( $exists ) {
+                $result['existing_count']++;
+            } else {
+                $result['all_exist'] = false;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Get record counts for all tables.
      */
     public function get_stats(): array {
@@ -378,8 +401,11 @@ class Database {
 
         $stats = [];
         foreach ( $this->get_available_tables() as $table => $label ) {
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+            $count = 0;
+            if ( $this->ensure_table_exists( $table ) ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+            }
             $stats[ $table ] = [
                 'label' => $label,
                 'count' => $count,

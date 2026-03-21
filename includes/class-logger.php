@@ -18,6 +18,17 @@ class Logger {
 
     public function __construct() {
         $this->log_file = SYSMAN_SUITE_PATH . 'logs/import.log';
+        $this->ensure_log_dir();
+    }
+
+    /**
+     * Ensure the log directory exists.
+     */
+    private function ensure_log_dir(): void {
+        $dir = dirname( $this->log_file );
+        if ( ! is_dir( $dir ) ) {
+            wp_mkdir_p( $dir );
+        }
     }
 
     /**

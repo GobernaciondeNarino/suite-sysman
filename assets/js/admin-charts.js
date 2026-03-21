@@ -35,28 +35,15 @@
             // Color palette preview
             $('#sysman_chart_colors').on('input change', () => this.updateColorPreview());
 
-            // Collapsible sections
+            // Preview button
+            $('#sysman-refresh-preview').on('click', () => this.refreshPreview());
+
+            // Collapsible toggle (chart config page)
             $(document).on('click', '.sysman-toggle-section', function () {
                 const body = $(this).closest('.sysman-collapsible').find('.sysman-collapsible-body');
                 body.slideToggle(200);
                 $(this).text(body.is(':visible') ? 'Colapsar' : 'Expandir');
             });
-
-            // Preview button
-            $('#sysman-refresh-preview').on('click', () => this.refreshPreview());
-
-            // Show/hide step indicators on import page
-            const report = $('#sysman-report');
-            if (report.length) {
-                report.on('change', () => {
-                    const val = report.val();
-                    if (val === 'all') {
-                        $('#sysman-import-steps').show();
-                    } else {
-                        $('#sysman-import-steps').hide();
-                    }
-                });
-            }
         },
 
         loadColumns() {

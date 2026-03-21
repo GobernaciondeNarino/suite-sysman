@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     1.1.0
+ * Version:     1.3.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '1.1.0' );
+define( 'SYSMAN_SUITE_VERSION', '1.3.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -78,6 +78,7 @@ final class Sysman_Suite {
         add_action( 'admin_menu', [ $this, 'admin_menu' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'admin_assets' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
+        add_action( 'admin_init', [ $this, 'maybe_create_tables' ] );
 
         // Cron
         add_action( 'sysman_scheduled_import', [ $this->importer, 'run_scheduled_import' ] );
@@ -95,12 +96,24 @@ final class Sysman_Suite {
             $frequency = get_option( 'sysman_import_frequency', 'daily' );
             wp_schedule_event( time(), $frequency, 'sysman_scheduled_import' );
         }
+        update_option( 'sysman_db_version', SYSMAN_SUITE_VERSION );
         flush_rewrite_rules();
     }
 
     public function deactivate(): void {
         wp_clear_scheduled_hook( 'sysman_scheduled_import' );
         flush_rewrite_rules();
+    }
+
+    /**
+     * Ensure tables exist on every admin load if they're missing.
+     */
+    public function maybe_create_tables(): void {
+        $db_version = get_option( 'sysman_db_version', '0' );
+        if ( version_compare( $db_version, SYSMAN_SUITE_VERSION, '<' ) ) {
+            $this->database->create_tables();
+            update_option( 'sysman_db_version', SYSMAN_SUITE_VERSION );
+        }
     }
 
     public function add_cron_schedules( array $schedules ): array {
@@ -121,9 +134,18 @@ final class Sysman_Suite {
             __( 'SYSMAN Suite', 'sysman-suite' ),
             'manage_options',
             'sysman-suite',
-            [ $this, 'render_import_page' ],
+            [ $this, 'render_dashboard_page' ],
             'dashicons-chart-area',
             30
+        );
+
+        add_submenu_page(
+            'sysman-suite',
+            __( 'Panel de Control', 'sysman-suite' ),
+            __( 'Panel de Control', 'sysman-suite' ),
+            'manage_options',
+            'sysman-suite',
+            [ $this, 'render_dashboard_page' ]
         );
 
         add_submenu_page(
@@ -131,7 +153,7 @@ final class Sysman_Suite {
             __( 'Importar Datos', 'sysman-suite' ),
             __( 'Importar Datos', 'sysman-suite' ),
             'manage_options',
-            'sysman-suite',
+            'sysman-import',
             [ $this, 'render_import_page' ]
         );
 
@@ -146,12 +168,16 @@ final class Sysman_Suite {
 
         add_submenu_page(
             'sysman-suite',
-            __( 'Registros', 'sysman-suite' ),
+            __( 'Logs', 'sysman-suite' ),
             __( 'Logs', 'sysman-suite' ),
             'manage_options',
             'sysman-logs',
             [ $this, 'render_logs_page' ]
         );
+    }
+
+    public function render_dashboard_page(): void {
+        include SYSMAN_SUITE_PATH . 'templates/admin/dashboard-page.php';
     }
 
     public function render_import_page(): void {
@@ -169,6 +195,7 @@ final class Sysman_Suite {
     public function admin_assets( string $hook ): void {
         $plugin_pages = [
             'toplevel_page_sysman-suite',
+            'sysman-suite_page_sysman-import',
             'sysman-suite_page_sysman-records',
             'sysman-suite_page_sysman-logs',
         ];

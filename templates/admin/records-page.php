@@ -23,93 +23,112 @@ $meses = [
 ];
 ?>
 <div class="wrap sysman-admin-wrap">
-    <h1 class="sysman-title">
-        <span aria-hidden="true" class="dashicons dashicons-list-view"></span>
-        <?php esc_html_e( 'SYSMAN Suite - Registros', 'sysman-suite' ); ?>
-    </h1>
 
-    <!-- Table Selector and Filters -->
-    <div class="sysman-panel" role="region" aria-label="<?php esc_attr_e( 'Filtros de registros', 'sysman-suite' ); ?>">
-        <div class="sysman-filters-row">
-            <div class="sysman-form-group">
-                <label for="sysman-table-select"><?php esc_html_e( 'Tabla', 'sysman-suite' ); ?></label>
-                <select id="sysman-table-select">
-                    <?php foreach ( $tables as $table_name => $label ) : ?>
-                    <option value="<?php echo esc_attr( str_replace( $GLOBALS['wpdb']->prefix, '', $table_name ) ); ?>">
-                        <?php echo esc_html( $label ); ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
+    <!-- Header -->
+    <div class="sysman-page-header">
+        <div class="sysman-page-header-content">
+            <div class="sysman-header-logo">
+                <span class="dashicons dashicons-list-view" aria-hidden="true" style="font-size:32px;width:32px;height:32px;color:#1a5632;"></span>
             </div>
-
-            <div class="sysman-form-group">
-                <label for="sysman-filter-anio"><?php esc_html_e( 'Año', 'sysman-suite' ); ?></label>
-                <select id="sysman-filter-anio">
-                    <option value="0"><?php esc_html_e( 'Todos', 'sysman-suite' ); ?></option>
-                </select>
+            <div>
+                <h1 class="sysman-page-title"><?php esc_html_e( 'Registros', 'sysman-suite' ); ?></h1>
+                <p class="sysman-page-subtitle"><?php esc_html_e( 'Explorar y exportar datos presupuestales almacenados', 'sysman-suite' ); ?></p>
             </div>
+        </div>
+    </div>
 
-            <div class="sysman-form-group">
-                <label for="sysman-filter-mes"><?php esc_html_e( 'Mes', 'sysman-suite' ); ?></label>
-                <select id="sysman-filter-mes">
-                    <?php foreach ( $meses as $num => $nombre ) : ?>
-                    <option value="<?php echo esc_attr( $num ); ?>"><?php echo esc_html( $nombre ); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+    <!-- Filters -->
+    <div class="sysman-card">
+        <div class="sysman-card-header">
+            <h2>
+                <span class="dashicons dashicons-filter" aria-hidden="true"></span>
+                <?php esc_html_e( 'Filtros', 'sysman-suite' ); ?>
+            </h2>
+        </div>
+        <div class="sysman-card-body">
+            <div class="sysman-filters-row">
+                <div class="sysman-form-group">
+                    <label for="sysman-table-select"><?php esc_html_e( 'Tabla', 'sysman-suite' ); ?></label>
+                    <select id="sysman-table-select">
+                        <?php foreach ( $tables as $table_name => $label ) : ?>
+                        <option value="<?php echo esc_attr( str_replace( $GLOBALS['wpdb']->prefix, '', $table_name ) ); ?>">
+                            <?php echo esc_html( $label ); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
 
-            <div class="sysman-form-group">
-                <label for="sysman-filter-search"><?php esc_html_e( 'Buscar', 'sysman-suite' ); ?></label>
-                <input type="search" id="sysman-filter-search" placeholder="<?php esc_attr_e( 'Buscar...', 'sysman-suite' ); ?>" class="regular-text">
-            </div>
+                <div class="sysman-form-group">
+                    <label for="sysman-filter-anio"><?php esc_html_e( 'Año', 'sysman-suite' ); ?></label>
+                    <select id="sysman-filter-anio">
+                        <option value="0"><?php esc_html_e( 'Todos', 'sysman-suite' ); ?></option>
+                    </select>
+                </div>
 
-            <div class="sysman-form-group sysman-form-group--actions">
-                <button type="button" id="sysman-filter-btn" class="button button-primary">
-                    <span aria-hidden="true" class="dashicons dashicons-search"></span>
-                    <?php esc_html_e( 'Filtrar', 'sysman-suite' ); ?>
-                </button>
-                <button type="button" id="sysman-export-csv-btn" class="button">
-                    <span aria-hidden="true" class="dashicons dashicons-media-spreadsheet"></span>
-                    <?php esc_html_e( 'Exportar CSV', 'sysman-suite' ); ?>
-                </button>
+                <div class="sysman-form-group">
+                    <label for="sysman-filter-mes"><?php esc_html_e( 'Mes', 'sysman-suite' ); ?></label>
+                    <select id="sysman-filter-mes">
+                        <?php foreach ( $meses as $num => $nombre ) : ?>
+                        <option value="<?php echo esc_attr( $num ); ?>"><?php echo esc_html( $nombre ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="sysman-form-group">
+                    <label for="sysman-filter-search"><?php esc_html_e( 'Buscar', 'sysman-suite' ); ?></label>
+                    <input type="search" id="sysman-filter-search" placeholder="<?php esc_attr_e( 'Buscar...', 'sysman-suite' ); ?>" class="regular-text">
+                </div>
+
+                <div class="sysman-form-group sysman-form-group--actions">
+                    <button type="button" id="sysman-filter-btn" class="button button-primary">
+                        <span class="dashicons dashicons-search" aria-hidden="true"></span>
+                        <?php esc_html_e( 'Filtrar', 'sysman-suite' ); ?>
+                    </button>
+                    <button type="button" id="sysman-export-csv-btn" class="button">
+                        <span class="dashicons dashicons-media-spreadsheet" aria-hidden="true"></span>
+                        <?php esc_html_e( 'CSV', 'sysman-suite' ); ?>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Records Table -->
-    <div class="sysman-panel" role="region" aria-label="<?php esc_attr_e( 'Tabla de registros', 'sysman-suite' ); ?>">
-        <div id="sysman-records-loading" class="sysman-loading" style="display:none;" aria-live="polite">
-            <span class="spinner is-active"></span>
-            <span><?php esc_html_e( 'Cargando registros...', 'sysman-suite' ); ?></span>
-        </div>
-
-        <div id="sysman-records-container">
-            <table class="widefat striped sysman-records-table" role="grid">
-                <thead id="sysman-records-thead">
-                </thead>
-                <tbody id="sysman-records-tbody">
-                    <tr>
-                        <td colspan="20" class="sysman-empty-message">
-                            <?php esc_html_e( 'Seleccione una tabla para ver los registros.', 'sysman-suite' ); ?>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        <div id="sysman-pagination" class="sysman-pagination" style="display:none;" role="navigation" aria-label="<?php esc_attr_e( 'Paginación de registros', 'sysman-suite' ); ?>">
-            <div class="sysman-pagination-info">
-                <span id="sysman-pagination-text"></span>
+    <div class="sysman-card">
+        <div class="sysman-card-body" style="padding: 0;">
+            <div id="sysman-records-loading" class="sysman-loading" style="display:none;" aria-live="polite">
+                <span class="spinner is-active"></span>
+                <span><?php esc_html_e( 'Cargando registros...', 'sysman-suite' ); ?></span>
             </div>
-            <div class="sysman-pagination-controls">
-                <button type="button" id="sysman-prev-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página anterior', 'sysman-suite' ); ?>">
-                    &laquo; <?php esc_html_e( 'Anterior', 'sysman-suite' ); ?>
-                </button>
-                <span id="sysman-page-info" class="sysman-page-info"></span>
-                <button type="button" id="sysman-next-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página siguiente', 'sysman-suite' ); ?>">
-                    <?php esc_html_e( 'Siguiente', 'sysman-suite' ); ?> &raquo;
-                </button>
+
+            <div id="sysman-records-container" style="overflow-x: auto;">
+                <table class="sysman-records-table" role="grid">
+                    <thead id="sysman-records-thead">
+                    </thead>
+                    <tbody id="sysman-records-tbody">
+                        <tr>
+                            <td colspan="20" class="sysman-empty-message">
+                                <?php esc_html_e( 'Seleccione una tabla para ver los registros.', 'sysman-suite' ); ?>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="sysman-pagination" class="sysman-pagination" style="display:none;padding:10px 20px;">
+                <div class="sysman-pagination-info">
+                    <span id="sysman-pagination-text"></span>
+                </div>
+                <div class="sysman-pagination-controls">
+                    <button type="button" id="sysman-prev-page" class="button" disabled>
+                        &laquo; <?php esc_html_e( 'Anterior', 'sysman-suite' ); ?>
+                    </button>
+                    <span id="sysman-page-info" class="sysman-page-info"></span>
+                    <button type="button" id="sysman-next-page" class="button" disabled>
+                        <?php esc_html_e( 'Siguiente', 'sysman-suite' ); ?> &raquo;
+                    </button>
+                </div>
             </div>
         </div>
     </div>

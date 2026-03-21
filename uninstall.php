@@ -30,6 +30,7 @@ $options = [
     'sysman_import_frequency',
     'sysman_last_import',
     'sysman_update_notice_dismissed',
+    'sysman_db_version',
 ];
 
 foreach ( $options as $option ) {
