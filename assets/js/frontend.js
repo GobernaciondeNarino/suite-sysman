@@ -1,5 +1,5 @@
 /**
- * SISMAN Suite - Frontend Chart Renderer
+ * SYSMAN Suite - Frontend Chart Renderer
  * Gobernación de Nariño
  * Uses D3plus for chart rendering
  */
@@ -17,8 +17,8 @@
             this.numberFormat = wrapper.dataset.numberFormat || 'colombian';
             this.yAxisTitle = wrapper.dataset.yAxisTitle || '';
             this.xAxisTitle = wrapper.dataset.xAxisTitle || '';
-            this.canvas = wrapper.querySelector('.sisman-chart-canvas');
-            this.loading = wrapper.querySelector('.sisman-chart-loading');
+            this.canvas = wrapper.querySelector('.sysman-chart-canvas');
+            this.loading = wrapper.querySelector('.sysman-chart-loading');
             this.data = [];
 
             // Parse custom color palette
@@ -48,10 +48,10 @@
 
         async fetchData() {
             const response = await fetch(
-                `${sismanFrontend.restUrl}chart/${this.chartId}`,
+                `${sysmanFrontend.restUrl}chart/${this.chartId}`,
                 {
                     headers: {
-                        'X-WP-Nonce': sismanFrontend.restNonce,
+                        'X-WP-Nonce': sysmanFrontend.restNonce,
                     },
                 }
             );
@@ -215,46 +215,46 @@
 
         bindEvents() {
             // Data modal
-            const dataBtn = this.wrapper.querySelector('.sisman-btn-data');
+            const dataBtn = this.wrapper.querySelector('.sysman-btn-data');
             if (dataBtn) {
                 dataBtn.addEventListener('click', () => this.showDataModal());
             }
 
             // CSV download
-            const downloadBtn = this.wrapper.querySelector('.sisman-btn-download');
+            const downloadBtn = this.wrapper.querySelector('.sysman-btn-download');
             if (downloadBtn) {
                 downloadBtn.addEventListener('click', () => this.downloadCSV());
             }
 
             // Image export
-            const imageBtn = this.wrapper.querySelector('.sisman-btn-image');
+            const imageBtn = this.wrapper.querySelector('.sysman-btn-image');
             if (imageBtn) {
                 imageBtn.addEventListener('click', () => this.exportImage());
             }
 
             // Share
-            const shareBtn = this.wrapper.querySelector('.sisman-btn-share');
+            const shareBtn = this.wrapper.querySelector('.sysman-btn-share');
             if (shareBtn) {
                 shareBtn.addEventListener('click', () => this.showShareModal());
             }
 
             // Fullscreen
-            const fsBtn = this.wrapper.querySelector('.sisman-btn-fullscreen');
+            const fsBtn = this.wrapper.querySelector('.sysman-btn-fullscreen');
             if (fsBtn) {
                 fsBtn.addEventListener('click', () => this.toggleFullscreen());
             }
 
             // Modal close handlers
-            this.wrapper.querySelectorAll('.sisman-modal-close, .sisman-modal-overlay').forEach((el) => {
+            this.wrapper.querySelectorAll('.sysman-modal-close, .sysman-modal-overlay').forEach((el) => {
                 el.addEventListener('click', () => {
-                    this.wrapper.querySelectorAll('.sisman-chart-modal').forEach((m) => {
+                    this.wrapper.querySelectorAll('.sysman-chart-modal').forEach((m) => {
                         m.style.display = 'none';
                     });
                 });
             });
 
             // Copy link
-            this.wrapper.querySelectorAll('.sisman-copy-link').forEach((btn) => {
+            this.wrapper.querySelectorAll('.sysman-copy-link').forEach((btn) => {
                 btn.addEventListener('click', () => {
                     const targetId = btn.dataset.target;
                     const input = document.getElementById(targetId);
@@ -270,7 +270,7 @@
             // ESC to close modals
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
-                    this.wrapper.querySelectorAll('.sisman-chart-modal').forEach((m) => {
+                    this.wrapper.querySelectorAll('.sysman-chart-modal').forEach((m) => {
                         m.style.display = 'none';
                     });
                     if (this.wrapper.classList.contains('fullscreen')) {
@@ -281,7 +281,7 @@
         }
 
         showDataModal() {
-            const modal = this.wrapper.querySelector('.sisman-data-modal');
+            const modal = this.wrapper.querySelector('.sysman-data-modal');
             if (!modal) return;
 
             const tbody = modal.querySelector('tbody');
@@ -297,45 +297,45 @@
             });
 
             modal.style.display = 'flex';
-            modal.querySelector('.sisman-modal-close').focus();
+            modal.querySelector('.sysman-modal-close').focus();
         }
 
         showShareModal() {
-            const modal = this.wrapper.querySelector('.sisman-share-modal');
+            const modal = this.wrapper.querySelector('.sysman-share-modal');
             if (!modal) return;
 
             const url = encodeURIComponent(window.location.href);
-            const title = encodeURIComponent(this.meta.title || 'Datos Presupuestales SISMAN');
+            const title = encodeURIComponent(this.meta.title || 'Datos Presupuestales SYSMAN');
 
-            const facebookBtn = modal.querySelector('.sisman-share-facebook');
+            const facebookBtn = modal.querySelector('.sysman-share-facebook');
             if (facebookBtn) {
                 facebookBtn.href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
             }
 
-            const twitterBtn = modal.querySelector('.sisman-share-twitter');
+            const twitterBtn = modal.querySelector('.sysman-share-twitter');
             if (twitterBtn) {
                 twitterBtn.href = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
             }
 
-            const linkedinBtn = modal.querySelector('.sisman-share-linkedin');
+            const linkedinBtn = modal.querySelector('.sysman-share-linkedin');
             if (linkedinBtn) {
                 linkedinBtn.href = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
             }
 
-            const whatsappBtn = modal.querySelector('.sisman-share-whatsapp');
+            const whatsappBtn = modal.querySelector('.sysman-share-whatsapp');
             if (whatsappBtn) {
                 whatsappBtn.href = `https://wa.me/?text=${title}%20${url}`;
             }
 
             modal.style.display = 'flex';
-            modal.querySelector('.sisman-modal-close').focus();
+            modal.querySelector('.sysman-modal-close').focus();
         }
 
         downloadCSV() {
-            const url = `${sismanFrontend.restUrl}chart/${this.chartId}/csv`;
+            const url = `${sysmanFrontend.restUrl}chart/${this.chartId}/csv`;
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sisman-chart-${this.chartId}.csv`;
+            a.download = `sysman-chart-${this.chartId}.csv`;
             a.click();
         }
 
@@ -348,7 +348,7 @@
                 html2canvas(canvas).then((canvasEl) => {
                     const a = document.createElement('a');
                     a.href = canvasEl.toDataURL('image/png');
-                    a.download = `sisman-chart-${this.chartId}.png`;
+                    a.download = `sysman-chart-${this.chartId}.png`;
                     a.click();
                 });
             } else {
@@ -361,7 +361,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `sisman-chart-${this.chartId}.svg`;
+                    a.download = `sysman-chart-${this.chartId}.svg`;
                     a.click();
                     URL.revokeObjectURL(url);
                 }
@@ -371,10 +371,10 @@
         toggleFullscreen() {
             this.wrapper.classList.toggle('fullscreen');
             if (this.wrapper.classList.contains('fullscreen')) {
-                const container = this.wrapper.querySelector('.sisman-chart-container');
+                const container = this.wrapper.querySelector('.sysman-chart-container');
                 container.style.height = 'calc(100vh - 120px)';
             } else {
-                const container = this.wrapper.querySelector('.sisman-chart-container');
+                const container = this.wrapper.querySelector('.sysman-chart-container');
                 container.style.height = this.chartHeight + 'px';
             }
         }
@@ -387,7 +387,7 @@
 
         showError(message) {
             this.hideLoading();
-            this.canvas.innerHTML = `<div class="sisman-error">${this.escapeHtml(message)}</div>`;
+            this.canvas.innerHTML = `<div class="sysman-error">${this.escapeHtml(message)}</div>`;
         }
 
         formatNumber(num) {
@@ -421,7 +421,7 @@
 
         showToast(message) {
             const toast = document.createElement('div');
-            toast.className = 'sisman-toast success';
+            toast.className = 'sysman-toast success';
             toast.textContent = message;
             toast.setAttribute('role', 'status');
             toast.setAttribute('aria-live', 'polite');
@@ -440,7 +440,7 @@
        Initialize all charts on page
        ======================================== */
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.sisman-chart-wrapper').forEach((wrapper) => {
+        document.querySelectorAll('.sysman-chart-wrapper').forEach((wrapper) => {
             new SismanChart(wrapper);
         });
     });

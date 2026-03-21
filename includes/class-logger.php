@@ -1,5 +1,5 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -17,7 +17,7 @@ class Logger {
     ];
 
     public function __construct() {
-        $this->log_file = SISMAN_SUITE_PATH . 'logs/import.log';
+        $this->log_file = SYSMAN_SUITE_PATH . 'logs/import.log';
     }
 
     /**

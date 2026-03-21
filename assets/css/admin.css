@@ -1,5 +1,5 @@
 /**
- * SISMAN Suite - Admin Styles
+ * SYSMAN Suite - Admin Styles
  * Gobernación de Nariño
  */
 
@@ -7,46 +7,46 @@
    Variables
    ======================================== */
 :root {
-    --sisman-primary: #1a5632;
-    --sisman-primary-dark: #0e3a20;
-    --sisman-primary-light: #2d7a4a;
-    --sisman-secondary: #c8a415;
-    --sisman-accent: #3498db;
-    --sisman-success: #27ae60;
-    --sisman-warning: #f39c12;
-    --sisman-danger: #e74c3c;
-    --sisman-gray-100: #f8f9fa;
-    --sisman-gray-200: #e9ecef;
-    --sisman-gray-300: #dee2e6;
-    --sisman-gray-600: #6c757d;
-    --sisman-gray-800: #343a40;
-    --sisman-radius: 8px;
-    --sisman-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    --sisman-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
-    --sisman-transition: all 0.3s ease;
+    --sysman-primary: #1a5632;
+    --sysman-primary-dark: #0e3a20;
+    --sysman-primary-light: #2d7a4a;
+    --sysman-secondary: #c8a415;
+    --sysman-accent: #3498db;
+    --sysman-success: #27ae60;
+    --sysman-warning: #f39c12;
+    --sysman-danger: #e74c3c;
+    --sysman-gray-100: #f8f9fa;
+    --sysman-gray-200: #e9ecef;
+    --sysman-gray-300: #dee2e6;
+    --sysman-gray-600: #6c757d;
+    --sysman-gray-800: #343a40;
+    --sysman-radius: 8px;
+    --sysman-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --sysman-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --sysman-transition: all 0.3s ease;
 }
 
 /* ========================================
    General Layout
    ======================================== */
-.sisman-admin-wrap {
+.sysman-admin-wrap {
     max-width: 1400px;
     margin: 20px auto;
     padding: 0 20px;
 }
 
-.sisman-title {
+.sysman-title {
     display: flex;
     align-items: center;
     gap: 10px;
     font-size: 24px;
-    color: var(--sisman-primary-dark);
+    color: var(--sysman-primary-dark);
     margin-bottom: 20px;
     padding-bottom: 15px;
-    border-bottom: 3px solid var(--sisman-primary);
+    border-bottom: 3px solid var(--sysman-primary);
 }
 
-.sisman-title .dashicons {
+.sysman-title .dashicons {
     font-size: 28px;
     width: 28px;
     height: 28px;
@@ -55,44 +55,44 @@
 /* ========================================
    Stats Cards
    ======================================== */
-.sisman-stats-grid {
+.sysman-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
 
-.sisman-stat-card {
+.sysman-stat-card {
     background: #fff;
-    border-radius: var(--sisman-radius);
-    box-shadow: var(--sisman-shadow);
+    border-radius: var(--sysman-radius);
+    box-shadow: var(--sysman-shadow);
     padding: 20px;
     display: flex;
     align-items: center;
     gap: 15px;
-    border-left: 4px solid var(--sisman-primary);
-    transition: var(--sisman-transition);
+    border-left: 4px solid var(--sysman-primary);
+    transition: var(--sysman-transition);
 }
 
-.sisman-stat-card:hover {
-    box-shadow: var(--sisman-shadow-lg);
+.sysman-stat-card:hover {
+    box-shadow: var(--sysman-shadow-lg);
     transform: translateY(-2px);
 }
 
-.sisman-stat-card--info {
-    border-left-color: var(--sisman-accent);
+.sysman-stat-card--info {
+    border-left-color: var(--sysman-accent);
 }
 
-.sisman-stat-card--error {
-    border-left-color: var(--sisman-danger);
+.sysman-stat-card--error {
+    border-left-color: var(--sysman-danger);
 }
 
-.sisman-stat-card--error .sisman-stat-icon .dashicons {
-    color: var(--sisman-danger);
+.sysman-stat-card--error .sysman-stat-icon .dashicons {
+    color: var(--sysman-danger);
 }
 
-.sisman-stat-icon {
-    background: var(--sisman-gray-100);
+.sysman-stat-icon {
+    background: var(--sysman-gray-100);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -102,61 +102,61 @@
     flex-shrink: 0;
 }
 
-.sisman-stat-icon .dashicons {
-    color: var(--sisman-primary);
+.sysman-stat-icon .dashicons {
+    color: var(--sysman-primary);
     font-size: 24px;
     width: 24px;
     height: 24px;
 }
 
-.sisman-stat-content h3 {
+.sysman-stat-content h3 {
     margin: 0 0 5px;
     font-size: 14px;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
     font-weight: 500;
 }
 
-.sisman-stat-number {
+.sysman-stat-number {
     font-size: 28px;
     font-weight: 700;
-    color: var(--sisman-gray-800);
+    color: var(--sysman-gray-800);
     margin: 0;
     line-height: 1.2;
 }
 
-.sisman-stat-label {
+.sysman-stat-label {
     margin: 2px 0 0;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
     font-size: 12px;
 }
 
 /* ========================================
    Panels
    ======================================== */
-.sisman-panel {
+.sysman-panel {
     background: #fff;
-    border-radius: var(--sisman-radius);
-    box-shadow: var(--sisman-shadow);
+    border-radius: var(--sysman-radius);
+    box-shadow: var(--sysman-shadow);
     padding: 25px;
     margin-bottom: 25px;
 }
 
-.sisman-panel-title {
+.sysman-panel-title {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 18px;
-    color: var(--sisman-primary-dark);
+    color: var(--sysman-primary-dark);
     margin: 0 0 20px;
     padding-bottom: 12px;
-    border-bottom: 2px solid var(--sisman-gray-200);
+    border-bottom: 2px solid var(--sysman-gray-200);
 }
 
-.sisman-panel-title .dashicons {
-    color: var(--sisman-primary);
+.sysman-panel-title .dashicons {
+    color: var(--sysman-primary);
 }
 
-.sisman-panel-header {
+.sysman-panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -165,13 +165,13 @@
     margin-bottom: 15px;
 }
 
-.sisman-panel-header .sisman-panel-title {
+.sysman-panel-header .sysman-panel-title {
     margin-bottom: 0;
     padding-bottom: 0;
     border-bottom: none;
 }
 
-.sisman-panel-actions {
+.sysman-panel-actions {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -180,65 +180,65 @@
 /* ========================================
    Forms
    ======================================== */
-.sisman-form-row {
+.sysman-form-row {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
     margin-bottom: 20px;
 }
 
-.sisman-form-group {
+.sysman-form-group {
     flex: 1;
     min-width: 200px;
 }
 
-.sisman-form-group label {
+.sysman-form-group label {
     display: block;
     font-weight: 600;
     margin-bottom: 5px;
-    color: var(--sisman-gray-800);
+    color: var(--sysman-gray-800);
 }
 
-.sisman-form-group select,
-.sisman-form-group input[type="text"],
-.sisman-form-group input[type="number"],
-.sisman-form-group input[type="search"] {
+.sysman-form-group select,
+.sysman-form-group input[type="text"],
+.sysman-form-group input[type="number"],
+.sysman-form-group input[type="search"] {
     width: 100%;
     max-width: 400px;
 }
 
-.sisman-form-group--actions {
+.sysman-form-group--actions {
     display: flex;
     align-items: flex-end;
     gap: 10px;
 }
 
-.sisman-form-actions {
+.sysman-form-actions {
     margin-top: 20px;
     text-align: center;
 }
 
-.sisman-form-actions .button-hero {
+.sysman-form-actions .button-hero {
     display: inline-flex;
     align-items: center;
     gap: 8px;
 }
 
-.sisman-form-actions .button-hero .dashicons {
+.sysman-form-actions .button-hero .dashicons {
     font-size: 20px;
     width: 20px;
     height: 20px;
 }
 
 /* Filters Row */
-.sisman-filters-row {
+.sysman-filters-row {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
     align-items: flex-end;
 }
 
-.sisman-filters-row .sisman-form-group {
+.sysman-filters-row .sysman-form-group {
     min-width: 150px;
     flex: 1;
 }
@@ -246,54 +246,54 @@
 /* ========================================
    Import Steps Indicator
    ======================================== */
-.sisman-import-steps {
+.sysman-import-steps {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0;
     margin: 20px 0 10px;
     padding: 15px;
-    background: var(--sisman-gray-100);
-    border-radius: var(--sisman-radius);
+    background: var(--sysman-gray-100);
+    border-radius: var(--sysman-radius);
 }
 
-.sisman-step {
+.sysman-step {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
     border-radius: 20px;
     background: #fff;
-    border: 2px solid var(--sisman-gray-300);
-    transition: var(--sisman-transition);
+    border: 2px solid var(--sysman-gray-300);
+    transition: var(--sysman-transition);
 }
 
-.sisman-step.active {
-    border-color: var(--sisman-accent);
+.sysman-step.active {
+    border-color: var(--sysman-accent);
     background: rgba(52, 152, 219, 0.1);
 }
 
-.sisman-step.active .sisman-step-indicator {
-    background: var(--sisman-accent);
+.sysman-step.active .sysman-step-indicator {
+    background: var(--sysman-accent);
     color: #fff;
 }
 
-.sisman-step.completed {
-    border-color: var(--sisman-success);
+.sysman-step.completed {
+    border-color: var(--sysman-success);
     background: rgba(39, 174, 96, 0.1);
 }
 
-.sisman-step.completed .sisman-step-indicator {
-    background: var(--sisman-success);
+.sysman-step.completed .sysman-step-indicator {
+    background: var(--sysman-success);
     color: #fff;
 }
 
-.sisman-step-indicator {
+.sysman-step-indicator {
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: var(--sisman-gray-300);
-    color: var(--sisman-gray-600);
+    background: var(--sysman-gray-300);
+    color: var(--sysman-gray-600);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -302,53 +302,53 @@
     flex-shrink: 0;
 }
 
-.sisman-step-label {
+.sysman-step-label {
     font-size: 12px;
     font-weight: 600;
-    color: var(--sisman-gray-800);
+    color: var(--sysman-gray-800);
     white-space: nowrap;
 }
 
-.sisman-step-connector {
+.sysman-step-connector {
     width: 30px;
     height: 2px;
-    background: var(--sisman-gray-300);
+    background: var(--sysman-gray-300);
     flex-shrink: 0;
 }
 
 /* ========================================
    Progress Bar
    ======================================== */
-.sisman-progress-container {
+.sysman-progress-container {
     margin-top: 20px;
     padding: 15px;
-    background: var(--sisman-gray-100);
-    border-radius: var(--sisman-radius);
+    background: var(--sysman-gray-100);
+    border-radius: var(--sysman-radius);
 }
 
-.sisman-progress-header {
+.sysman-progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
 }
 
-.sisman-progress-bar {
+.sysman-progress-bar {
     height: 24px;
-    background: var(--sisman-gray-200);
+    background: var(--sysman-gray-200);
     border-radius: 12px;
     overflow: hidden;
 }
 
-.sisman-progress-fill {
+.sysman-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--sisman-primary), var(--sisman-primary-light), var(--sisman-success));
+    background: linear-gradient(90deg, var(--sysman-primary), var(--sysman-primary-light), var(--sysman-success));
     border-radius: 12px;
     transition: width 0.5s ease;
     position: relative;
 }
 
-.sisman-progress-fill::after {
+.sysman-progress-fill::after {
     content: '';
     position: absolute;
     top: 0;
@@ -361,58 +361,58 @@
         rgba(255, 255, 255, 0.3),
         transparent
     );
-    animation: sisman-progress-shimmer 2s infinite;
+    animation: sysman-progress-shimmer 2s infinite;
 }
 
-@keyframes sisman-progress-shimmer {
+@keyframes sysman-progress-shimmer {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
 }
 
-.sisman-progress-text {
-    color: var(--sisman-gray-600);
+.sysman-progress-text {
+    color: var(--sysman-gray-600);
     font-size: 13px;
 }
 
-.sisman-progress-percent {
+.sysman-progress-percent {
     font-weight: 700;
-    color: var(--sisman-primary);
+    color: var(--sysman-primary);
     font-size: 14px;
 }
 
 /* Spin animation for import button */
-@keyframes sisman-spin {
+@keyframes sysman-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
-.sisman-spin {
-    animation: sisman-spin 1s linear infinite;
+.sysman-spin {
+    animation: sysman-spin 1s linear infinite;
     display: inline-block;
 }
 
 /* ========================================
    Results
    ======================================== */
-.sisman-results-container {
+.sysman-results-container {
     margin-top: 20px;
     padding: 20px;
-    border-radius: var(--sisman-radius);
+    border-radius: var(--sysman-radius);
 }
 
-.sisman-results-container.success {
+.sysman-results-container.success {
     background: #d4edda;
     border: 1px solid #c3e6cb;
     color: #155724;
 }
 
-.sisman-results-container.error {
+.sysman-results-container.error {
     background: #f8d7da;
     border: 1px solid #f5c6cb;
     color: #721c24;
 }
 
-.sisman-result-header {
+.sysman-result-header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -420,21 +420,21 @@
     font-size: 15px;
 }
 
-.sisman-result-header .dashicons {
+.sysman-result-header .dashicons {
     font-size: 20px;
     width: 20px;
     height: 20px;
 }
 
-.sisman-result-header.success .dashicons {
-    color: var(--sisman-success);
+.sysman-result-header.success .dashicons {
+    color: var(--sysman-success);
 }
 
-.sisman-result-header.error .dashicons {
-    color: var(--sisman-danger);
+.sysman-result-header.error .dashicons {
+    color: var(--sysman-danger);
 }
 
-.sisman-results-table {
+.sysman-results-table {
     width: 100%;
     border-collapse: collapse;
     background: rgba(255, 255, 255, 0.5);
@@ -442,7 +442,7 @@
     overflow: hidden;
 }
 
-.sisman-results-table th {
+.sysman-results-table th {
     padding: 8px 12px;
     text-align: left;
     font-weight: 600;
@@ -450,18 +450,18 @@
     font-size: 13px;
 }
 
-.sisman-results-table td {
+.sysman-results-table td {
     padding: 8px 12px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     font-size: 13px;
 }
 
-.sisman-result-total td {
+.sysman-result-total td {
     border-top: 2px solid rgba(0, 0, 0, 0.15);
     font-weight: 600;
 }
 
-.sisman-badge {
+.sysman-badge {
     display: inline-block;
     padding: 2px 8px;
     border-radius: 10px;
@@ -470,17 +470,17 @@
     text-transform: uppercase;
 }
 
-.sisman-badge.success {
-    background: var(--sisman-success);
+.sysman-badge.success {
+    background: var(--sysman-success);
     color: #fff;
 }
 
-.sisman-badge.error {
-    background: var(--sisman-danger);
+.sysman-badge.error {
+    background: var(--sysman-danger);
     color: #fff;
 }
 
-.sisman-result-note {
+.sysman-result-note {
     margin-top: 12px;
     font-size: 13px;
     display: flex;
@@ -488,7 +488,7 @@
     gap: 5px;
 }
 
-.sisman-result-note a {
+.sysman-result-note a {
     color: inherit;
     text-decoration: underline;
 }
@@ -496,14 +496,14 @@
 /* ========================================
    Records Table
    ======================================== */
-.sisman-records-table {
+.sysman-records-table {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
 }
 
-.sisman-records-table th {
-    background: var(--sisman-primary);
+.sysman-records-table th {
+    background: var(--sysman-primary);
     color: #fff;
     padding: 10px 12px;
     text-align: left;
@@ -513,44 +513,44 @@
     user-select: none;
 }
 
-.sisman-records-table th:hover {
-    background: var(--sisman-primary-dark);
+.sysman-records-table th:hover {
+    background: var(--sysman-primary-dark);
 }
 
-.sisman-records-table td {
+.sysman-records-table td {
     padding: 8px 12px;
-    border-bottom: 1px solid var(--sisman-gray-200);
+    border-bottom: 1px solid var(--sysman-gray-200);
     max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.sisman-records-table tbody tr {
+.sysman-records-table tbody tr {
     cursor: pointer;
     transition: background-color 0.2s;
 }
 
-.sisman-records-table tbody tr:hover {
-    background: var(--sisman-gray-100);
+.sysman-records-table tbody tr:hover {
+    background: var(--sysman-gray-100);
 }
 
-.sisman-records-table tbody tr:focus-within {
-    outline: 2px solid var(--sisman-accent);
+.sysman-records-table tbody tr:focus-within {
+    outline: 2px solid var(--sysman-accent);
     outline-offset: -2px;
 }
 
-.sisman-empty-message {
+.sysman-empty-message {
     text-align: center;
     padding: 40px !important;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
     font-style: italic;
 }
 
 /* ========================================
    Pagination
    ======================================== */
-.sisman-pagination {
+.sysman-pagination {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -558,26 +558,26 @@
     padding: 10px 0;
 }
 
-.sisman-pagination-info {
-    color: var(--sisman-gray-600);
+.sysman-pagination-info {
+    color: var(--sysman-gray-600);
     font-size: 13px;
 }
 
-.sisman-pagination-controls {
+.sysman-pagination-controls {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.sisman-page-info {
-    color: var(--sisman-gray-800);
+.sysman-page-info {
+    color: var(--sysman-gray-800);
     font-weight: 600;
 }
 
 /* ========================================
    Modal
    ======================================== */
-.sisman-modal {
+.sysman-modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -589,7 +589,7 @@
     justify-content: center;
 }
 
-.sisman-modal-overlay {
+.sysman-modal-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -598,11 +598,11 @@
     background: rgba(0, 0, 0, 0.6);
 }
 
-.sisman-modal-content {
+.sysman-modal-content {
     position: relative;
     background: #fff;
-    border-radius: var(--sisman-radius);
-    box-shadow: var(--sisman-shadow-lg);
+    border-radius: var(--sysman-radius);
+    box-shadow: var(--sysman-shadow-lg);
     max-width: 800px;
     width: 90%;
     max-height: 80vh;
@@ -611,22 +611,22 @@
     overflow: hidden;
 }
 
-.sisman-modal-header {
+.sysman-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    background: var(--sisman-primary);
+    background: var(--sysman-primary);
     color: #fff;
 }
 
-.sisman-modal-header h2 {
+.sysman-modal-header h2 {
     margin: 0;
     font-size: 18px;
     color: #fff;
 }
 
-.sisman-modal-close {
+.sysman-modal-close {
     background: none;
     border: none;
     color: #fff;
@@ -637,34 +637,34 @@
     opacity: 0.8;
 }
 
-.sisman-modal-close:hover {
+.sysman-modal-close:hover {
     opacity: 1;
 }
 
-.sisman-modal-close:focus {
+.sysman-modal-close:focus {
     outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
-.sisman-modal-body {
+.sysman-modal-body {
     padding: 20px;
     overflow-y: auto;
 }
 
-.sisman-modal-body table {
+.sysman-modal-body table {
     width: 100%;
     border-collapse: collapse;
 }
 
-.sisman-modal-body table td {
+.sysman-modal-body table td {
     padding: 8px 12px;
-    border-bottom: 1px solid var(--sisman-gray-200);
+    border-bottom: 1px solid var(--sysman-gray-200);
     vertical-align: top;
 }
 
-.sisman-modal-body table td:first-child {
+.sysman-modal-body table td:first-child {
     font-weight: 600;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
     width: 35%;
     white-space: nowrap;
 }
@@ -672,7 +672,7 @@
 /* ========================================
    Loading
    ======================================== */
-.sisman-loading {
+.sysman-loading {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -683,15 +683,15 @@
 /* ========================================
    Log Viewer
    ======================================== */
-.sisman-log-viewer {
-    background: var(--sisman-gray-800);
-    border-radius: var(--sisman-radius);
+.sysman-log-viewer {
+    background: var(--sysman-gray-800);
+    border-radius: var(--sysman-radius);
     padding: 15px;
     max-height: 500px;
     overflow-y: auto;
 }
 
-.sisman-log-content {
+.sysman-log-content {
     color: #b4b4b4;
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
@@ -701,54 +701,54 @@
     word-break: break-all;
 }
 
-.sisman-log-error {
+.sysman-log-error {
     color: #ff6b6b;
     font-weight: 600;
 }
 
-.sisman-log-warn {
+.sysman-log-warn {
     color: #ffd93d;
 }
 
-.sisman-log-success {
+.sysman-log-success {
     color: #51cf66;
 }
 
-.sisman-log-separator {
+.sysman-log-separator {
     color: #555;
 }
 
-.sisman-log-header {
+.sysman-log-header {
     color: #74c0fc;
     font-weight: 700;
 }
 
-.sisman-log-size {
-    color: var(--sisman-gray-600);
+.sysman-log-size {
+    color: var(--sysman-gray-600);
     font-size: 13px;
 }
 
 /* ========================================
    Chart Configuration
    ======================================== */
-.sisman-chart-config {
+.sysman-chart-config {
     max-width: 100%;
 }
 
-.sisman-config-section {
+.sysman-config-section {
     margin-bottom: 25px;
     padding: 20px;
-    background: var(--sisman-gray-100);
-    border-radius: var(--sisman-radius);
-    border: 1px solid var(--sisman-gray-200);
+    background: var(--sysman-gray-100);
+    border-radius: var(--sysman-radius);
+    border: 1px solid var(--sysman-gray-200);
 }
 
-.sisman-config-section:last-child {
+.sysman-config-section:last-child {
     margin-bottom: 0;
 }
 
-.sisman-config-section h3 {
-    color: var(--sisman-primary-dark);
+.sysman-config-section h3 {
+    color: var(--sysman-primary-dark);
     margin: 0 0 15px;
     font-size: 15px;
     display: flex;
@@ -756,95 +756,95 @@
     gap: 6px;
 }
 
-.sisman-config-section h3 .dashicons {
-    color: var(--sisman-primary);
+.sysman-config-section h3 .dashicons {
+    color: var(--sysman-primary);
     font-size: 18px;
     width: 18px;
     height: 18px;
 }
 
 /* Chart Type Selector */
-.sisman-chart-types {
+.sysman-chart-types {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
 }
 
-.sisman-chart-type-option {
+.sysman-chart-type-option {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    border: 2px solid var(--sisman-gray-300);
-    border-radius: var(--sisman-radius);
+    border: 2px solid var(--sysman-gray-300);
+    border-radius: var(--sysman-radius);
     cursor: pointer;
-    transition: var(--sisman-transition);
+    transition: var(--sysman-transition);
     min-width: 100px;
     background: #fff;
 }
 
-.sisman-chart-type-option:hover {
-    border-color: var(--sisman-primary-light);
+.sysman-chart-type-option:hover {
+    border-color: var(--sysman-primary-light);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.sisman-chart-type-option.active,
-.sisman-chart-type-option:has(input:checked) {
-    border-color: var(--sisman-accent);
+.sysman-chart-type-option.active,
+.sysman-chart-type-option:has(input:checked) {
+    border-color: var(--sysman-accent);
     background: rgba(52, 152, 219, 0.05);
-    box-shadow: 0 0 0 1px var(--sisman-accent);
+    box-shadow: 0 0 0 1px var(--sysman-accent);
 }
 
-.sisman-chart-type-option input[type="radio"] {
+.sysman-chart-type-option input[type="radio"] {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-.sisman-chart-type-icon {
+.sysman-chart-type-icon {
     width: 48px;
     height: 48px;
 }
 
-.sisman-chart-type-icon svg {
+.sysman-chart-type-icon svg {
     width: 100%;
     height: 100%;
 }
 
-.sisman-chart-type-option .dashicons {
+.sysman-chart-type-option .dashicons {
     font-size: 24px;
     width: 24px;
     height: 24px;
-    color: var(--sisman-primary);
+    color: var(--sysman-primary);
 }
 
-.sisman-chart-type-label {
+.sysman-chart-type-label {
     font-size: 12px;
     font-weight: 600;
-    color: var(--sisman-gray-800);
+    color: var(--sysman-gray-800);
     text-align: center;
 }
 
 /* Appearance table */
-.sisman-appearance-table th {
+.sysman-appearance-table th {
     width: 200px;
     padding: 12px 10px;
 }
 
-.sisman-appearance-table td {
+.sysman-appearance-table td {
     padding: 12px 10px;
 }
 
 /* Color palette preview */
-.sisman-color-preview {
+.sysman-color-preview {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
 }
 
-.sisman-color-swatch {
+.sysman-color-swatch {
     width: 32px;
     height: 32px;
     border-radius: 4px;
@@ -854,18 +854,18 @@
     transition: transform 0.2s;
 }
 
-.sisman-color-swatch:hover {
+.sysman-color-swatch:hover {
     transform: scale(1.2);
 }
 
 /* Toolbar options */
-.sisman-toolbar-options {
+.sysman-toolbar-options {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
 }
 
-.sisman-toolbar-options label {
+.sysman-toolbar-options label {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -874,12 +874,12 @@
 }
 
 /* Collapsible section */
-.sisman-collapsible {
+.sysman-collapsible {
     padding: 0 !important;
     overflow: hidden;
 }
 
-.sisman-collapsible-header {
+.sysman-collapsible-header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -887,91 +887,91 @@
     cursor: pointer;
 }
 
-.sisman-collapsible-header .dashicons {
-    color: var(--sisman-gray-600);
+.sysman-collapsible-header .dashicons {
+    color: var(--sysman-gray-600);
 }
 
-.sisman-collapsible-header strong {
+.sysman-collapsible-header strong {
     flex: 1;
     font-size: 14px;
 }
 
-.sisman-collapsible-body {
+.sysman-collapsible-body {
     padding: 0 20px 20px;
 }
 
-.sisman-collapsible-body textarea {
+.sysman-collapsible-body textarea {
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
 }
 
 /* Chart Preview */
-.sisman-preview-container {
+.sysman-preview-container {
     text-align: center;
 }
 
-.sisman-preview-container .button-primary {
+.sysman-preview-container .button-primary {
     margin-bottom: 15px;
 }
 
-.sisman-chart-preview-area {
+.sysman-chart-preview-area {
     min-height: 200px;
-    border: 1px dashed var(--sisman-gray-300);
-    border-radius: var(--sisman-radius);
+    border: 1px dashed var(--sysman-gray-300);
+    border-radius: var(--sysman-radius);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--sisman-gray-100);
+    background: var(--sysman-gray-100);
 }
 
-.sisman-preview-placeholder {
-    color: var(--sisman-gray-600);
+.sysman-preview-placeholder {
+    color: var(--sysman-gray-600);
     font-style: italic;
     padding: 40px;
 }
 
-.sisman-preview-data {
+.sysman-preview-data {
     width: 100%;
     padding: 15px;
     text-align: left;
 }
 
-.sisman-preview-data table {
+.sysman-preview-data table {
     margin-top: 10px;
 }
 
 /* Custom Filters */
-.sisman-filter-row {
+.sysman-filter-row {
     display: flex;
     gap: 10px;
     align-items: center;
     margin-bottom: 10px;
 }
 
-.sisman-filter-row select,
-.sisman-filter-row input[type="text"] {
+.sysman-filter-row select,
+.sysman-filter-row input[type="text"] {
     flex: 1;
 }
 
-.sisman-remove-filter {
-    color: var(--sisman-danger) !important;
-    border-color: var(--sisman-danger) !important;
+.sysman-remove-filter {
+    color: var(--sysman-danger) !important;
+    border-color: var(--sysman-danger) !important;
     min-width: 30px;
 }
 
 /* ========================================
    API Documentation
    ======================================== */
-.sisman-api-docs h3 {
-    color: var(--sisman-primary-dark);
+.sysman-api-docs h3 {
+    color: var(--sysman-primary-dark);
     margin-top: 20px;
 }
 
-.sisman-code-block {
+.sysman-code-block {
     display: block;
     padding: 10px 15px;
-    background: var(--sisman-gray-100);
-    border: 1px solid var(--sisman-gray-300);
+    background: var(--sysman-gray-100);
+    border: 1px solid var(--sysman-gray-300);
     border-radius: 4px;
     font-size: 13px;
     word-break: break-all;
@@ -981,51 +981,51 @@
    Responsive
    ======================================== */
 @media screen and (max-width: 782px) {
-    .sisman-stats-grid {
+    .sysman-stats-grid {
         grid-template-columns: 1fr;
     }
 
-    .sisman-form-row {
+    .sysman-form-row {
         flex-direction: column;
     }
 
-    .sisman-form-group {
+    .sysman-form-group {
         min-width: 100%;
     }
 
-    .sisman-filters-row {
+    .sysman-filters-row {
         flex-direction: column;
     }
 
-    .sisman-pagination {
+    .sysman-pagination {
         flex-direction: column;
         gap: 10px;
     }
 
-    .sisman-chart-types {
+    .sysman-chart-types {
         justify-content: center;
     }
 
-    .sisman-chart-type-option {
+    .sysman-chart-type-option {
         min-width: 80px;
     }
 
-    .sisman-modal-content {
+    .sysman-modal-content {
         width: 95%;
         max-height: 90vh;
     }
 
-    .sisman-import-steps {
+    .sysman-import-steps {
         flex-direction: column;
         gap: 5px;
     }
 
-    .sisman-step-connector {
+    .sysman-step-connector {
         width: 2px;
         height: 15px;
     }
 
-    .sisman-toolbar-options {
+    .sysman-toolbar-options {
         flex-direction: column;
     }
 }
@@ -1034,19 +1034,19 @@
    Accessibility - High Contrast
    ======================================== */
 @media (prefers-contrast: high) {
-    .sisman-stat-card {
+    .sysman-stat-card {
         border: 2px solid #000;
     }
 
-    .sisman-panel {
+    .sysman-panel {
         border: 2px solid #000;
     }
 
-    .sisman-records-table th {
+    .sysman-records-table th {
         background: #000;
     }
 
-    .sisman-chart-type-option.active {
+    .sysman-chart-type-option.active {
         border-width: 3px;
     }
 }
@@ -1064,17 +1064,17 @@
 /* ========================================
    Focus Styles
    ======================================== */
-.sisman-admin-wrap button:focus,
-.sisman-admin-wrap a:focus,
-.sisman-admin-wrap input:focus,
-.sisman-admin-wrap select:focus,
-.sisman-admin-wrap textarea:focus {
-    outline: 2px solid var(--sisman-accent);
+.sysman-admin-wrap button:focus,
+.sysman-admin-wrap a:focus,
+.sysman-admin-wrap input:focus,
+.sysman-admin-wrap select:focus,
+.sysman-admin-wrap textarea:focus {
+    outline: 2px solid var(--sysman-accent);
     outline-offset: 2px;
 }
 
 /* Skip Link (for screen readers) */
-.sisman-skip-link {
+.sysman-skip-link {
     position: absolute;
     left: -10000px;
     top: auto;
@@ -1083,15 +1083,15 @@
     overflow: hidden;
 }
 
-.sisman-skip-link:focus {
+.sysman-skip-link:focus {
     position: fixed;
     top: 5px;
     left: 5px;
     width: auto;
     height: auto;
     padding: 10px 15px;
-    background: var(--sisman-primary);
+    background: var(--sysman-primary);
     color: #fff;
     z-index: 100000;
-    border-radius: var(--sisman-radius);
+    border-radius: var(--sysman-radius);
 }

@@ -1,5 +1,5 @@
 /**
- * SISMAN Suite - Admin Chart Configuration Manager
+ * SYSMAN Suite - Admin Chart Configuration Manager
  * Gobernación de Nariño
  */
 (function ($) {
@@ -7,7 +7,7 @@
 
     const ChartConfigManager = {
         init() {
-            if ($('.sisman-chart-config').length === 0) return;
+            if ($('.sysman-chart-config').length === 0) return;
 
             this.bindEvents();
             this.loadColumns();
@@ -16,51 +16,51 @@
 
         bindEvents() {
             // Table change: reload columns
-            $('#sisman_data_table').on('change', () => this.loadColumns());
+            $('#sysman_data_table').on('change', () => this.loadColumns());
 
             // Chart type selection
-            $('.sisman-chart-type-option').on('click', function () {
-                $('.sisman-chart-type-option').removeClass('active');
+            $('.sysman-chart-type-option').on('click', function () {
+                $('.sysman-chart-type-option').removeClass('active');
                 $(this).addClass('active');
             });
 
             // Add filter
-            $('#sisman-add-filter').on('click', () => this.addFilter());
+            $('#sysman-add-filter').on('click', () => this.addFilter());
 
             // Remove filter
-            $(document).on('click', '.sisman-remove-filter', function () {
-                $(this).closest('.sisman-filter-row').remove();
+            $(document).on('click', '.sysman-remove-filter', function () {
+                $(this).closest('.sysman-filter-row').remove();
             });
 
             // Color palette preview
-            $('#sisman_chart_colors').on('input change', () => this.updateColorPreview());
+            $('#sysman_chart_colors').on('input change', () => this.updateColorPreview());
 
             // Collapsible sections
-            $(document).on('click', '.sisman-toggle-section', function () {
-                const body = $(this).closest('.sisman-collapsible').find('.sisman-collapsible-body');
+            $(document).on('click', '.sysman-toggle-section', function () {
+                const body = $(this).closest('.sysman-collapsible').find('.sysman-collapsible-body');
                 body.slideToggle(200);
                 $(this).text(body.is(':visible') ? 'Colapsar' : 'Expandir');
             });
 
             // Preview button
-            $('#sisman-refresh-preview').on('click', () => this.refreshPreview());
+            $('#sysman-refresh-preview').on('click', () => this.refreshPreview());
 
             // Show/hide step indicators on import page
-            const report = $('#sisman-report');
+            const report = $('#sysman-report');
             if (report.length) {
                 report.on('change', () => {
                     const val = report.val();
                     if (val === 'all') {
-                        $('#sisman-import-steps').show();
+                        $('#sysman-import-steps').show();
                     } else {
-                        $('#sisman-import-steps').hide();
+                        $('#sysman-import-steps').hide();
                     }
                 });
             }
         },
 
         loadColumns() {
-            const table = $('#sisman_data_table').val();
+            const table = $('#sysman_data_table').val();
             if (!table) return;
 
             // Extract table key (remove prefix)
@@ -68,7 +68,7 @@
             let key = '';
             let found = false;
             for (const part of parts) {
-                if (found || part === 'sisman') {
+                if (found || part === 'sysman') {
                     found = true;
                     key += (key ? '_' : '') + part;
                 }
@@ -76,8 +76,8 @@
             if (!key) key = table;
 
             $.ajax({
-                url: `${sismanCharts.restUrl}columns/${key}`,
-                headers: { 'X-WP-Nonce': sismanCharts.restNonce },
+                url: `${sysmanCharts.restUrl}columns/${key}`,
+                headers: { 'X-WP-Nonce': sysmanCharts.restNonce },
                 success: (columns) => {
                     this.populateColumnSelects(columns);
                 },
@@ -93,11 +93,11 @@
                 (col) => !excludeColumns.includes(col)
             );
 
-            const savedGroup = $('#sisman-saved-group-column').val();
-            const savedValue = $('#sisman-saved-value-column').val();
+            const savedGroup = $('#sysman-saved-group-column').val();
+            const savedValue = $('#sysman-saved-value-column').val();
 
             // Group column select
-            const groupSelect = $('#sisman_group_column');
+            const groupSelect = $('#sysman_group_column');
             groupSelect.empty().append('<option value="">-- Seleccionar columna --</option>');
             filteredColumns.forEach((col) => {
                 const option = $('<option>').val(col).text(this.formatColumnName(col));
@@ -106,7 +106,7 @@
             });
 
             // Value column select
-            const valueSelect = $('#sisman_value_column');
+            const valueSelect = $('#sysman_value_column');
             valueSelect.empty().append('<option value="">-- Seleccionar columna --</option>');
             filteredColumns.forEach((col) => {
                 const option = $('<option>').val(col).text(this.formatColumnName(col));
@@ -115,7 +115,7 @@
             });
 
             // Update filter column dropdowns
-            $('.sisman-filter-column').each(function () {
+            $('.sysman-filter-column').each(function () {
                 const current = $(this).val();
                 $(this).empty().append('<option value="">Columna</option>');
                 filteredColumns.forEach((col) => {
@@ -127,13 +127,13 @@
         },
 
         addFilter() {
-            const index = $('.sisman-filter-row').length;
+            const index = $('.sysman-filter-row').length;
             const html = `
-                <div class="sisman-filter-row" data-index="${index}">
-                    <select name="sisman_filters[${index}][column]" class="sisman-filter-column">
+                <div class="sysman-filter-row" data-index="${index}">
+                    <select name="sysman_filters[${index}][column]" class="sysman-filter-column">
                         <option value="">Columna</option>
                     </select>
-                    <select name="sisman_filters[${index}][operator]">
+                    <select name="sysman_filters[${index}][operator]">
                         <option value="=">=</option>
                         <option value="!=">!=</option>
                         <option value=">">&gt;</option>
@@ -142,18 +142,18 @@
                         <option value="<=">&lt;=</option>
                         <option value="LIKE">LIKE</option>
                     </select>
-                    <input type="text" name="sisman_filters[${index}][value]" placeholder="Valor">
-                    <button type="button" class="button sisman-remove-filter" aria-label="Eliminar filtro">&times;</button>
+                    <input type="text" name="sysman_filters[${index}][value]" placeholder="Valor">
+                    <button type="button" class="button sysman-remove-filter" aria-label="Eliminar filtro">&times;</button>
                 </div>
             `;
 
-            $('#sisman-filters-list').append(html);
+            $('#sysman-filters-list').append(html);
             this.loadColumns();
         },
 
         updateColorPreview() {
-            const input = $('#sisman_chart_colors');
-            const preview = $('#sisman-color-preview');
+            const input = $('#sysman_chart_colors');
+            const preview = $('#sysman-color-preview');
             if (!input.length || !preview.length) return;
 
             const colors = input.val().split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c));
@@ -161,33 +161,33 @@
             preview.empty();
             colors.forEach((color) => {
                 preview.append(
-                    $('<span class="sisman-color-swatch">').css('background-color', color).attr('title', color)
+                    $('<span class="sysman-color-swatch">').css('background-color', color).attr('title', color)
                 );
             });
         },
 
         refreshPreview() {
-            const area = $('#sisman-chart-preview-area');
+            const area = $('#sysman-chart-preview-area');
             const postId = $('#post_ID').val();
 
             if (!postId) {
-                area.html('<p class="sisman-preview-placeholder">Guarde la gráfica primero para ver la vista previa.</p>');
+                area.html('<p class="sysman-preview-placeholder">Guarde la gráfica primero para ver la vista previa.</p>');
                 return;
             }
 
             area.html('<div style="text-align:center;padding:40px;"><span class="spinner is-active" style="float:none;"></span><p>Cargando vista previa...</p></div>');
 
             $.ajax({
-                url: `${sismanCharts.restUrl}chart/${postId}`,
-                headers: { 'X-WP-Nonce': sismanCharts.restNonce },
+                url: `${sysmanCharts.restUrl}chart/${postId}`,
+                headers: { 'X-WP-Nonce': sysmanCharts.restNonce },
                 success: (response) => {
                     if (!response.data || response.data.length === 0) {
-                        area.html('<p class="sisman-preview-placeholder">No hay datos disponibles. Verifique la configuración y que la tabla tenga registros.</p>');
+                        area.html('<p class="sysman-preview-placeholder">No hay datos disponibles. Verifique la configuración y que la tabla tenga registros.</p>');
                         return;
                     }
 
                     // Display data summary as preview
-                    let html = '<div class="sisman-preview-data">';
+                    let html = '<div class="sysman-preview-data">';
                     html += `<p><strong>Tipo:</strong> ${response.meta.chart_type || 'bar'} | <strong>Registros:</strong> ${response.data.length}</p>`;
                     html += '<table class="widefat striped"><thead><tr><th>Etiqueta</th><th>Valor</th></tr></thead><tbody>';
                     response.data.slice(0, 10).forEach((row) => {
@@ -202,7 +202,7 @@
                     area.html(html);
                 },
                 error: () => {
-                    area.html('<p class="sisman-preview-placeholder" style="color:#dc3232;">Error al cargar la vista previa. Guarde la gráfica e intente de nuevo.</p>');
+                    area.html('<p class="sysman-preview-placeholder" style="color:#dc3232;">Error al cargar la vista previa. Guarde la gráfica e intente de nuevo.</p>');
                 },
             });
         },

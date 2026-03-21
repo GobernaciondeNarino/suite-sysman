@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-$plugin = Sisman_Suite::instance();
+$plugin = Sysman_Suite::instance();
 $meta   = $plugin->visualizer->get_chart_meta( $id );
 
 $chart_type    = $meta['chart_type'];
@@ -19,8 +19,8 @@ $show_toolbar  = $meta['show_toolbar'];
 $title         = $meta['title'];
 ?>
 
-<div class="sisman-chart-wrapper"
-     id="sisman-chart-<?php echo esc_attr( $id ); ?>"
+<div class="sysman-chart-wrapper"
+     id="sysman-chart-<?php echo esc_attr( $id ); ?>"
      data-chart-id="<?php echo esc_attr( $id ); ?>"
      data-chart-type="<?php echo esc_attr( $chart_type ); ?>"
      data-chart-height="<?php echo esc_attr( $chart_height ); ?>"
@@ -32,38 +32,38 @@ $title         = $meta['title'];
      data-x-axis-title="<?php echo esc_attr( $x_axis_title ); ?>"
      data-show-timeline="<?php echo esc_attr( $show_timeline ? 'true' : 'false' ); ?>"
      role="figure"
-     aria-label="<?php echo esc_attr( sprintf( __( 'Gráfico: %s', 'sisman-suite' ), $title ) ); ?>">
+     aria-label="<?php echo esc_attr( sprintf( __( 'Gráfico: %s', 'sysman-suite' ), $title ) ); ?>">
 
     <?php if ( $show_toolbar ) : ?>
     <!-- Toolbar -->
-    <div class="sisman-chart-toolbar" role="toolbar" aria-label="<?php esc_attr_e( 'Herramientas del gráfico', 'sisman-suite' ); ?>">
-        <h3 class="sisman-chart-title"><?php echo esc_html( $title ); ?></h3>
-        <div class="sisman-chart-actions">
+    <div class="sysman-chart-toolbar" role="toolbar" aria-label="<?php esc_attr_e( 'Herramientas del gráfico', 'sysman-suite' ); ?>">
+        <h3 class="sysman-chart-title"><?php echo esc_html( $title ); ?></h3>
+        <div class="sysman-chart-actions">
             <?php if ( $meta['toolbar_detail'] ) : ?>
-            <button type="button" class="sisman-btn sisman-btn-data" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Ver datos', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Ver datos', 'sisman-suite' ); ?>">
+            <button type="button" class="sysman-btn sysman-btn-data" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Ver datos', 'sysman-suite' ); ?>" title="<?php esc_attr_e( 'Ver datos', 'sysman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-editor-table"></span>
             </button>
             <?php endif; ?>
 
             <?php if ( $meta['toolbar_csv'] ) : ?>
-            <button type="button" class="sisman-btn sisman-btn-download" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar CSV', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar CSV', 'sisman-suite' ); ?>">
+            <button type="button" class="sysman-btn sysman-btn-download" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar CSV', 'sysman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar CSV', 'sysman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-download"></span>
             </button>
             <?php endif; ?>
 
             <?php if ( $meta['toolbar_image'] ) : ?>
-            <button type="button" class="sisman-btn sisman-btn-image" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar imagen', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar imagen', 'sisman-suite' ); ?>">
+            <button type="button" class="sysman-btn sysman-btn-image" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Descargar imagen', 'sysman-suite' ); ?>" title="<?php esc_attr_e( 'Descargar imagen', 'sysman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-format-image"></span>
             </button>
             <?php endif; ?>
 
             <?php if ( $meta['toolbar_share'] ) : ?>
-            <button type="button" class="sisman-btn sisman-btn-share" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Compartir', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Compartir', 'sisman-suite' ); ?>">
+            <button type="button" class="sysman-btn sysman-btn-share" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Compartir', 'sysman-suite' ); ?>" title="<?php esc_attr_e( 'Compartir', 'sysman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-share"></span>
             </button>
             <?php endif; ?>
 
-            <button type="button" class="sisman-btn sisman-btn-fullscreen" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Pantalla completa', 'sisman-suite' ); ?>" title="<?php esc_attr_e( 'Pantalla completa', 'sisman-suite' ); ?>">
+            <button type="button" class="sysman-btn sysman-btn-fullscreen" data-chart-id="<?php echo esc_attr( $id ); ?>" aria-label="<?php esc_attr_e( 'Pantalla completa', 'sysman-suite' ); ?>" title="<?php esc_attr_e( 'Pantalla completa', 'sysman-suite' ); ?>">
                 <span aria-hidden="true" class="dashicons dashicons-fullscreen-alt"></span>
             </button>
         </div>
@@ -71,25 +71,25 @@ $title         = $meta['title'];
     <?php endif; ?>
 
     <!-- Chart Container -->
-    <div class="sisman-chart-container" style="height: <?php echo esc_attr( $chart_height ); ?>px;">
-        <div class="sisman-chart-loading" aria-live="polite">
-            <div class="sisman-spinner"></div>
-            <p><?php esc_html_e( 'Cargando gráfico...', 'sisman-suite' ); ?></p>
+    <div class="sysman-chart-container" style="height: <?php echo esc_attr( $chart_height ); ?>px;">
+        <div class="sysman-chart-loading" aria-live="polite">
+            <div class="sysman-spinner"></div>
+            <p><?php esc_html_e( 'Cargando gráfico...', 'sysman-suite' ); ?></p>
         </div>
-        <div class="sisman-chart-canvas"></div>
+        <div class="sysman-chart-canvas"></div>
     </div>
 
     <!-- Data Table Modal -->
-    <div class="sisman-chart-modal sisman-data-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sisman-data-title-<?php echo esc_attr( $id ); ?>">
-        <div class="sisman-modal-overlay"></div>
-        <div class="sisman-modal-content">
-            <div class="sisman-modal-header">
-                <h3 id="sisman-data-title-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Datos del Gráfico', 'sisman-suite' ); ?></h3>
-                <button type="button" class="sisman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sisman-suite' ); ?>">&times;</button>
+    <div class="sysman-chart-modal sysman-data-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sysman-data-title-<?php echo esc_attr( $id ); ?>">
+        <div class="sysman-modal-overlay"></div>
+        <div class="sysman-modal-content">
+            <div class="sysman-modal-header">
+                <h3 id="sysman-data-title-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Datos del Gráfico', 'sysman-suite' ); ?></h3>
+                <button type="button" class="sysman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sysman-suite' ); ?>">&times;</button>
             </div>
-            <div class="sisman-modal-body">
-                <table class="sisman-data-table" role="grid">
-                    <thead><tr><th><?php esc_html_e( 'Etiqueta', 'sisman-suite' ); ?></th><th><?php esc_html_e( 'Valor', 'sisman-suite' ); ?></th></tr></thead>
+            <div class="sysman-modal-body">
+                <table class="sysman-data-table" role="grid">
+                    <thead><tr><th><?php esc_html_e( 'Etiqueta', 'sysman-suite' ); ?></th><th><?php esc_html_e( 'Valor', 'sysman-suite' ); ?></th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -97,33 +97,33 @@ $title         = $meta['title'];
     </div>
 
     <!-- Share Modal -->
-    <div class="sisman-chart-modal sisman-share-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sisman-share-title-<?php echo esc_attr( $id ); ?>">
-        <div class="sisman-modal-overlay"></div>
-        <div class="sisman-modal-content">
-            <div class="sisman-modal-header">
-                <h3 id="sisman-share-title-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Compartir Gráfico', 'sisman-suite' ); ?></h3>
-                <button type="button" class="sisman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sisman-suite' ); ?>">&times;</button>
+    <div class="sysman-chart-modal sysman-share-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sysman-share-title-<?php echo esc_attr( $id ); ?>">
+        <div class="sysman-modal-overlay"></div>
+        <div class="sysman-modal-content">
+            <div class="sysman-modal-header">
+                <h3 id="sysman-share-title-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Compartir Gráfico', 'sysman-suite' ); ?></h3>
+                <button type="button" class="sysman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sysman-suite' ); ?>">&times;</button>
             </div>
-            <div class="sisman-modal-body">
-                <div class="sisman-share-buttons">
-                    <a href="#" class="sisman-share-btn sisman-share-facebook" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en Facebook', 'sisman-suite' ); ?>">
+            <div class="sysman-modal-body">
+                <div class="sysman-share-buttons">
+                    <a href="#" class="sysman-share-btn sysman-share-facebook" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en Facebook', 'sysman-suite' ); ?>">
                         Facebook
                     </a>
-                    <a href="#" class="sisman-share-btn sisman-share-twitter" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en X/Twitter', 'sisman-suite' ); ?>">
+                    <a href="#" class="sysman-share-btn sysman-share-twitter" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en X/Twitter', 'sysman-suite' ); ?>">
                         X / Twitter
                     </a>
-                    <a href="#" class="sisman-share-btn sisman-share-linkedin" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en LinkedIn', 'sisman-suite' ); ?>">
+                    <a href="#" class="sysman-share-btn sysman-share-linkedin" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en LinkedIn', 'sysman-suite' ); ?>">
                         LinkedIn
                     </a>
-                    <a href="#" class="sisman-share-btn sisman-share-whatsapp" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en WhatsApp', 'sisman-suite' ); ?>">
+                    <a href="#" class="sysman-share-btn sysman-share-whatsapp" target="_blank" rel="noopener" aria-label="<?php esc_attr_e( 'Compartir en WhatsApp', 'sysman-suite' ); ?>">
                         WhatsApp
                     </a>
                 </div>
-                <div class="sisman-share-link">
-                    <label for="sisman-share-url-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Enlace directo:', 'sisman-suite' ); ?></label>
-                    <input type="text" id="sisman-share-url-<?php echo esc_attr( $id ); ?>" value="<?php echo esc_attr( get_permalink() ); ?>" readonly>
-                    <button type="button" class="button sisman-copy-link" data-target="sisman-share-url-<?php echo esc_attr( $id ); ?>">
-                        <?php esc_html_e( 'Copiar', 'sisman-suite' ); ?>
+                <div class="sysman-share-link">
+                    <label for="sysman-share-url-<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Enlace directo:', 'sysman-suite' ); ?></label>
+                    <input type="text" id="sysman-share-url-<?php echo esc_attr( $id ); ?>" value="<?php echo esc_attr( get_permalink() ); ?>" readonly>
+                    <button type="button" class="button sysman-copy-link" data-target="sysman-share-url-<?php echo esc_attr( $id ); ?>">
+                        <?php esc_html_e( 'Copiar', 'sysman-suite' ); ?>
                     </button>
                 </div>
             </div>
@@ -131,9 +131,9 @@ $title         = $meta['title'];
     </div>
 
     <!-- Source attribution -->
-    <div class="sisman-chart-footer">
-        <p class="sisman-chart-source">
-            <?php esc_html_e( 'Fuente: Sistema SISMAN - Gobernación de Nariño', 'sisman-suite' ); ?>
+    <div class="sysman-chart-footer">
+        <p class="sysman-chart-source">
+            <?php esc_html_e( 'Fuente: Sistema SYSMAN - Gobernación de Nariño', 'sysman-suite' ); ?>
         </p>
     </div>
 </div>

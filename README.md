@@ -1,10 +1,10 @@
-# SISMAN Suite - Plugin WordPress
+# SYSMAN Suite - Plugin WordPress
 
-Plugin de WordPress para importar, almacenar y visualizar datos presupuestales desde el sistema **SISMAN** de la **Gobernación de Nariño**.
+Plugin de WordPress para importar, almacenar y visualizar datos presupuestales desde el sistema **SYSMAN** de la **Gobernación de Nariño**.
 
 ## Descripción
 
-SISMAN Suite permite conectarse a la API del sistema presupuestal SISMAN para obtener y gestionar los siguientes informes:
+SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para obtener y gestionar los siguientes informes:
 
 1. **Ejecución Presupuestal de Gastos Acumulada** (`numinforme=1`)
 2. **Auxiliar Presupuestal por Cuentas** (`numinforme=2`)
@@ -31,9 +31,9 @@ SISMAN Suite permite conectarse a la API del sistema presupuestal SISMAN para ob
 
 ## Instalación
 
-1. Subir la carpeta `sisman-suite` al directorio `/wp-content/plugins/`
+1. Subir la carpeta `sysman-suite` al directorio `/wp-content/plugins/`
 2. Activar el plugin desde el menú 'Plugins' de WordPress
-3. Navegar a **SISMAN Suite** en el menú de administración
+3. Navegar a **SYSMAN Suite** en el menú de administración
 4. Configurar los parámetros de la API (compañía, año, mes)
 5. Realizar la primera importación de datos
 
@@ -41,52 +41,52 @@ SISMAN Suite permite conectarse a la API del sistema presupuestal SISMAN para ob
 
 ### Importar Datos
 
-1. Ir a **SISMAN Suite > Importar Datos**
+1. Ir a **SYSMAN Suite > Importar Datos**
 2. Seleccionar compañía, año, mes y tipo de informe
 3. Hacer clic en "Iniciar Importación"
 
 ### Ver Registros
 
-1. Ir a **SISMAN Suite > Registros**
+1. Ir a **SYSMAN Suite > Registros**
 2. Seleccionar la tabla a consultar
 3. Usar los filtros de año, mes y búsqueda
 
 ### Crear Gráficos
 
-1. Ir a **SISMAN Suite > Gráficos > Nuevo Gráfico**
+1. Ir a **SYSMAN Suite > Gráficos > Nuevo Gráfico**
 2. Configurar tipo de gráfico, fuente de datos y filtros
 3. Publicar el gráfico
-4. Usar el shortcode `[sisman_chart id="XX"]` en cualquier página
+4. Usar el shortcode `[sysman_chart id="XX"]` en cualquier página
 
 ### WP-CLI
 
 ```bash
 # Importar todos los informes
-wp sisman import --anio=2024 --mes=6
+wp sysman import --anio=2024 --mes=6
 
 # Importar solo ejecución presupuestal
-wp sisman import --report=ejecucion --anio=2024 --mes=1
+wp sysman import --report=ejecucion --anio=2024 --mes=1
 
 # Ver estadísticas
-wp sisman stats
+wp sysman stats
 
 # Vaciar tablas
-wp sisman truncate --yes
+wp sysman truncate --yes
 ```
 
 ## API REST
 
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
-| `/wp-json/sisman-suite/v1/records/{tabla}` | GET | Obtener registros con paginación |
-| `/wp-json/sisman-suite/v1/stats` | GET | Estadísticas de registros |
-| `/wp-json/sisman-suite/v1/tables` | GET | Lista de tablas disponibles |
-| `/wp-json/sisman-suite/v1/columns/{tabla}` | GET | Columnas de una tabla |
-| `/wp-json/sisman-suite/v1/chart/{id}` | GET | Datos de un gráfico |
-| `/wp-json/sisman-suite/v1/chart/{id}/csv` | GET | Descargar CSV de un gráfico |
-| `/wp-json/sisman-suite/v1/years/{tabla}` | GET | Años disponibles |
+| `/wp-json/sysman-suite/v1/records/{tabla}` | GET | Obtener registros con paginación |
+| `/wp-json/sysman-suite/v1/stats` | GET | Estadísticas de registros |
+| `/wp-json/sysman-suite/v1/tables` | GET | Lista de tablas disponibles |
+| `/wp-json/sysman-suite/v1/columns/{tabla}` | GET | Columnas de una tabla |
+| `/wp-json/sysman-suite/v1/chart/{id}` | GET | Datos de un gráfico |
+| `/wp-json/sysman-suite/v1/chart/{id}/csv` | GET | Descargar CSV de un gráfico |
+| `/wp-json/sysman-suite/v1/years/{tabla}` | GET | Años disponibles |
 
-## API SISMAN
+## API SYSMAN
 
 URL Base: `https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar`
 

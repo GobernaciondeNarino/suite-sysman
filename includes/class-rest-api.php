@@ -1,5 +1,5 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -15,7 +15,7 @@ class Rest_Api {
     }
 
     public function register_routes(): void {
-        $namespace = 'sisman-suite/v1';
+        $namespace = 'sysman-suite/v1';
 
         // Records endpoint (paginated)
         register_rest_route( $namespace, '/records/(?P<table>[\w]+)', [
@@ -151,11 +151,11 @@ class Rest_Api {
     public function get_chart_data( \WP_REST_Request $request ): \WP_REST_Response {
         $id = $request->get_param( 'id' );
 
-        if ( 'sisman_chart' !== get_post_type( $id ) ) {
+        if ( 'sysman_chart' !== get_post_type( $id ) ) {
             return new \WP_REST_Response( [ 'error' => 'Gráfico no encontrado' ], 404 );
         }
 
-        $plugin = \Sisman_Suite::instance();
+        $plugin = \Sysman_Suite::instance();
         $data   = $plugin->visualizer->get_chart_data( $id );
         $meta   = $plugin->visualizer->get_chart_meta( $id );
 
@@ -168,11 +168,11 @@ class Rest_Api {
     public function download_chart_csv( \WP_REST_Request $request ): \WP_REST_Response {
         $id = $request->get_param( 'id' );
 
-        if ( 'sisman_chart' !== get_post_type( $id ) ) {
+        if ( 'sysman_chart' !== get_post_type( $id ) ) {
             return new \WP_REST_Response( [ 'error' => 'Gráfico no encontrado' ], 404 );
         }
 
-        $plugin = \Sisman_Suite::instance();
+        $plugin = \Sysman_Suite::instance();
         $data   = $plugin->visualizer->get_chart_data( $id );
 
         $csv = "Etiqueta,Valor\n";
@@ -184,7 +184,7 @@ class Rest_Api {
 
         $response = new \WP_REST_Response( $csv );
         $response->header( 'Content-Type', 'text/csv; charset=UTF-8' );
-        $response->header( 'Content-Disposition', 'attachment; filename="sisman-chart-' . $id . '.csv"' );
+        $response->header( 'Content-Disposition', 'attachment; filename="sysman-chart-' . $id . '.csv"' );
 
         return $response;
     }

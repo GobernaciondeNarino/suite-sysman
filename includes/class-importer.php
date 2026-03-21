@@ -1,5 +1,5 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -23,8 +23,8 @@ class Importer {
         $this->database = $database;
         $this->logger   = $logger;
 
-        add_action( 'wp_ajax_sisman_start_import', [ $this, 'ajax_start_import' ] );
-        add_action( 'wp_ajax_sisman_import_status', [ $this, 'ajax_import_status' ] );
+        add_action( 'wp_ajax_sysman_start_import', [ $this, 'ajax_start_import' ] );
+        add_action( 'wp_ajax_sysman_import_status', [ $this, 'ajax_import_status' ] );
     }
 
     /**
@@ -42,7 +42,7 @@ class Importer {
     }
 
     /**
-     * Fetch data from the SISMAN API.
+     * Fetch data from the SYSMAN API.
      */
     private function fetch_api( string $url ): array {
         $this->logger->log( "Consultando API: {$url}" );
@@ -79,10 +79,10 @@ class Importer {
             return [ 'success' => false, 'error' => 'JSON inválido', 'data' => [] ];
         }
 
-        // SISMAN API returns { codigo: 0, mensaje: "OK", cuerpo: [...] }
+        // SYSMAN API returns { codigo: 0, mensaje: "OK", cuerpo: [...] }
         if ( ! isset( $data['codigo'] ) || (int) $data['codigo'] !== 0 ) {
             $msg = $data['mensaje'] ?? 'Error desconocido';
-            $this->logger->log( "ERROR API SISMAN: {$msg}", 'error' );
+            $this->logger->log( "ERROR API SYSMAN: {$msg}", 'error' );
             return [ 'success' => false, 'error' => $msg, 'data' => [] ];
         }
 
@@ -96,7 +96,7 @@ class Importer {
      * Update the import status transient.
      */
     private function update_status( int $step, int $total, string $message, string $report_key = '' ): void {
-        set_transient( 'sisman_import_status', [
+        set_transient( 'sysman_import_status', [
             'running'      => true,
             'step'         => $step,
             'total'        => $total,
@@ -120,7 +120,7 @@ class Importer {
             return $result;
         }
 
-        $table    = $wpdb->prefix . 'sisman_ejecucion_gastos';
+        $table    = $wpdb->prefix . 'sysman_ejecucion_gastos';
         $inserted = $this->database->insert_ejecucion_records( $result['data'], $table, $anio, $mes, $compania );
 
         $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en ejecución." );
@@ -173,7 +173,7 @@ class Importer {
             return $result;
         }
 
-        $table    = $wpdb->prefix . 'sisman_plan_presupuestal';
+        $table    = $wpdb->prefix . 'sysman_plan_presupuestal';
         $inserted = $this->database->insert_ejecucion_records( $result['data'], $table, $anio, $mes, $compania );
 
         $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en plan." );
@@ -192,19 +192,19 @@ class Importer {
     public function import_all( string $compania, int $anio, int $mes ): array {
         $results = [];
 
-        $this->update_status( 1, 3, 'Conectando con API SISMAN...', 'ejecucion' );
+        $this->update_status( 1, 3, 'Conectando con API SYSMAN...', 'ejecucion' );
         $results['ejecucion'] = $this->import_ejecucion( $compania, $anio, $mes );
 
-        $this->update_status( 2, 3, 'Conectando con API SISMAN...', 'auxiliar' );
+        $this->update_status( 2, 3, 'Conectando con API SYSMAN...', 'auxiliar' );
         $results['auxiliar'] = $this->import_auxiliar( $compania, $anio, $mes );
 
-        $this->update_status( 3, 3, 'Conectando con API SISMAN...', 'plan' );
+        $this->update_status( 3, 3, 'Conectando con API SYSMAN...', 'plan' );
         $results['plan'] = $this->import_plan( $compania, $anio, $mes );
 
-        delete_transient( 'sisman_import_status' );
+        delete_transient( 'sysman_import_status' );
 
         // Save last import info
-        update_option( 'sisman_last_import', [
+        update_option( 'sysman_last_import', [
             'date'     => current_time( 'mysql' ),
             'compania' => $compania,
             'anio'     => $anio,
@@ -219,7 +219,7 @@ class Importer {
      * AJAX: Start import.
      */
     public function ajax_start_import(): void {
-        check_ajax_referer( 'sisman_import_nonce', 'nonce' );
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
@@ -273,10 +273,10 @@ class Importer {
                 break;
         }
 
-        delete_transient( 'sisman_import_status' );
+        delete_transient( 'sysman_import_status' );
 
         // Save last import info
-        update_option( 'sisman_last_import', [
+        update_option( 'sysman_last_import', [
             'date'     => current_time( 'mysql' ),
             'compania' => $compania,
             'anio'     => $anio,
@@ -310,9 +310,9 @@ class Importer {
      * AJAX: Check import status.
      */
     public function ajax_import_status(): void {
-        check_ajax_referer( 'sisman_import_nonce', 'nonce' );
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
 
-        $status = get_transient( 'sisman_import_status' );
+        $status = get_transient( 'sysman_import_status' );
 
         if ( ! $status ) {
             wp_send_json_success( [
@@ -328,9 +328,9 @@ class Importer {
      * Scheduled import via WP Cron.
      */
     public function run_scheduled_import(): void {
-        $compania = get_option( 'sisman_api_compania', '001' );
-        $anio     = (int) get_option( 'sisman_api_anio', date( 'Y' ) );
-        $mes      = (int) get_option( 'sisman_api_mes', date( 'n' ) );
+        $compania = get_option( 'sysman_api_compania', '001' );
+        $anio     = (int) get_option( 'sysman_api_anio', date( 'Y' ) );
+        $mes      = (int) get_option( 'sysman_api_mes', date( 'n' ) );
 
         $this->logger->log( '======================================================', 'info' );
         $this->logger->log( 'INICIO DE IMPORTACIÓN PROGRAMADA (CRON)', 'info' );

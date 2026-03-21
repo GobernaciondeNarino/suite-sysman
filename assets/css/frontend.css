@@ -1,5 +1,5 @@
 /**
- * SISMAN Suite - Frontend Styles
+ * SYSMAN Suite - Frontend Styles
  * Gobernación de Nariño
  */
 
@@ -7,33 +7,33 @@
    Variables
    ======================================== */
 :root {
-    --sisman-primary: #1a5632;
-    --sisman-primary-dark: #0e3a20;
-    --sisman-primary-light: #2d7a4a;
-    --sisman-accent: #3498db;
-    --sisman-gray-100: #f8f9fa;
-    --sisman-gray-200: #e9ecef;
-    --sisman-gray-300: #dee2e6;
-    --sisman-gray-600: #6c757d;
-    --sisman-gray-800: #343a40;
-    --sisman-radius: 8px;
-    --sisman-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --sisman-shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.15);
+    --sysman-primary: #1a5632;
+    --sysman-primary-dark: #0e3a20;
+    --sysman-primary-light: #2d7a4a;
+    --sysman-accent: #3498db;
+    --sysman-gray-100: #f8f9fa;
+    --sysman-gray-200: #e9ecef;
+    --sysman-gray-300: #dee2e6;
+    --sysman-gray-600: #6c757d;
+    --sysman-gray-800: #343a40;
+    --sysman-radius: 8px;
+    --sysman-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --sysman-shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* ========================================
    Chart Wrapper
    ======================================== */
-.sisman-chart-wrapper {
+.sysman-chart-wrapper {
     background: #fff;
-    border-radius: var(--sisman-radius);
-    box-shadow: var(--sisman-shadow);
+    border-radius: var(--sysman-radius);
+    box-shadow: var(--sysman-shadow);
     margin: 20px 0;
     overflow: hidden;
-    border: 1px solid var(--sisman-gray-200);
+    border: 1px solid var(--sysman-gray-200);
 }
 
-.sisman-chart-wrapper.fullscreen {
+.sysman-chart-wrapper.fullscreen {
     position: fixed;
     top: 0;
     left: 0;
@@ -47,30 +47,30 @@
 /* ========================================
    Toolbar
    ======================================== */
-.sisman-chart-toolbar {
+.sysman-chart-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 20px;
-    background: var(--sisman-primary);
+    background: var(--sysman-primary);
     color: #fff;
     flex-wrap: wrap;
     gap: 10px;
 }
 
-.sisman-chart-title {
+.sysman-chart-title {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
     color: #fff;
 }
 
-.sisman-chart-actions {
+.sysman-chart-actions {
     display: flex;
     gap: 5px;
 }
 
-.sisman-btn {
+.sysman-btn {
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 4px;
@@ -83,16 +83,16 @@
     transition: background 0.2s;
 }
 
-.sisman-btn:hover {
+.sysman-btn:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
-.sisman-btn:focus {
+.sysman-btn:focus {
     outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
-.sisman-btn .dashicons {
+.sysman-btn .dashicons {
     font-size: 18px;
     width: 18px;
     height: 18px;
@@ -101,18 +101,18 @@
 /* ========================================
    Chart Container
    ======================================== */
-.sisman-chart-container {
+.sysman-chart-container {
     position: relative;
     width: 100%;
     overflow: hidden;
 }
 
-.sisman-chart-canvas {
+.sysman-chart-canvas {
     width: 100%;
     height: 100%;
 }
 
-.sisman-chart-canvas svg {
+.sysman-chart-canvas svg {
     width: 100%;
     height: 100%;
 }
@@ -120,33 +120,33 @@
 /* ========================================
    Loading State
    ======================================== */
-.sisman-chart-loading {
+.sysman-chart-loading {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
 }
 
-.sisman-spinner {
+.sysman-spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid var(--sisman-gray-200);
-    border-top-color: var(--sisman-primary);
+    border: 4px solid var(--sysman-gray-200);
+    border-top-color: var(--sysman-primary);
     border-radius: 50%;
-    animation: sisman-spin 0.8s linear infinite;
+    animation: sysman-spin 0.8s linear infinite;
     margin: 0 auto 10px;
 }
 
-@keyframes sisman-spin {
+@keyframes sysman-spin {
     to { transform: rotate(360deg); }
 }
 
 /* ========================================
    Modals
    ======================================== */
-.sisman-chart-modal {
+.sysman-chart-modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -158,7 +158,7 @@
     justify-content: center;
 }
 
-.sisman-chart-modal .sisman-modal-overlay {
+.sysman-chart-modal .sysman-modal-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -167,11 +167,11 @@
     background: rgba(0, 0, 0, 0.6);
 }
 
-.sisman-chart-modal .sisman-modal-content {
+.sysman-chart-modal .sysman-modal-content {
     position: relative;
     background: #fff;
-    border-radius: var(--sisman-radius);
-    box-shadow: var(--sisman-shadow-lg);
+    border-radius: var(--sysman-radius);
+    box-shadow: var(--sysman-shadow-lg);
     max-width: 700px;
     width: 90%;
     max-height: 80vh;
@@ -180,22 +180,22 @@
     overflow: hidden;
 }
 
-.sisman-chart-modal .sisman-modal-header {
+.sysman-chart-modal .sysman-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 20px;
-    background: var(--sisman-primary);
+    background: var(--sysman-primary);
     color: #fff;
 }
 
-.sisman-chart-modal .sisman-modal-header h3 {
+.sysman-chart-modal .sysman-modal-header h3 {
     margin: 0;
     font-size: 16px;
     color: #fff;
 }
 
-.sisman-chart-modal .sisman-modal-close {
+.sysman-chart-modal .sysman-modal-close {
     background: none;
     border: none;
     color: #fff;
@@ -206,54 +206,54 @@
     opacity: 0.8;
 }
 
-.sisman-chart-modal .sisman-modal-close:hover {
+.sysman-chart-modal .sysman-modal-close:hover {
     opacity: 1;
 }
 
-.sisman-chart-modal .sisman-modal-close:focus {
+.sysman-chart-modal .sysman-modal-close:focus {
     outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
-.sisman-chart-modal .sisman-modal-body {
+.sysman-chart-modal .sysman-modal-body {
     padding: 20px;
     overflow-y: auto;
 }
 
 /* Data Table in Modal */
-.sisman-data-table {
+.sysman-data-table {
     width: 100%;
     border-collapse: collapse;
 }
 
-.sisman-data-table th {
-    background: var(--sisman-gray-100);
+.sysman-data-table th {
+    background: var(--sysman-gray-100);
     padding: 10px 12px;
     text-align: left;
     font-weight: 600;
-    border-bottom: 2px solid var(--sisman-gray-300);
+    border-bottom: 2px solid var(--sysman-gray-300);
 }
 
-.sisman-data-table td {
+.sysman-data-table td {
     padding: 8px 12px;
-    border-bottom: 1px solid var(--sisman-gray-200);
+    border-bottom: 1px solid var(--sysman-gray-200);
 }
 
-.sisman-data-table tbody tr:hover {
-    background: var(--sisman-gray-100);
+.sysman-data-table tbody tr:hover {
+    background: var(--sysman-gray-100);
 }
 
 /* ========================================
    Share Buttons
    ======================================== */
-.sisman-share-buttons {
+.sysman-share-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 20px;
 }
 
-.sisman-share-btn {
+.sysman-share-btn {
     display: inline-flex;
     align-items: center;
     padding: 10px 20px;
@@ -268,105 +268,105 @@
     min-width: 120px;
 }
 
-.sisman-share-btn:hover {
+.sysman-share-btn:hover {
     opacity: 0.9;
     color: #fff !important;
 }
 
-.sisman-share-btn:focus {
-    outline: 2px solid var(--sisman-accent);
+.sysman-share-btn:focus {
+    outline: 2px solid var(--sysman-accent);
     outline-offset: 2px;
 }
 
-.sisman-share-facebook { background: #1877f2; }
-.sisman-share-twitter { background: #000; }
-.sisman-share-linkedin { background: #0a66c2; }
-.sisman-share-whatsapp { background: #25d366; }
+.sysman-share-facebook { background: #1877f2; }
+.sysman-share-twitter { background: #000; }
+.sysman-share-linkedin { background: #0a66c2; }
+.sysman-share-whatsapp { background: #25d366; }
 
 /* Share Link */
-.sisman-share-link {
+.sysman-share-link {
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
 }
 
-.sisman-share-link label {
+.sysman-share-link label {
     font-weight: 600;
     white-space: nowrap;
 }
 
-.sisman-share-link input {
+.sysman-share-link input {
     flex: 1;
     min-width: 200px;
     padding: 6px 10px;
-    border: 1px solid var(--sisman-gray-300);
+    border: 1px solid var(--sysman-gray-300);
     border-radius: 4px;
 }
 
-.sisman-copy-link {
+.sysman-copy-link {
     padding: 6px 15px;
-    border: 1px solid var(--sisman-gray-300);
+    border: 1px solid var(--sysman-gray-300);
     border-radius: 4px;
-    background: var(--sisman-gray-100);
+    background: var(--sysman-gray-100);
     cursor: pointer;
     white-space: nowrap;
 }
 
-.sisman-copy-link:hover {
-    background: var(--sisman-gray-200);
+.sysman-copy-link:hover {
+    background: var(--sysman-gray-200);
 }
 
 /* ========================================
    Chart Footer
    ======================================== */
-.sisman-chart-footer {
+.sysman-chart-footer {
     padding: 8px 20px;
-    background: var(--sisman-gray-100);
-    border-top: 1px solid var(--sisman-gray-200);
+    background: var(--sysman-gray-100);
+    border-top: 1px solid var(--sysman-gray-200);
 }
 
-.sisman-chart-source {
+.sysman-chart-source {
     margin: 0;
     font-size: 11px;
-    color: var(--sisman-gray-600);
+    color: var(--sysman-gray-600);
     font-style: italic;
 }
 
 /* ========================================
    Error State
    ======================================== */
-.sisman-error {
+.sysman-error {
     padding: 15px 20px;
     background: #f8d7da;
     color: #721c24;
     border: 1px solid #f5c6cb;
-    border-radius: var(--sisman-radius);
+    border-radius: var(--sysman-radius);
     text-align: center;
 }
 
 /* ========================================
    Toast Notifications
    ======================================== */
-.sisman-toast {
+.sysman-toast {
     position: fixed;
     bottom: 30px;
     right: 30px;
     padding: 12px 20px;
-    background: var(--sisman-gray-800);
+    background: var(--sysman-gray-800);
     color: #fff;
     border-radius: 6px;
-    box-shadow: var(--sisman-shadow-lg);
+    box-shadow: var(--sysman-shadow-lg);
     z-index: 1000001;
     font-size: 14px;
-    animation: sisman-toast-in 0.3s ease;
+    animation: sysman-toast-in 0.3s ease;
 }
 
-.sisman-toast.success {
-    background: var(--sisman-primary);
+.sysman-toast.success {
+    background: var(--sysman-primary);
 }
 
-@keyframes sisman-toast-in {
+@keyframes sysman-toast-in {
     from {
         opacity: 0;
         transform: translateY(20px);
@@ -381,19 +381,19 @@
    Responsive
    ======================================== */
 @media screen and (max-width: 768px) {
-    .sisman-chart-toolbar {
+    .sysman-chart-toolbar {
         padding: 10px 15px;
     }
 
-    .sisman-chart-title {
+    .sysman-chart-title {
         font-size: 14px;
     }
 
-    .sisman-share-buttons {
+    .sysman-share-buttons {
         flex-direction: column;
     }
 
-    .sisman-share-btn {
+    .sysman-share-btn {
         min-width: auto;
     }
 }
@@ -402,33 +402,33 @@
    Accessibility
    ======================================== */
 @media (prefers-reduced-motion: reduce) {
-    .sisman-spinner {
+    .sysman-spinner {
         animation: none;
-        border-top-color: var(--sisman-primary);
+        border-top-color: var(--sysman-primary);
     }
 
-    .sisman-toast {
+    .sysman-toast {
         animation: none;
     }
 }
 
 @media (prefers-contrast: high) {
-    .sisman-chart-wrapper {
+    .sysman-chart-wrapper {
         border: 2px solid #000;
     }
 
-    .sisman-btn {
+    .sysman-btn {
         border: 2px solid #fff;
     }
 
-    .sisman-data-table th {
+    .sysman-data-table th {
         background: #000;
         color: #fff;
     }
 }
 
 /* Screen reader only text */
-.sisman-sr-only {
+.sysman-sr-only {
     position: absolute;
     width: 1px;
     height: 1px;

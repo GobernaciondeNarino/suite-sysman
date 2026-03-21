@@ -1,6 +1,6 @@
 <?php
 /**
- * SISMAN Suite - Uninstall
+ * SYSMAN Suite - Uninstall
  * Removes all plugin data on uninstall.
  */
 
@@ -12,9 +12,9 @@ global $wpdb;
 
 // Drop custom tables
 $tables = [
-    $wpdb->prefix . 'sisman_ejecucion_gastos',
-    $wpdb->prefix . 'sisman_auxiliar_cuentas',
-    $wpdb->prefix . 'sisman_plan_presupuestal',
+    $wpdb->prefix . 'sysman_ejecucion_gastos',
+    $wpdb->prefix . 'sysman_auxiliar_cuentas',
+    $wpdb->prefix . 'sysman_plan_presupuestal',
 ];
 
 foreach ( $tables as $table ) {
@@ -24,12 +24,12 @@ foreach ( $tables as $table ) {
 
 // Delete options
 $options = [
-    'sisman_api_compania',
-    'sisman_api_anio',
-    'sisman_api_mes',
-    'sisman_import_frequency',
-    'sisman_last_import',
-    'sisman_update_notice_dismissed',
+    'sysman_api_compania',
+    'sysman_api_anio',
+    'sysman_api_mes',
+    'sysman_import_frequency',
+    'sysman_last_import',
+    'sysman_update_notice_dismissed',
 ];
 
 foreach ( $options as $option ) {
@@ -37,12 +37,12 @@ foreach ( $options as $option ) {
 }
 
 // Delete transients
-delete_transient( 'sisman_import_status' );
-delete_transient( 'sisman_suite_update_info' );
+delete_transient( 'sysman_import_status' );
+delete_transient( 'sysman_suite_update_info' );
 
 // Delete chart CPT posts
 $charts = get_posts( [
-    'post_type'   => 'sisman_chart',
+    'post_type'   => 'sysman_chart',
     'numberposts' => -1,
     'post_status' => 'any',
     'fields'      => 'ids',
@@ -53,4 +53,4 @@ foreach ( $charts as $chart_id ) {
 }
 
 // Clear cron
-wp_clear_scheduled_hook( 'sisman_scheduled_import' );
+wp_clear_scheduled_hook( 'sysman_scheduled_import' );

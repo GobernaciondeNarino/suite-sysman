@@ -1,5 +1,5 @@
 /**
- * SISMAN Suite - Admin Import & Records Manager
+ * SYSMAN Suite - Admin Import & Records Manager
  * Gobernación de Nariño
  */
 (function ($) {
@@ -15,27 +15,27 @@
         },
 
         bindEvents() {
-            $('#sisman-import-btn').on('click', () => this.startImport());
-            $('#sisman-report').on('change', () => this.toggleAuxiliarOptions());
+            $('#sysman-import-btn').on('click', () => this.startImport());
+            $('#sysman-report').on('change', () => this.toggleAuxiliarOptions());
         },
 
         toggleAuxiliarOptions() {
-            const report = $('#sisman-report').val();
-            $('.sisman-auxiliar-options').toggle(report === 'auxiliar');
+            const report = $('#sysman-report').val();
+            $('.sysman-auxiliar-options').toggle(report === 'auxiliar');
         },
 
         startImport() {
-            const btn = $('#sisman-import-btn');
-            const progress = $('#sisman-import-progress');
-            const results = $('#sisman-import-results');
+            const btn = $('#sysman-import-btn');
+            const progress = $('#sysman-import-progress');
+            const results = $('#sysman-import-results');
 
-            if (!confirm(sismanAdmin.strings.confirmImport)) {
+            if (!confirm(sysmanAdmin.strings.confirmImport)) {
                 return;
             }
 
             // Disable button and show progress
             btn.prop('disabled', true).html(
-                '<span class="dashicons dashicons-update sisman-spin"></span> ' + sismanAdmin.strings.importing
+                '<span class="dashicons dashicons-update sysman-spin"></span> ' + sysmanAdmin.strings.importing
             );
             progress.show();
             results.hide().empty();
@@ -44,32 +44,32 @@
             this.setProgress(0, 'Preparando importación...');
 
             const data = {
-                action: 'sisman_start_import',
-                nonce: sismanAdmin.nonce,
-                compania: $('#sisman-compania').val(),
-                anio: $('#sisman-anio').val(),
-                mes: $('#sisman-mes').val(),
-                report: $('#sisman-report').val(),
-                tipo_cpte: $('#sisman-tipo-cpte').val(),
+                action: 'sysman_start_import',
+                nonce: sysmanAdmin.nonce,
+                compania: $('#sysman-compania').val(),
+                anio: $('#sysman-anio').val(),
+                mes: $('#sysman-mes').val(),
+                report: $('#sysman-report').val(),
+                tipo_cpte: $('#sysman-tipo-cpte').val(),
             };
 
             // Start polling for status updates
             this.statusInterval = setInterval(() => this.pollStatus(), 1500);
 
             $.ajax({
-                url: sismanAdmin.ajaxUrl,
+                url: sysmanAdmin.ajaxUrl,
                 type: 'POST',
                 data: data,
                 timeout: 600000, // 10 minutes
                 success: (response) => {
                     this.stopPolling();
-                    this.setProgress(100, sismanAdmin.strings.complete);
+                    this.setProgress(100, sysmanAdmin.strings.complete);
 
                     if (response.success) {
                         this.showResults(response.data.results, 'success');
                     } else {
                         this.showResults(
-                            { error: response.data?.message || sismanAdmin.strings.error },
+                            { error: response.data?.message || sysmanAdmin.strings.error },
                             'error'
                         );
                     }
@@ -77,7 +77,7 @@
                 error: (xhr, status, error) => {
                     this.stopPolling();
 
-                    let errorMsg = sismanAdmin.strings.error;
+                    let errorMsg = sysmanAdmin.strings.error;
                     if (status === 'timeout') {
                         errorMsg = 'La importación excedió el tiempo máximo de espera. Revise los logs para más detalles.';
                     } else if (error) {
@@ -97,11 +97,11 @@
 
         pollStatus() {
             $.ajax({
-                url: sismanAdmin.ajaxUrl,
+                url: sysmanAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'sisman_import_status',
-                    nonce: sismanAdmin.nonce,
+                    action: 'sysman_import_status',
+                    nonce: sysmanAdmin.nonce,
                 },
                 success: (response) => {
                     if (response.success && response.data.running) {
@@ -128,10 +128,10 @@
         },
 
         setProgress(percent, message) {
-            const container = $('#sisman-import-progress');
-            const fill = container.find('.sisman-progress-fill');
-            const text = container.find('.sisman-progress-text');
-            const pctLabel = container.find('.sisman-progress-percent');
+            const container = $('#sysman-import-progress');
+            const fill = container.find('.sysman-progress-fill');
+            const text = container.find('.sysman-progress-text');
+            const pctLabel = container.find('.sysman-progress-percent');
 
             fill.css('width', percent + '%');
             container.attr('aria-valuenow', Math.round(percent));
@@ -142,10 +142,10 @@
         },
 
         updateStepIndicators(data) {
-            const steps = $('#sisman-import-steps');
+            const steps = $('#sysman-import-steps');
             if (steps.length === 0) return;
 
-            steps.find('.sisman-step').each(function (index) {
+            steps.find('.sysman-step').each(function (index) {
                 const stepNum = index + 1;
                 $(this).removeClass('active completed');
                 if (stepNum < data.step) {
@@ -157,12 +157,12 @@
         },
 
         showResults(data, type) {
-            const container = $('#sisman-import-results');
+            const container = $('#sysman-import-results');
             container.removeClass('success error').addClass(type).empty();
 
             if (type === 'error') {
                 container.append(
-                    $('<div class="sisman-result-header error">').html(
+                    $('<div class="sysman-result-header error">').html(
                         '<span class="dashicons dashicons-warning"></span> ' +
                         '<strong>Error en la importación</strong>'
                     )
@@ -170,7 +170,7 @@
                 container.append($('<p>').text(data.error));
             } else {
                 container.append(
-                    $('<div class="sisman-result-header success">').html(
+                    $('<div class="sysman-result-header success">').html(
                         '<span class="dashicons dashicons-yes-alt"></span> ' +
                         '<strong>Importación completada exitosamente</strong>'
                     )
@@ -182,7 +182,7 @@
                     plan: 'Plan Presupuestal',
                 };
 
-                const table = $('<table class="sisman-results-table"><thead><tr>' +
+                const table = $('<table class="sysman-results-table"><thead><tr>' +
                     '<th>Informe</th><th>Estado</th><th>Registros</th><th>Detalles</th>' +
                     '</tr></thead><tbody></tbody></table>');
 
@@ -201,12 +201,12 @@
                         totalImported += imported;
                         totalRecords += total;
 
-                        row.append($('<td>').html('<span class="sisman-badge success">OK</span>'));
+                        row.append($('<td>').html('<span class="sysman-badge success">OK</span>'));
                         row.append($('<td>').html(`<strong>${imported.toLocaleString('es-CO')}</strong> / ${total.toLocaleString('es-CO')}`));
                         row.append($('<td>').text(imported === total ? 'Todos importados' : `${total - imported} omitidos (duplicados)`));
                     } else {
                         hasErrors = true;
-                        row.append($('<td>').html('<span class="sisman-badge error">Error</span>'));
+                        row.append($('<td>').html('<span class="sysman-badge error">Error</span>'));
                         row.append($('<td>').text('-'));
                         row.append($('<td>').text(result.error || 'Error desconocido'));
                     }
@@ -217,7 +217,7 @@
                 // Summary row
                 if (Object.keys(data).length > 1) {
                     table.find('tbody').append(
-                        $('<tr class="sisman-result-total">').html(
+                        $('<tr class="sysman-result-total">').html(
                             `<td><strong>Total</strong></td><td></td>` +
                             `<td><strong>${totalImported.toLocaleString('es-CO')}</strong> / ${totalRecords.toLocaleString('es-CO')}</td>` +
                             `<td></td>`
@@ -229,9 +229,9 @@
 
                 if (hasErrors) {
                     container.append(
-                        $('<p class="sisman-result-note">').html(
+                        $('<p class="sysman-result-note">').html(
                             '<span class="dashicons dashicons-info"></span> ' +
-                            'Algunos informes presentaron errores. Revise los <a href="?page=sisman-logs">logs</a> para más detalles.'
+                            'Algunos informes presentaron errores. Revise los <a href="?page=sysman-logs">logs</a> para más detalles.'
                         )
                     );
                 }
@@ -253,61 +253,61 @@
         totalPages: 0,
 
         init() {
-            if ($('#sisman-records-container').length === 0) return;
+            if ($('#sysman-records-container').length === 0) return;
             this.bindEvents();
             this.loadRecords();
         },
 
         bindEvents() {
-            $('#sisman-table-select').on('change', () => {
+            $('#sysman-table-select').on('change', () => {
                 this.currentPage = 1;
                 this.loadYears();
                 this.loadRecords();
             });
-            $('#sisman-filter-btn').on('click', () => {
+            $('#sysman-filter-btn').on('click', () => {
                 this.currentPage = 1;
                 this.loadRecords();
             });
-            $('#sisman-filter-search').on('keypress', (e) => {
+            $('#sysman-filter-search').on('keypress', (e) => {
                 if (e.which === 13) {
                     this.currentPage = 1;
                     this.loadRecords();
                 }
             });
-            $('#sisman-prev-page').on('click', () => {
+            $('#sysman-prev-page').on('click', () => {
                 if (this.currentPage > 1) {
                     this.currentPage--;
                     this.loadRecords();
                 }
             });
-            $('#sisman-next-page').on('click', () => {
+            $('#sysman-next-page').on('click', () => {
                 if (this.currentPage < this.totalPages) {
                     this.currentPage++;
                     this.loadRecords();
                 }
             });
-            $('#sisman-export-csv-btn').on('click', () => this.exportCSV());
+            $('#sysman-export-csv-btn').on('click', () => this.exportCSV());
 
             // Modal close
-            $(document).on('click', '.sisman-modal-close, .sisman-modal-overlay', () => {
-                $('#sisman-record-modal').hide();
+            $(document).on('click', '.sysman-modal-close, .sysman-modal-overlay', () => {
+                $('#sysman-record-modal').hide();
             });
             $(document).on('keydown', (e) => {
                 if (e.key === 'Escape') {
-                    $('#sisman-record-modal').hide();
+                    $('#sysman-record-modal').hide();
                 }
             });
         },
 
         loadYears() {
-            const table = $('#sisman-table-select').val();
+            const table = $('#sysman-table-select').val();
             if (!table) return;
 
             $.ajax({
-                url: `${sismanAdmin.restUrl}years/${table}`,
-                headers: { 'X-WP-Nonce': sismanAdmin.restNonce },
+                url: `${sysmanAdmin.restUrl}years/${table}`,
+                headers: { 'X-WP-Nonce': sysmanAdmin.restNonce },
                 success: (years) => {
-                    const select = $('#sisman-filter-anio');
+                    const select = $('#sysman-filter-anio');
                     const current = select.val();
                     select.empty().append('<option value="0">Todos</option>');
                     years.forEach((year) => {
@@ -318,21 +318,21 @@
         },
 
         loadRecords() {
-            const table = $('#sisman-table-select').val();
+            const table = $('#sysman-table-select').val();
             if (!table) return;
 
-            const loading = $('#sisman-records-loading');
+            const loading = $('#sysman-records-loading');
             loading.show();
 
             $.ajax({
-                url: `${sismanAdmin.restUrl}records/${table}`,
-                headers: { 'X-WP-Nonce': sismanAdmin.restNonce },
+                url: `${sysmanAdmin.restUrl}records/${table}`,
+                headers: { 'X-WP-Nonce': sysmanAdmin.restNonce },
                 data: {
                     page: this.currentPage,
                     per_page: this.perPage,
-                    search: $('#sisman-filter-search').val(),
-                    anio: $('#sisman-filter-anio').val(),
-                    mes: $('#sisman-filter-mes').val(),
+                    search: $('#sysman-filter-search').val(),
+                    anio: $('#sysman-filter-anio').val(),
+                    mes: $('#sysman-filter-mes').val(),
                 },
                 success: (response, status, xhr) => {
                     const total = parseInt(xhr.getResponseHeader('X-WP-Total')) || response.total;
@@ -343,8 +343,8 @@
                     this.updatePagination(total);
                 },
                 error: () => {
-                    $('#sisman-records-tbody').html(
-                        '<tr><td colspan="20" class="sisman-empty-message">Error al cargar los registros.</td></tr>'
+                    $('#sysman-records-tbody').html(
+                        '<tr><td colspan="20" class="sysman-empty-message">Error al cargar los registros.</td></tr>'
                     );
                 },
                 complete: () => loading.hide(),
@@ -352,14 +352,14 @@
         },
 
         renderTable(records) {
-            const thead = $('#sisman-records-thead');
-            const tbody = $('#sisman-records-tbody');
+            const thead = $('#sysman-records-thead');
+            const tbody = $('#sysman-records-tbody');
 
             thead.empty();
             tbody.empty();
 
             if (!records || records.length === 0) {
-                tbody.html('<tr><td colspan="20" class="sisman-empty-message">No se encontraron registros.</td></tr>');
+                tbody.html('<tr><td colspan="20" class="sysman-empty-message">No se encontraron registros.</td></tr>');
                 return;
             }
 
@@ -401,8 +401,8 @@
         },
 
         showDetail(record) {
-            const modal = $('#sisman-record-modal');
-            const body = $('#sisman-modal-body');
+            const modal = $('#sysman-record-modal');
+            const body = $('#sysman-modal-body');
 
             let html = '<table role="presentation">';
             for (const [key, value] of Object.entries(record)) {
@@ -419,11 +419,11 @@
 
             body.html(html);
             modal.show();
-            modal.find('.sisman-modal-close').trigger('focus');
+            modal.find('.sysman-modal-close').trigger('focus');
         },
 
         updatePagination(total) {
-            const pagination = $('#sisman-pagination');
+            const pagination = $('#sysman-pagination');
 
             if (total === 0) {
                 pagination.hide();
@@ -435,25 +435,25 @@
             const start = (this.currentPage - 1) * this.perPage + 1;
             const end = Math.min(this.currentPage * this.perPage, total);
 
-            $('#sisman-pagination-text').text(`Mostrando ${start}-${end} de ${total.toLocaleString('es-CO')} registros`);
-            $('#sisman-page-info').text(`Página ${this.currentPage} de ${this.totalPages}`);
-            $('#sisman-prev-page').prop('disabled', this.currentPage <= 1);
-            $('#sisman-next-page').prop('disabled', this.currentPage >= this.totalPages);
+            $('#sysman-pagination-text').text(`Mostrando ${start}-${end} de ${total.toLocaleString('es-CO')} registros`);
+            $('#sysman-page-info').text(`Página ${this.currentPage} de ${this.totalPages}`);
+            $('#sysman-prev-page').prop('disabled', this.currentPage <= 1);
+            $('#sysman-next-page').prop('disabled', this.currentPage >= this.totalPages);
         },
 
         exportCSV() {
-            const table = $('#sisman-table-select').val();
+            const table = $('#sysman-table-select').val();
             if (!table) return;
 
             // Get all visible records as CSV
             const rows = [];
             const headers = [];
-            $('#sisman-records-thead th').each(function () {
+            $('#sysman-records-thead th').each(function () {
                 headers.push($(this).text());
             });
             rows.push(headers.join(','));
 
-            $('#sisman-records-tbody tr').each(function () {
+            $('#sysman-records-tbody tr').each(function () {
                 const cells = [];
                 $(this).find('td').each(function () {
                     cells.push(`"${$(this).text().replace(/"/g, '""')}"`);
@@ -468,7 +468,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sisman-${table}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.download = `sysman-${table}-${new Date().toISOString().slice(0, 10)}.csv`;
             a.click();
             URL.revokeObjectURL(url);
         },

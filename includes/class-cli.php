@@ -1,23 +1,23 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * WP-CLI commands for SISMAN Suite.
+ * WP-CLI commands for SYSMAN Suite.
  *
  * ## EXAMPLES
  *
- *     wp sisman import --anio=2024 --mes=1
- *     wp sisman stats
- *     wp sisman truncate --yes
+ *     wp sysman import --anio=2024 --mes=1
+ *     wp sysman stats
+ *     wp sysman truncate --yes
  */
 class Cli {
 
     /**
-     * Import data from SISMAN API.
+     * Import data from SYSMAN API.
      *
      * ## OPTIONS
      *
@@ -38,8 +38,8 @@ class Cli {
      *
      * ## EXAMPLES
      *
-     *     wp sisman import --anio=2024 --mes=6
-     *     wp sisman import --report=ejecucion --anio=2024 --mes=1
+     *     wp sysman import --anio=2024 --mes=6
+     *     wp sysman import --report=ejecucion --anio=2024 --mes=1
      *
      * @param array $args       Positional arguments.
      * @param array $assoc_args Named arguments.
@@ -51,10 +51,10 @@ class Cli {
         $report    = $assoc_args['report'] ?? 'all';
         $tipo_cpte = $assoc_args['tipo_cpte'] ?? 'RES';
 
-        $plugin   = \Sisman_Suite::instance();
+        $plugin   = \Sysman_Suite::instance();
         $importer = $plugin->importer;
 
-        \WP_CLI::log( "Importando datos SISMAN: Compañía={$compania}, Año={$anio}, Mes={$mes}, Informe={$report}" );
+        \WP_CLI::log( "Importando datos SYSMAN: Compañía={$compania}, Año={$anio}, Mes={$mes}, Informe={$report}" );
 
         $start = microtime( true );
 
@@ -88,10 +88,10 @@ class Cli {
      *
      * ## EXAMPLES
      *
-     *     wp sisman stats
+     *     wp sysman stats
      */
     public function stats(): void {
-        $plugin = \Sisman_Suite::instance();
+        $plugin = \Sysman_Suite::instance();
         $stats  = $plugin->database->get_stats();
 
         $rows = [];
@@ -116,12 +116,12 @@ class Cli {
      *
      * ## EXAMPLES
      *
-     *     wp sisman truncate --yes
+     *     wp sysman truncate --yes
      */
     public function truncate( array $args, array $assoc_args ): void {
         \WP_CLI::confirm( '¿Está seguro de eliminar todos los datos del plugin?', $assoc_args );
 
-        $plugin = \Sisman_Suite::instance();
+        $plugin = \Sysman_Suite::instance();
         $plugin->database->drop_tables();
         $plugin->database->create_tables();
 

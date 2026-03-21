@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-$plugin = Sisman_Suite::instance();
+$plugin = Sysman_Suite::instance();
 $tables = $plugin->database->get_available_tables();
 
 $meses = [
@@ -22,18 +22,18 @@ $meses = [
     12 => 'Diciembre',
 ];
 ?>
-<div class="wrap sisman-admin-wrap">
-    <h1 class="sisman-title">
+<div class="wrap sysman-admin-wrap">
+    <h1 class="sysman-title">
         <span aria-hidden="true" class="dashicons dashicons-list-view"></span>
-        <?php esc_html_e( 'SISMAN Suite - Registros', 'sisman-suite' ); ?>
+        <?php esc_html_e( 'SYSMAN Suite - Registros', 'sysman-suite' ); ?>
     </h1>
 
     <!-- Table Selector and Filters -->
-    <div class="sisman-panel" role="region" aria-label="<?php esc_attr_e( 'Filtros de registros', 'sisman-suite' ); ?>">
-        <div class="sisman-filters-row">
-            <div class="sisman-form-group">
-                <label for="sisman-table-select"><?php esc_html_e( 'Tabla', 'sisman-suite' ); ?></label>
-                <select id="sisman-table-select">
+    <div class="sysman-panel" role="region" aria-label="<?php esc_attr_e( 'Filtros de registros', 'sysman-suite' ); ?>">
+        <div class="sysman-filters-row">
+            <div class="sysman-form-group">
+                <label for="sysman-table-select"><?php esc_html_e( 'Tabla', 'sysman-suite' ); ?></label>
+                <select id="sysman-table-select">
                     <?php foreach ( $tables as $table_name => $label ) : ?>
                     <option value="<?php echo esc_attr( str_replace( $GLOBALS['wpdb']->prefix, '', $table_name ) ); ?>">
                         <?php echo esc_html( $label ); ?>
@@ -42,55 +42,55 @@ $meses = [
                 </select>
             </div>
 
-            <div class="sisman-form-group">
-                <label for="sisman-filter-anio"><?php esc_html_e( 'Año', 'sisman-suite' ); ?></label>
-                <select id="sisman-filter-anio">
-                    <option value="0"><?php esc_html_e( 'Todos', 'sisman-suite' ); ?></option>
+            <div class="sysman-form-group">
+                <label for="sysman-filter-anio"><?php esc_html_e( 'Año', 'sysman-suite' ); ?></label>
+                <select id="sysman-filter-anio">
+                    <option value="0"><?php esc_html_e( 'Todos', 'sysman-suite' ); ?></option>
                 </select>
             </div>
 
-            <div class="sisman-form-group">
-                <label for="sisman-filter-mes"><?php esc_html_e( 'Mes', 'sisman-suite' ); ?></label>
-                <select id="sisman-filter-mes">
+            <div class="sysman-form-group">
+                <label for="sysman-filter-mes"><?php esc_html_e( 'Mes', 'sysman-suite' ); ?></label>
+                <select id="sysman-filter-mes">
                     <?php foreach ( $meses as $num => $nombre ) : ?>
                     <option value="<?php echo esc_attr( $num ); ?>"><?php echo esc_html( $nombre ); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
 
-            <div class="sisman-form-group">
-                <label for="sisman-filter-search"><?php esc_html_e( 'Buscar', 'sisman-suite' ); ?></label>
-                <input type="search" id="sisman-filter-search" placeholder="<?php esc_attr_e( 'Buscar...', 'sisman-suite' ); ?>" class="regular-text">
+            <div class="sysman-form-group">
+                <label for="sysman-filter-search"><?php esc_html_e( 'Buscar', 'sysman-suite' ); ?></label>
+                <input type="search" id="sysman-filter-search" placeholder="<?php esc_attr_e( 'Buscar...', 'sysman-suite' ); ?>" class="regular-text">
             </div>
 
-            <div class="sisman-form-group sisman-form-group--actions">
-                <button type="button" id="sisman-filter-btn" class="button button-primary">
+            <div class="sysman-form-group sysman-form-group--actions">
+                <button type="button" id="sysman-filter-btn" class="button button-primary">
                     <span aria-hidden="true" class="dashicons dashicons-search"></span>
-                    <?php esc_html_e( 'Filtrar', 'sisman-suite' ); ?>
+                    <?php esc_html_e( 'Filtrar', 'sysman-suite' ); ?>
                 </button>
-                <button type="button" id="sisman-export-csv-btn" class="button">
+                <button type="button" id="sysman-export-csv-btn" class="button">
                     <span aria-hidden="true" class="dashicons dashicons-media-spreadsheet"></span>
-                    <?php esc_html_e( 'Exportar CSV', 'sisman-suite' ); ?>
+                    <?php esc_html_e( 'Exportar CSV', 'sysman-suite' ); ?>
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Records Table -->
-    <div class="sisman-panel" role="region" aria-label="<?php esc_attr_e( 'Tabla de registros', 'sisman-suite' ); ?>">
-        <div id="sisman-records-loading" class="sisman-loading" style="display:none;" aria-live="polite">
+    <div class="sysman-panel" role="region" aria-label="<?php esc_attr_e( 'Tabla de registros', 'sysman-suite' ); ?>">
+        <div id="sysman-records-loading" class="sysman-loading" style="display:none;" aria-live="polite">
             <span class="spinner is-active"></span>
-            <span><?php esc_html_e( 'Cargando registros...', 'sisman-suite' ); ?></span>
+            <span><?php esc_html_e( 'Cargando registros...', 'sysman-suite' ); ?></span>
         </div>
 
-        <div id="sisman-records-container">
-            <table class="widefat striped sisman-records-table" role="grid">
-                <thead id="sisman-records-thead">
+        <div id="sysman-records-container">
+            <table class="widefat striped sysman-records-table" role="grid">
+                <thead id="sysman-records-thead">
                 </thead>
-                <tbody id="sisman-records-tbody">
+                <tbody id="sysman-records-tbody">
                     <tr>
-                        <td colspan="20" class="sisman-empty-message">
-                            <?php esc_html_e( 'Seleccione una tabla para ver los registros.', 'sisman-suite' ); ?>
+                        <td colspan="20" class="sysman-empty-message">
+                            <?php esc_html_e( 'Seleccione una tabla para ver los registros.', 'sysman-suite' ); ?>
                         </td>
                     </tr>
                 </tbody>
@@ -98,31 +98,31 @@ $meses = [
         </div>
 
         <!-- Pagination -->
-        <div id="sisman-pagination" class="sisman-pagination" style="display:none;" role="navigation" aria-label="<?php esc_attr_e( 'Paginación de registros', 'sisman-suite' ); ?>">
-            <div class="sisman-pagination-info">
-                <span id="sisman-pagination-text"></span>
+        <div id="sysman-pagination" class="sysman-pagination" style="display:none;" role="navigation" aria-label="<?php esc_attr_e( 'Paginación de registros', 'sysman-suite' ); ?>">
+            <div class="sysman-pagination-info">
+                <span id="sysman-pagination-text"></span>
             </div>
-            <div class="sisman-pagination-controls">
-                <button type="button" id="sisman-prev-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página anterior', 'sisman-suite' ); ?>">
-                    &laquo; <?php esc_html_e( 'Anterior', 'sisman-suite' ); ?>
+            <div class="sysman-pagination-controls">
+                <button type="button" id="sysman-prev-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página anterior', 'sysman-suite' ); ?>">
+                    &laquo; <?php esc_html_e( 'Anterior', 'sysman-suite' ); ?>
                 </button>
-                <span id="sisman-page-info" class="sisman-page-info"></span>
-                <button type="button" id="sisman-next-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página siguiente', 'sisman-suite' ); ?>">
-                    <?php esc_html_e( 'Siguiente', 'sisman-suite' ); ?> &raquo;
+                <span id="sysman-page-info" class="sysman-page-info"></span>
+                <button type="button" id="sysman-next-page" class="button" disabled aria-label="<?php esc_attr_e( 'Página siguiente', 'sysman-suite' ); ?>">
+                    <?php esc_html_e( 'Siguiente', 'sysman-suite' ); ?> &raquo;
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Record Detail Modal -->
-    <div id="sisman-record-modal" class="sisman-modal" role="dialog" aria-modal="true" aria-labelledby="sisman-modal-title" style="display:none;">
-        <div class="sisman-modal-overlay"></div>
-        <div class="sisman-modal-content">
-            <div class="sisman-modal-header">
-                <h2 id="sisman-modal-title"><?php esc_html_e( 'Detalle del Registro', 'sisman-suite' ); ?></h2>
-                <button type="button" class="sisman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sisman-suite' ); ?>">&times;</button>
+    <div id="sysman-record-modal" class="sysman-modal" role="dialog" aria-modal="true" aria-labelledby="sysman-modal-title" style="display:none;">
+        <div class="sysman-modal-overlay"></div>
+        <div class="sysman-modal-content">
+            <div class="sysman-modal-header">
+                <h2 id="sysman-modal-title"><?php esc_html_e( 'Detalle del Registro', 'sysman-suite' ); ?></h2>
+                <button type="button" class="sysman-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'sysman-suite' ); ?>">&times;</button>
             </div>
-            <div class="sisman-modal-body" id="sisman-modal-body">
+            <div class="sysman-modal-body" id="sysman-modal-body">
             </div>
         </div>
     </div>

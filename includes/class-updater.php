@@ -1,5 +1,5 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -11,8 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Updater {
 
-    private const GITHUB_REPO  = 'GobernaciondeNarino/sisman-suite';
-    private const CACHE_KEY    = 'sisman_suite_update_info';
+    private const GITHUB_REPO  = 'GobernaciondeNarino/sysman-suite';
+    private const CACHE_KEY    = 'sysman_suite_update_info';
     private const CACHE_EXPIRY = 12 * HOUR_IN_SECONDS;
 
     public function __construct() {
@@ -20,11 +20,11 @@ class Updater {
         add_filter( 'plugins_api', [ $this, 'plugin_info' ], 20, 3 );
         add_action( 'upgrader_process_complete', [ $this, 'clear_cache' ], 10, 2 );
         add_filter( 'plugin_row_meta', [ $this, 'plugin_row_meta' ], 10, 2 );
-        add_action( 'in_plugin_update_message-' . SISMAN_SUITE_BASENAME, [ $this, 'update_message' ], 10, 2 );
+        add_action( 'in_plugin_update_message-' . SYSMAN_SUITE_BASENAME, [ $this, 'update_message' ], 10, 2 );
 
         // Admin notice for major updates
         add_action( 'admin_notices', [ $this, 'update_notice' ] );
-        add_action( 'wp_ajax_sisman_dismiss_update_notice', [ $this, 'dismiss_update_notice' ] );
+        add_action( 'wp_ajax_sysman_dismiss_update_notice', [ $this, 'dismiss_update_notice' ] );
     }
 
     /**
@@ -40,17 +40,17 @@ class Updater {
             return $transient;
         }
 
-        $current_version = SISMAN_SUITE_VERSION;
+        $current_version = SYSMAN_SUITE_VERSION;
 
         if ( version_compare( $current_version, $remote['version'], '<' ) ) {
-            $transient->response[ SISMAN_SUITE_BASENAME ] = (object) [
-                'slug'        => 'sisman-suite',
-                'plugin'      => SISMAN_SUITE_BASENAME,
+            $transient->response[ SYSMAN_SUITE_BASENAME ] = (object) [
+                'slug'        => 'sysman-suite',
+                'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $remote['version'],
                 'url'         => $remote['url'],
                 'package'     => $remote['download_url'],
                 'icons'       => [
-                    'default' => SISMAN_SUITE_URL . 'assets/icon-128.png',
+                    'default' => SYSMAN_SUITE_URL . 'assets/icon-128.png',
                 ],
                 'tested'      => $remote['tested'] ?? '',
                 'requires'    => $remote['requires'] ?? '6.0',
@@ -58,9 +58,9 @@ class Updater {
             ];
         } else {
             // Plugin is up to date
-            $transient->no_update[ SISMAN_SUITE_BASENAME ] = (object) [
-                'slug'        => 'sisman-suite',
-                'plugin'      => SISMAN_SUITE_BASENAME,
+            $transient->no_update[ SYSMAN_SUITE_BASENAME ] = (object) [
+                'slug'        => 'sysman-suite',
+                'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $current_version,
                 'url'         => 'https://github.com/' . self::GITHUB_REPO,
             ];
@@ -73,7 +73,7 @@ class Updater {
      * Provide plugin info for the WordPress update screen.
      */
     public function plugin_info( $result, $action, $args ) {
-        if ( 'plugin_information' !== $action || 'sisman-suite' !== ( $args->slug ?? '' ) ) {
+        if ( 'plugin_information' !== $action || 'sysman-suite' !== ( $args->slug ?? '' ) ) {
             return $result;
         }
 
@@ -83,8 +83,8 @@ class Updater {
         }
 
         return (object) [
-            'name'            => 'SISMAN Suite',
-            'slug'            => 'sisman-suite',
+            'name'            => 'SYSMAN Suite',
+            'slug'            => 'sysman-suite',
             'version'         => $remote['version'],
             'author'          => '<a href="https://narino.gov.co">Gobernación de Nariño</a>',
             'author_profile'  => 'https://narino.gov.co',
@@ -96,9 +96,9 @@ class Updater {
             'trunk'           => $remote['download_url'],
             'last_updated'    => $remote['published_at'] ?? '',
             'sections'        => [
-                'description'  => __( 'Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SISMAN de la Gobernación de Nariño.', 'sisman-suite' ),
+                'description'  => __( 'Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.', 'sysman-suite' ),
                 'changelog'    => $this->format_changelog( $remote['changelog'] ?? '' ),
-                'installation' => __( '<ol><li>Sube la carpeta del plugin a <code>/wp-content/plugins/</code></li><li>Activa el plugin en WordPress</li><li>Ve a <strong>SISMAN Suite</strong> en el menú del admin</li></ol>', 'sisman-suite' ),
+                'installation' => __( '<ol><li>Sube la carpeta del plugin a <code>/wp-content/plugins/</code></li><li>Activa el plugin en WordPress</li><li>Ve a <strong>SYSMAN Suite</strong> en el menú del admin</li></ol>', 'sysman-suite' ),
             ],
             'banners'         => [],
         ];
@@ -119,7 +119,7 @@ class Updater {
                 'timeout' => 15,
                 'headers' => [
                     'Accept'     => 'application/vnd.github.v3+json',
-                    'User-Agent' => 'SISMAN-Suite/' . SISMAN_SUITE_VERSION,
+                    'User-Agent' => 'SYSMAN-Suite/' . SYSMAN_SUITE_VERSION,
                 ],
             ]
         );
@@ -191,7 +191,7 @@ class Updater {
      */
     private function format_changelog( string $markdown ): string {
         if ( empty( $markdown ) ) {
-            return '<p>' . esc_html__( 'No hay registro de cambios disponible.', 'sisman-suite' ) . '</p>';
+            return '<p>' . esc_html__( 'No hay registro de cambios disponible.', 'sysman-suite' ) . '</p>';
         }
 
         // Basic markdown to HTML conversion
@@ -220,14 +220,14 @@ class Updater {
      * Add custom links to the plugin row.
      */
     public function plugin_row_meta( array $links, string $file ): array {
-        if ( SISMAN_SUITE_BASENAME !== $file ) {
+        if ( SYSMAN_SUITE_BASENAME !== $file ) {
             return $links;
         }
 
         $links[] = '<a href="https://github.com/' . self::GITHUB_REPO . '/releases">' .
-            esc_html__( 'Registro de cambios', 'sisman-suite' ) . '</a>';
+            esc_html__( 'Registro de cambios', 'sysman-suite' ) . '</a>';
         $links[] = '<a href="https://github.com/' . self::GITHUB_REPO . '/issues">' .
-            esc_html__( 'Reportar problema', 'sisman-suite' ) . '</a>';
+            esc_html__( 'Reportar problema', 'sysman-suite' ) . '</a>';
 
         return $links;
     }
@@ -245,11 +245,11 @@ class Updater {
         $changelog = wp_trim_words( wp_strip_all_tags( $remote['changelog'] ), 30 );
         if ( $changelog ) {
             printf(
-                '<br><span class="sisman-update-changelog">%s: %s <a href="%s" target="_blank">%s</a></span>',
-                esc_html__( 'Novedades', 'sisman-suite' ),
+                '<br><span class="sysman-update-changelog">%s: %s <a href="%s" target="_blank">%s</a></span>',
+                esc_html__( 'Novedades', 'sysman-suite' ),
                 esc_html( $changelog ),
                 esc_url( $remote['url'] ),
-                esc_html__( 'Ver detalles completos', 'sisman-suite' )
+                esc_html__( 'Ver detalles completos', 'sysman-suite' )
             );
         }
     }
@@ -258,21 +258,21 @@ class Updater {
      * Display admin notice when an update is available.
      */
     public function update_notice(): void {
-        // Only show on SISMAN Suite pages
+        // Only show on SYSMAN Suite pages
         $screen = get_current_screen();
-        if ( ! $screen || strpos( $screen->id, 'sisman' ) === false ) {
+        if ( ! $screen || strpos( $screen->id, 'sysman' ) === false ) {
             return;
         }
 
         // Check if dismissed
-        $dismissed = get_option( 'sisman_update_notice_dismissed', '' );
+        $dismissed = get_option( 'sysman_update_notice_dismissed', '' );
 
         $remote = $this->get_remote_version();
         if ( ! $remote ) {
             return;
         }
 
-        if ( ! version_compare( SISMAN_SUITE_VERSION, $remote['version'], '<' ) ) {
+        if ( ! version_compare( SYSMAN_SUITE_VERSION, $remote['version'], '<' ) ) {
             return;
         }
 
@@ -281,33 +281,33 @@ class Updater {
         }
 
         ?>
-        <div class="notice notice-info is-dismissible sisman-update-notice" data-version="<?php echo esc_attr( $remote['version'] ); ?>">
+        <div class="notice notice-info is-dismissible sysman-update-notice" data-version="<?php echo esc_attr( $remote['version'] ); ?>">
             <p>
-                <strong><?php esc_html_e( 'SISMAN Suite', 'sisman-suite' ); ?></strong> &mdash;
+                <strong><?php esc_html_e( 'SYSMAN Suite', 'sysman-suite' ); ?></strong> &mdash;
                 <?php
                 printf(
                     /* translators: %s: new version number */
-                    esc_html__( 'Hay una nueva versión disponible: %s. Actualice para obtener las últimas mejoras y correcciones.', 'sisman-suite' ),
+                    esc_html__( 'Hay una nueva versión disponible: %s. Actualice para obtener las últimas mejoras y correcciones.', 'sysman-suite' ),
                     '<strong>' . esc_html( $remote['version'] ) . '</strong>'
                 );
                 ?>
                 <a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>" class="button button-small" style="margin-left:10px;">
-                    <?php esc_html_e( 'Actualizar ahora', 'sisman-suite' ); ?>
+                    <?php esc_html_e( 'Actualizar ahora', 'sysman-suite' ); ?>
                 </a>
                 <?php if ( ! empty( $remote['url'] ) ) : ?>
                 <a href="<?php echo esc_url( $remote['url'] ); ?>" target="_blank" style="margin-left:5px;">
-                    <?php esc_html_e( 'Ver cambios', 'sisman-suite' ); ?>
+                    <?php esc_html_e( 'Ver cambios', 'sysman-suite' ); ?>
                 </a>
                 <?php endif; ?>
             </p>
         </div>
         <script>
         jQuery(function($) {
-            $('.sisman-update-notice').on('click', '.notice-dismiss', function() {
+            $('.sysman-update-notice').on('click', '.notice-dismiss', function() {
                 $.post(ajaxurl, {
-                    action: 'sisman_dismiss_update_notice',
+                    action: 'sysman_dismiss_update_notice',
                     version: '<?php echo esc_js( $remote['version'] ); ?>',
-                    nonce: '<?php echo esc_js( wp_create_nonce( 'sisman_dismiss_notice' ) ); ?>'
+                    nonce: '<?php echo esc_js( wp_create_nonce( 'sysman_dismiss_notice' ) ); ?>'
                 });
             });
         });
@@ -319,10 +319,10 @@ class Updater {
      * AJAX: Dismiss update notice for a specific version.
      */
     public function dismiss_update_notice(): void {
-        check_ajax_referer( 'sisman_dismiss_notice', 'nonce' );
+        check_ajax_referer( 'sysman_dismiss_notice', 'nonce' );
         $version = sanitize_text_field( $_POST['version'] ?? '' );
         if ( $version ) {
-            update_option( 'sisman_update_notice_dismissed', $version );
+            update_option( 'sysman_update_notice_dismissed', $version );
         }
         wp_die();
     }

@@ -1,5 +1,5 @@
 <?php
-namespace SismanSuite;
+namespace SysmanSuite;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -26,7 +26,7 @@ class Database {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         // Table 1: Ejecución Presupuestal de Gastos (numinforme=1)
-        $table_ejecucion = $wpdb->prefix . 'sisman_ejecucion_gastos';
+        $table_ejecucion = $wpdb->prefix . 'sysman_ejecucion_gastos';
         $sql_ejecucion = "CREATE TABLE {$table_ejecucion} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             anio INT NOT NULL DEFAULT 0,
@@ -63,7 +63,7 @@ class Database {
         dbDelta( $sql_ejecucion );
 
         // Table 2: Auxiliar Presupuestal por Cuentas (numinforme=2)
-        $table_auxiliar = $wpdb->prefix . 'sisman_auxiliar_cuentas';
+        $table_auxiliar = $wpdb->prefix . 'sysman_auxiliar_cuentas';
         $sql_auxiliar = "CREATE TABLE {$table_auxiliar} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             anio INT NOT NULL DEFAULT 0,
@@ -93,7 +93,7 @@ class Database {
         dbDelta( $sql_auxiliar );
 
         // Table 3: Plan Presupuestal (numinforme=4)
-        $table_plan = $wpdb->prefix . 'sisman_plan_presupuestal';
+        $table_plan = $wpdb->prefix . 'sysman_plan_presupuestal';
         $sql_plan = "CREATE TABLE {$table_plan} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             anio INT NOT NULL DEFAULT 0,
@@ -138,9 +138,9 @@ class Database {
     public function get_available_tables(): array {
         global $wpdb;
         return [
-            $wpdb->prefix . 'sisman_ejecucion_gastos'  => __( 'Ejecución Presupuestal de Gastos', 'sisman-suite' ),
-            $wpdb->prefix . 'sisman_auxiliar_cuentas'   => __( 'Auxiliar Presupuestal por Cuentas', 'sisman-suite' ),
-            $wpdb->prefix . 'sisman_plan_presupuestal'  => __( 'Plan Presupuestal', 'sisman-suite' ),
+            $wpdb->prefix . 'sysman_ejecucion_gastos'  => __( 'Ejecución Presupuestal de Gastos', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_auxiliar_cuentas'   => __( 'Auxiliar Presupuestal por Cuentas', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_plan_presupuestal'  => __( 'Plan Presupuestal', 'sysman-suite' ),
         ];
     }
 
@@ -185,6 +185,16 @@ class Database {
         }
 
         return $this->column_cache[ $table ];
+    }
+
+    /**
+     * Check if a table actually exists in the database.
+     */
+    public function ensure_table_exists( string $table ): bool {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $found = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+        return ( null !== $found );
     }
 
     /**
@@ -246,17 +256,27 @@ class Database {
             return 0;
         }
 
+        if ( ! $this->ensure_table_exists( $table_name ) ) {
+            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
+            return 0;
+        }
+
         $field_map = $this->get_ejecucion_field_map();
         $inserted  = 0;
 
-        // Delete existing records for same period to avoid duplicates
+        // Delete existing records for same year and company to avoid duplicates
         $wpdb->delete( $table_name, [
             'anio'     => $anio,
-            'mes'      => $mes,
             'compania' => $compania,
-        ], [ '%d', '%d', '%s' ] );
+        ], [ '%d', '%s' ] );
 
-        foreach ( $records as $record ) {
+        foreach ( $records as $index => $record ) {
+            // Log the first record's keys for debugging field mapping
+            if ( 0 === $index ) {
+                $record_keys = implode( ', ', array_keys( $record ) );
+                $this->logger->log( "Claves del primer registro API (ejecucion): {$record_keys}" );
+            }
+
             $data = [
                 'anio'     => $anio,
                 'mes'      => $mes,
@@ -273,7 +293,7 @@ class Database {
                         'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
                         'pagos', 'obligacionesporpagar',
                     ], true ) ) {
-                        $data[ $db_column ] = floatval( str_replace( [ '.', ',' ], [ '', '.' ], $value ) );
+                        $data[ $db_column ] = floatval( $value );
                     } else {
                         $data[ $db_column ] = sanitize_text_field( $value );
                     }
@@ -281,9 +301,11 @@ class Database {
             }
 
             $result = $wpdb->insert( $table_name, $data );
-            if ( false !== $result ) {
-                $inserted++;
+            if ( false === $result ) {
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
+                break;
             }
+            $inserted++;
         }
 
         $this->logger->log( "Insertados {$inserted} registros en {$table_name} (Año: {$anio}, Mes: {$mes})." );
@@ -296,19 +318,28 @@ class Database {
     public function insert_auxiliar_records( array $records, int $anio, int $mes, string $compania, string $tipo_cpte ): int {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'sisman_auxiliar_cuentas';
+        $table_name = $wpdb->prefix . 'sysman_auxiliar_cuentas';
         $field_map  = $this->get_auxiliar_field_map();
         $inserted   = 0;
 
-        // Delete existing records for same period
-        $wpdb->delete( $table_name, [
-            'anio'      => $anio,
-            'mes'       => $mes,
-            'compania'  => $compania,
-            'tipo_cpte' => $tipo_cpte,
-        ], [ '%d', '%d', '%s', '%s' ] );
+        if ( ! $this->ensure_table_exists( $table_name ) ) {
+            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
+            return 0;
+        }
 
-        foreach ( $records as $record ) {
+        // Delete existing records for same year and company to avoid duplicates
+        $wpdb->delete( $table_name, [
+            'anio'     => $anio,
+            'compania' => $compania,
+        ], [ '%d', '%s' ] );
+
+        foreach ( $records as $index => $record ) {
+            // Log the first record's keys for debugging field mapping
+            if ( 0 === $index ) {
+                $record_keys = implode( ', ', array_keys( $record ) );
+                $this->logger->log( "Claves del primer registro API (auxiliar): {$record_keys}" );
+            }
+
             $data = [
                 'anio'      => $anio,
                 'mes'       => $mes,
@@ -320,7 +351,7 @@ class Database {
                 if ( isset( $record[ $api_field ] ) ) {
                     $value = $record[ $api_field ];
                     if ( in_array( $db_column, [ 'valordebito', 'valorcredito', 'saldoporejecutaresp' ], true ) ) {
-                        $data[ $db_column ] = floatval( str_replace( [ '.', ',' ], [ '', '.' ], $value ) );
+                        $data[ $db_column ] = floatval( $value );
                     } else {
                         $data[ $db_column ] = sanitize_text_field( $value );
                     }
@@ -328,9 +359,11 @@ class Database {
             }
 
             $result = $wpdb->insert( $table_name, $data );
-            if ( false !== $result ) {
-                $inserted++;
+            if ( false === $result ) {
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
+                break;
             }
+            $inserted++;
         }
 
         $this->logger->log( "Insertados {$inserted} registros auxiliares (Año: {$anio}, Mes: {$mes}, Tipo: {$tipo_cpte})." );
