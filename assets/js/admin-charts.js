@@ -269,56 +269,57 @@
 
         /**
          * Render live D3plus preview in admin.
-         * The key fix: save the post first via AJAX, then fetch data from REST API.
+         * Uses dedicated AJAX endpoint that builds query from current form values
+         * (no need to save the post first).
          */
         refreshPreview() {
             const area = $('#sysman-chart-preview-area');
             const status = $('#sysman-preview-status');
-            const postId = $('#post_ID').val();
 
-            if (!postId || postId === '0') {
-                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Guarde la gráfica primero para ver la vista previa.</p>');
+            // Collect current form values
+            const dataTable   = $('#sysman_data_table').val();
+            const groupColumn = $('#sysman_group_column').val();
+            const valueColumn = $('#sysman_value_column').val();
+
+            if (!dataTable || !groupColumn || !valueColumn) {
+                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupación y columna de valor para ver la vista previa.</p>');
                 return;
             }
 
-            area.html('<div style="text-align:center;padding:80px 20px;"><span class="spinner is-active" style="float:none;"></span><p>Guardando configuración y cargando datos...</p></div>');
-            status.text('Guardando...');
-
-            // First, save the post silently via AJAX to persist current form values
-            const formData = $('form#post').serialize();
+            area.html('<div style="text-align:center;padding:80px 20px;"><span class="spinner is-active" style="float:none;"></span><p>Cargando datos y renderizando gráfico...</p></div>');
+            status.text('Cargando...');
 
             $.ajax({
-                url: window.ajaxurl || '/wp-admin/admin-ajax.php',
+                url: sysmanCharts.ajaxUrl,
                 type: 'POST',
-                data: formData + '&action=editpost&_inline_edit=' + $('#_wpnonce').val(),
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                complete: () => {
-                    // Whether save succeeds or not, try to load preview from REST
-                    status.text('Cargando datos...');
-                    this.loadPreviewData(area, status, postId);
+                data: {
+                    action:        'sysman_preview_chart',
+                    preview_nonce: sysmanCharts.previewNonce,
+                    data_table:    dataTable,
+                    group_column:  groupColumn,
+                    value_column:  valueColumn,
+                    aggregate:     $('#sysman_aggregate').val() || 'SUM',
+                    chart_type:    $('input[name="sysman_chart_type"]:checked').val() || 'bar',
+                    chart_height:  $('#sysman_chart_height').val() || 400,
+                    chart_colors:  $('#sysman_chart_colors').val() || '',
+                    show_legend:   $('input[name="sysman_show_legend"]').is(':checked') ? 'yes' : '',
+                    y_axis_title:  $('#sysman_y_axis_title').val() || '',
+                    x_axis_title:  $('#sysman_x_axis_title').val() || '',
+                    filter_anio:   $('#sysman_filter_anio').val() || 0,
+                    filter_mes:    $('#sysman_filter_mes').val() || 0,
+                    filter_destino: $('#sysman_filter_destino').val() || '',
                 },
-            });
-        },
-
-        loadPreviewData(area, status, postId) {
-            $.ajax({
-                url: `${sysmanCharts.restUrl}chart/${postId}`,
-                headers: { 'X-WP-Nonce': sysmanCharts.restNonce },
                 success: (response) => {
-                    if (!response.data || response.data.length === 0) {
-                        area.html('<p style="text-align:center;padding:60px 20px;color:#999;">No hay datos disponibles. Verifique que la tabla tenga registros y que la configuración esté guardada.</p>');
+                    if (!response.success || !response.data.data || response.data.data.length === 0) {
+                        area.html('<p style="text-align:center;padding:60px 20px;color:#999;">No hay datos disponibles. Verifique que la tabla tenga registros.</p>');
                         status.text('Sin datos');
                         return;
                     }
-                    this.renderD3PlusPreview(area, response.data, response.meta);
-                    status.text(`${response.data.length} registros`);
+                    this.renderD3PlusPreview(area, response.data.data, response.data.meta);
+                    status.text(`${response.data.data.length} registros`);
                 },
-                error: (xhr) => {
-                    let msg = 'Error al cargar los datos.';
-                    if (xhr.status === 404) {
-                        msg = 'Gráfico no encontrado. Publique o guarde el gráfico primero.';
-                    }
-                    area.html(`<p style="text-align:center;padding:60px 20px;color:#dc3232;">${msg}</p>`);
+                error: () => {
+                    area.html('<p style="text-align:center;padding:60px 20px;color:#dc3232;">Error al cargar los datos de vista previa.</p>');
                     status.text('Error');
                 },
             });

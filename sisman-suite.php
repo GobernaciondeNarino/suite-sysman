@@ -251,8 +251,10 @@ final class Sysman_Suite {
                 true
             );
             wp_localize_script( 'sysman-admin-charts', 'sysmanCharts', [
-                'restUrl'   => rest_url( 'sysman-suite/v1/' ),
-                'restNonce' => wp_create_nonce( 'wp_rest' ),
+                'restUrl'      => rest_url( 'sysman-suite/v1/' ),
+                'restNonce'    => wp_create_nonce( 'wp_rest' ),
+                'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+                'previewNonce' => wp_create_nonce( 'sysman_chart_preview' ),
             ] );
         }
     }

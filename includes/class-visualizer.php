@@ -25,6 +25,9 @@ class Visualizer {
         // Custom columns for chart list table
         add_filter( 'manage_sysman_chart_posts_columns', [ $this, 'set_chart_columns' ] );
         add_action( 'manage_sysman_chart_posts_custom_column', [ $this, 'render_chart_column' ], 10, 2 );
+
+        // AJAX endpoint for admin chart preview (builds query from POST data)
+        add_action( 'wp_ajax_sysman_preview_chart', [ $this, 'ajax_preview_chart' ] );
     }
 
     /**
@@ -409,6 +412,84 @@ class Visualizer {
                 echo '<code style="background:#f0f0f0;padding:3px 8px;border-radius:3px;font-size:12px;user-select:all;">[sysman_chart id="' . esc_attr( $post_id ) . '"]</code>';
                 break;
         }
+    }
+
+    /**
+     * AJAX handler for admin chart preview.
+     * Builds query from POST data without requiring the post to be saved.
+     */
+    public function ajax_preview_chart(): void {
+        check_ajax_referer( 'sysman_chart_preview', 'preview_nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Sin permisos' ], 403 );
+        }
+
+        global $wpdb;
+
+        $table     = sanitize_text_field( $_POST['data_table'] ?? '' );
+        $group_col = sanitize_text_field( $_POST['group_column'] ?? '' );
+        $value_col = sanitize_text_field( $_POST['value_column'] ?? '' );
+        $aggregate = strtoupper( sanitize_text_field( $_POST['aggregate'] ?? 'SUM' ) );
+
+        if ( ! $this->database->validate_table( $table ) ) {
+            wp_send_json_error( [ 'message' => 'Tabla no válida' ] );
+        }
+        if ( ! $this->database->validate_column( $table, $group_col ) ) {
+            wp_send_json_error( [ 'message' => 'Columna de agrupación no válida' ] );
+        }
+        if ( ! $this->database->validate_column( $table, $value_col ) ) {
+            wp_send_json_error( [ 'message' => 'Columna de valor no válida' ] );
+        }
+        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
+            $aggregate = 'SUM';
+        }
+
+        $query   = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        $where   = [];
+        $prepare = [];
+
+        $filter_anio = absint( $_POST['filter_anio'] ?? 0 );
+        $filter_mes  = absint( $_POST['filter_mes'] ?? 0 );
+        if ( $filter_anio > 0 ) {
+            $where[]   = 'anio = %d';
+            $prepare[] = $filter_anio;
+        }
+        if ( $filter_mes > 0 ) {
+            $where[]   = 'mes = %d';
+            $prepare[] = $filter_mes;
+        }
+
+        $filter_destino = sanitize_text_field( $_POST['filter_destino'] ?? '' );
+        if ( ! empty( $filter_destino ) ) {
+            $where[]   = 'destino = %s';
+            $prepare[] = $filter_destino;
+        }
+
+        if ( $where ) {
+            $query .= ' WHERE ' . implode( ' AND ', $where );
+        }
+
+        $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+
+        if ( $prepare ) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $query = $wpdb->prepare( $query, ...$prepare );
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $results = $wpdb->get_results( $query, ARRAY_A ) ?: [];
+
+        $meta = [
+            'chart_type'   => sanitize_text_field( $_POST['chart_type'] ?? 'bar' ),
+            'chart_height' => absint( $_POST['chart_height'] ?? 400 ),
+            'chart_colors' => sanitize_text_field( $_POST['chart_colors'] ?? '#844e80,#ff7300,#ffc53b,#3eba6a,#0080c3,#e74c3c,#9b59b6,#1abc9c' ),
+            'show_legend'  => ( $_POST['show_legend'] ?? '' ) === 'yes',
+            'y_axis_title' => sanitize_text_field( $_POST['y_axis_title'] ?? '' ),
+            'x_axis_title' => sanitize_text_field( $_POST['x_axis_title'] ?? '' ),
+        ];
+
+        wp_send_json_success( [ 'data' => $results, 'meta' => $meta ] );
     }
 
     /**
