@@ -1,37 +1,67 @@
 /**
- * SYSMAN Suite - Frontend Chart Renderer
+ * SYSMAN Suite - Frontend Chart Renderer v1.5.0
  * Gobernación de Nariño
- * Uses D3plus for chart rendering
+ * Uses D3plus for chart rendering, following secop-suite reference architecture.
  */
 (function () {
     'use strict';
 
-    class SismanChart {
-        constructor(wrapper) {
-            this.wrapper = wrapper;
-            this.chartId = wrapper.dataset.chartId;
-            this.chartType = wrapper.dataset.chartType || 'bar';
-            this.chartHeight = parseInt(wrapper.dataset.chartHeight) || 400;
-            this.showLegend = wrapper.dataset.showLegend === 'true';
-            this.showLabels = wrapper.dataset.showLabels === 'true';
-            this.numberFormat = wrapper.dataset.numberFormat || 'colombian';
-            this.yAxisTitle = wrapper.dataset.yAxisTitle || '';
-            this.xAxisTitle = wrapper.dataset.xAxisTitle || '';
-            this.canvas = wrapper.querySelector('.sysman-chart-canvas');
-            this.loading = wrapper.querySelector('.sysman-chart-loading');
-            this.data = [];
+    /* ========================================
+       Number Formatter (Colombian style)
+       ======================================== */
+    const NumberFormatter = {
+        colombiano(value) {
+            const v = Math.abs(value);
+            if (v >= 1e12) return (value / 1e12).toFixed(1).replace('.', ',') + ' Billones';
+            if (v >= 1e9)  return (value / 1e9).toFixed(1).replace('.', ',') + ' MMll';
+            if (v >= 1e6)  return (value / 1e6).toFixed(2).replace('.', ',') + 'MMII';
+            if (v >= 1e3)  return (value / 1e3).toFixed(1).replace('.', ',') + ' Mil';
+            return value.toLocaleString('es-CO');
+        },
 
-            // Parse custom color palette
-            const colorStr = wrapper.dataset.chartColors || '';
-            this.colors = colorStr
-                ? colorStr.split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c))
-                : [];
-            if (this.colors.length === 0) {
-                this.colors = [
-                    '#844e80', '#ff7300', '#ffc53b', '#3eba6a',
-                    '#0080c3', '#e74c3c', '#9b59b6', '#1abc9c',
-                ];
+        internacional(value) {
+            return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
+        abreviado(value) {
+            const v = Math.abs(value);
+            if (v >= 1e12) return (value / 1e12).toFixed(1) + 'B';
+            if (v >= 1e9)  return (value / 1e9).toFixed(1) + 'MM';
+            if (v >= 1e6)  return (value / 1e6).toFixed(1) + 'M';
+            if (v >= 1e3)  return (value / 1e3).toFixed(1) + 'K';
+            return value.toFixed(2);
+        },
+
+        fullFormat(value, format) {
+            return value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
+        format(value, format) {
+            if (typeof value !== 'number' || isNaN(value)) return '0';
+            switch (format) {
+                case 'colombian':  return this.colombiano(value);
+                case 'abbreviated': return this.abreviado(value);
+                case 'international': return this.internacional(value);
+                default: return this.colombiano(value);
             }
+        },
+    };
+
+    /* ========================================
+       ChartManager Class
+       ======================================== */
+    class ChartManager {
+        constructor(container) {
+            this.container = container;
+            this.configEl = document.getElementById(container.id + '-config');
+            if (!this.configEl) return;
+
+            this.config = JSON.parse(this.configEl.textContent);
+            this.renderTarget = container.querySelector('.sysman-chart-render');
+            this.loadingEl = container.querySelector('.sysman-loading');
+            this.errorEl = container.querySelector('.sysman-error-message');
+            this.data = [];
+            this.chart = null;
 
             this.init();
         }
@@ -40,7 +70,7 @@
             try {
                 await this.fetchData();
                 this.renderChart();
-                this.bindEvents();
+                this.bindToolbar();
             } catch (error) {
                 this.showError(error.message);
             }
@@ -48,163 +78,205 @@
 
         async fetchData() {
             const response = await fetch(
-                `${sysmanFrontend.restUrl}chart/${this.chartId}`,
-                {
-                    headers: {
-                        'X-WP-Nonce': sysmanFrontend.restNonce,
-                    },
-                }
+                `${this.config.restUrl}chart/${this.config.chartId}`,
+                { headers: { 'X-WP-Nonce': this.config.nonce } }
             );
 
-            if (!response.ok) {
-                throw new Error('Error al cargar los datos del gráfico');
-            }
+            if (!response.ok) throw new Error('Error al cargar los datos del gráfico');
 
             const result = await response.json();
             this.data = result.data || [];
             this.meta = result.meta || {};
 
-            if (this.data.length === 0) {
-                throw new Error('No hay datos disponibles para este gráfico');
-            }
+            if (this.data.length === 0) throw new Error('No hay datos disponibles para este gráfico');
         }
 
         renderChart() {
             this.hideLoading();
 
+            const config = this.config;
+            const numberFormat = config.numberFormat || 'colombian';
+            const colorsStr = config.colors || '#844e80,#ff7300,#ffc53b,#3eba6a,#0080c3,#e74c3c,#9b59b6,#1abc9c';
+            const colors = colorsStr.split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c));
+
             // Prepare data for D3plus
             const chartData = this.data.map((d) => ({
-                label: String(d.label || ''),
-                value: parseFloat(d.value) || 0,
+                x: String(d.label || ''),
+                y: parseFloat(d.value) || 0,
+                group: String(d.label || ''),
             }));
 
-            const colors = this.colors;
-            const formatNumber = (num) => this.formatNumber(num);
+            // Color scale function
+            const colorMap = {};
+            chartData.forEach((d, i) => {
+                if (!colorMap[d.group]) {
+                    colorMap[d.group] = colors[Object.keys(colorMap).length % colors.length];
+                }
+            });
+            const colorFn = (d) => colorMap[d.group || d.x] || colors[0];
 
-            const config = {
-                data: chartData,
-                groupBy: 'label',
-                height: this.chartHeight,
+            // Base tooltip config
+            const tooltipConfig = {
+                tbody: [
+                    [config.xAxisTitle || 'Categoría', (d) => d.x],
+                    [config.yAxisTitle || 'Valor', (d) => NumberFormatter.fullFormat(d.y, numberFormat)],
+                ],
             };
 
-            // Add axis titles if provided
-            const axisConfig = {};
-            if (this.yAxisTitle) {
-                axisConfig.yConfig = { title: this.yAxisTitle };
-            }
-            if (this.xAxisTitle) {
-                axisConfig.xConfig = { title: this.xAxisTitle };
-            }
+            // Axis configs
+            const yConfig = {
+                title: config.yAxisTitle || '',
+                tickFormat: (d) => NumberFormatter.format(d, numberFormat),
+            };
+            const xConfig = {
+                title: config.xAxisTitle || '',
+            };
+
+            const target = this.renderTarget;
+            const showLegend = config.showLegend;
+            const showTimeline = config.showTimeline;
 
             try {
-                switch (this.chartType) {
+                switch (config.type) {
                     case 'bar':
-                        new d3plus.BarChart()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                ...axisConfig,
-                                x: 'label',
-                                y: 'value',
-                                tooltipConfig: {
-                                    body: (d) => `Valor: ${formatNumber(d.value)}`,
-                                },
-                                shapeConfig: {
-                                    fill: (d, i) => colors[i % colors.length],
-                                },
-                            })
-                            .render();
+                        this.chart = new d3plus.BarChart()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .select(target)
+                            .color(colorFn)
+                            .tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig)
+                            .xConfig(xConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES');
+
+                        if (showTimeline) {
+                            this.chart.time('x').timeline(true);
+                        }
+                        this.chart.render();
                         break;
 
                     case 'line':
-                        new d3plus.LinePlot()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                ...axisConfig,
-                                x: 'label',
-                                y: 'value',
-                                tooltipConfig: {
-                                    body: (d) => `Valor: ${formatNumber(d.value)}`,
-                                },
-                            })
+                        this.chart = new d3plus.LinePlot()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .select(target)
+                            .tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig)
+                            .xConfig(xConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
                             .render();
                         break;
 
                     case 'area':
-                        new d3plus.AreaPlot()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                ...axisConfig,
-                                x: 'label',
-                                y: 'value',
-                            })
+                        this.chart = new d3plus.AreaPlot()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .select(target)
+                            .tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig)
+                            .xConfig(xConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
                             .render();
                         break;
 
                     case 'pie':
                     case 'donut':
-                        new d3plus.Pie()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                value: 'value',
-                                innerRadius: this.chartType === 'donut' ? 80 : 0,
-                                tooltipConfig: {
-                                    body: (d) => `Valor: ${formatNumber(d.value)}`,
-                                },
-                                shapeConfig: {
-                                    fill: (d, i) => colors[i % colors.length],
-                                },
-                            })
-                            .render();
+                        this.chart = new d3plus.Pie()
+                            .data(chartData)
+                            .groupBy('group')
+                            .value('y')
+                            .select(target)
+                            .color(colorFn)
+                            .tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES');
+
+                        if (config.type === 'donut') {
+                            this.chart.innerRadius(80);
+                        }
+                        this.chart.render();
                         break;
 
                     case 'treemap':
-                        new d3plus.Treemap()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                sum: 'value',
-                                tooltipConfig: {
-                                    body: (d) => `Valor: ${formatNumber(d.value)}`,
-                                },
-                                shapeConfig: {
-                                    fill: (d, i) => colors[i % colors.length],
-                                },
-                            })
+                        this.chart = new d3plus.Treemap()
+                            .data(chartData)
+                            .groupBy('group')
+                            .sum('y')
+                            .select(target)
+                            .color(colorFn)
+                            .tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
                             .render();
                         break;
 
                     case 'stacked_bar':
+                        this.chart = new d3plus.BarChart()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .stacked(true)
+                            .select(target)
+                            .color(colorFn)
+                            .tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig)
+                            .xConfig(xConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
+                            .render();
+                        break;
+
                     case 'grouped_bar':
-                        new d3plus.BarChart()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                ...axisConfig,
-                                x: 'label',
-                                y: 'value',
-                                stacked: this.chartType === 'stacked_bar',
-                                tooltipConfig: {
-                                    body: (d) => `Valor: ${formatNumber(d.value)}`,
-                                },
-                                shapeConfig: {
-                                    fill: (d, i) => colors[i % colors.length],
-                                },
-                            })
+                        this.chart = new d3plus.BarChart()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .stacked(false)
+                            .select(target)
+                            .color(colorFn)
+                            .tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig)
+                            .xConfig(xConfig)
+                            .legend(showLegend || false)
+                            .legendPosition('bottom')
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
                             .render();
                         break;
 
                     default:
-                        new d3plus.BarChart()
-                            .select(this.canvas)
-                            .config({
-                                ...config,
-                                x: 'label',
-                                y: 'value',
-                            })
+                        this.chart = new d3plus.BarChart()
+                            .data(chartData)
+                            .groupBy('group')
+                            .x('x')
+                            .y('y')
+                            .select(target)
+                            .color(colorFn)
+                            .height(parseInt(config.height) || 400)
+                            .locale('es_ES')
                             .render();
                 }
             } catch (err) {
@@ -213,48 +285,42 @@
             }
         }
 
-        bindEvents() {
-            // Data modal
-            const dataBtn = this.wrapper.querySelector('.sysman-btn-data');
-            if (dataBtn) {
-                dataBtn.addEventListener('click', () => this.showDataModal());
-            }
+        /* ========================================
+           Toolbar Actions
+           ======================================== */
+        bindToolbar() {
+            const container = this.container;
 
-            // CSV download
-            const downloadBtn = this.wrapper.querySelector('.sysman-btn-download');
-            if (downloadBtn) {
-                downloadBtn.addEventListener('click', () => this.downloadCSV());
-            }
+            container.querySelectorAll('.sysman-toolbar-btn[data-action]').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                    const action = btn.dataset.action;
+                    switch (action) {
+                        case 'detail': this.showDetailModal(); break;
+                        case 'share':  this.showShareModal();  break;
+                        case 'data':   this.showDataModal();   break;
+                        case 'image':  this.exportImage();     break;
+                        case 'download': this.downloadCSV();   break;
+                    }
+                });
+            });
 
-            // Image export
-            const imageBtn = this.wrapper.querySelector('.sysman-btn-image');
-            if (imageBtn) {
-                imageBtn.addEventListener('click', () => this.exportImage());
-            }
-
-            // Share
-            const shareBtn = this.wrapper.querySelector('.sysman-btn-share');
-            if (shareBtn) {
-                shareBtn.addEventListener('click', () => this.showShareModal());
-            }
-
-            // Fullscreen
-            const fsBtn = this.wrapper.querySelector('.sysman-btn-fullscreen');
-            if (fsBtn) {
-                fsBtn.addEventListener('click', () => this.toggleFullscreen());
+            // CSV export from data modal
+            const csvBtn = container.querySelector('.sysman-btn-csv-export');
+            if (csvBtn) {
+                csvBtn.addEventListener('click', () => this.downloadCSV());
             }
 
             // Modal close handlers
-            this.wrapper.querySelectorAll('.sysman-modal-close, .sysman-modal-overlay').forEach((el) => {
+            container.querySelectorAll('.sysman-modal-close, .sysman-modal-overlay').forEach((el) => {
                 el.addEventListener('click', () => {
-                    this.wrapper.querySelectorAll('.sysman-chart-modal').forEach((m) => {
+                    container.querySelectorAll('.sysman-modal').forEach((m) => {
                         m.style.display = 'none';
                     });
                 });
             });
 
             // Copy link
-            this.wrapper.querySelectorAll('.sysman-copy-link').forEach((btn) => {
+            container.querySelectorAll('.sysman-copy-link').forEach((btn) => {
                 btn.addEventListener('click', () => {
                     const targetId = btn.dataset.target;
                     const input = document.getElementById(targetId);
@@ -270,18 +336,15 @@
             // ESC to close modals
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
-                    this.wrapper.querySelectorAll('.sysman-chart-modal').forEach((m) => {
+                    container.querySelectorAll('.sysman-modal').forEach((m) => {
                         m.style.display = 'none';
                     });
-                    if (this.wrapper.classList.contains('fullscreen')) {
-                        this.wrapper.classList.remove('fullscreen');
-                    }
                 }
             });
         }
 
         showDataModal() {
-            const modal = this.wrapper.querySelector('.sysman-data-modal');
+            const modal = this.container.querySelector('.sysman-data-modal');
             if (!modal) return;
 
             const tbody = modal.querySelector('tbody');
@@ -289,70 +352,65 @@
 
             this.data.forEach((row) => {
                 const tr = document.createElement('tr');
+                const label = String(row.label || '');
+                const value = parseFloat(row.value) || 0;
                 tr.innerHTML = `
-                    <td>${this.escapeHtml(String(row.label || ''))}</td>
-                    <td>${this.formatNumber(parseFloat(row.value) || 0)}</td>
+                    <td>${this.escapeHtml(label)}</td>
+                    <td>${NumberFormatter.fullFormat(value, this.config.numberFormat)}</td>
                 `;
                 tbody.appendChild(tr);
             });
 
             modal.style.display = 'flex';
-            modal.querySelector('.sysman-modal-close').focus();
         }
 
         showShareModal() {
-            const modal = this.wrapper.querySelector('.sysman-share-modal');
+            const modal = this.container.querySelector('.sysman-share-modal');
             if (!modal) return;
 
             const url = encodeURIComponent(window.location.href);
-            const title = encodeURIComponent(this.meta.title || 'Datos Presupuestales SYSMAN');
+            const title = encodeURIComponent(this.config.title || 'Datos Presupuestales SYSMAN');
 
-            const facebookBtn = modal.querySelector('.sysman-share-facebook');
-            if (facebookBtn) {
-                facebookBtn.href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-            }
+            const fb = modal.querySelector('.sysman-share-facebook');
+            if (fb) fb.href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
 
-            const twitterBtn = modal.querySelector('.sysman-share-twitter');
-            if (twitterBtn) {
-                twitterBtn.href = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
-            }
+            const tw = modal.querySelector('.sysman-share-twitter');
+            if (tw) tw.href = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
 
-            const linkedinBtn = modal.querySelector('.sysman-share-linkedin');
-            if (linkedinBtn) {
-                linkedinBtn.href = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
-            }
+            const li = modal.querySelector('.sysman-share-linkedin');
+            if (li) li.href = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
 
-            const whatsappBtn = modal.querySelector('.sysman-share-whatsapp');
-            if (whatsappBtn) {
-                whatsappBtn.href = `https://wa.me/?text=${title}%20${url}`;
-            }
+            const wa = modal.querySelector('.sysman-share-whatsapp');
+            if (wa) wa.href = `https://wa.me/?text=${title}%20${url}`;
 
             modal.style.display = 'flex';
-            modal.querySelector('.sysman-modal-close').focus();
+        }
+
+        showDetailModal() {
+            const modal = this.container.querySelector('.sysman-detail-modal');
+            if (modal) modal.style.display = 'flex';
         }
 
         downloadCSV() {
-            const url = `${sysmanFrontend.restUrl}chart/${this.chartId}/csv`;
+            const url = `${this.config.restUrl}chart/${this.config.chartId}/csv`;
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sysman-chart-${this.chartId}.csv`;
+            a.download = `sysman-chart-${this.config.chartId}.csv`;
             a.click();
         }
 
         exportImage() {
-            const canvas = this.canvas;
+            const canvas = this.renderTarget;
             if (!canvas) return;
 
-            // Use html2canvas if available, otherwise use SVG serialization
             if (typeof html2canvas !== 'undefined') {
-                html2canvas(canvas).then((canvasEl) => {
+                html2canvas(this.container).then((canvasEl) => {
                     const a = document.createElement('a');
                     a.href = canvasEl.toDataURL('image/png');
-                    a.download = `sysman-chart-${this.chartId}.png`;
+                    a.download = `sysman-chart-${this.config.chartId}.png`;
                     a.click();
                 });
             } else {
-                // Fallback: serialize SVG
                 const svg = canvas.querySelector('svg');
                 if (svg) {
                     const serializer = new XMLSerializer();
@@ -361,62 +419,27 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `sysman-chart-${this.chartId}.svg`;
+                    a.download = `sysman-chart-${this.config.chartId}.svg`;
                     a.click();
                     URL.revokeObjectURL(url);
                 }
             }
         }
 
-        toggleFullscreen() {
-            this.wrapper.classList.toggle('fullscreen');
-            if (this.wrapper.classList.contains('fullscreen')) {
-                const container = this.wrapper.querySelector('.sysman-chart-container');
-                container.style.height = 'calc(100vh - 120px)';
-            } else {
-                const container = this.wrapper.querySelector('.sysman-chart-container');
-                container.style.height = this.chartHeight + 'px';
-            }
-        }
-
+        /* ========================================
+           UI Helpers
+           ======================================== */
         hideLoading() {
-            if (this.loading) {
-                this.loading.style.display = 'none';
-            }
+            if (this.loadingEl) this.loadingEl.style.display = 'none';
         }
 
         showError(message) {
             this.hideLoading();
-            this.canvas.innerHTML = `<div class="sysman-error">${this.escapeHtml(message)}</div>`;
-        }
-
-        formatNumber(num) {
-            if (isNaN(num)) return '0';
-
-            switch (this.numberFormat) {
-                case 'colombian':
-                    return num.toLocaleString('es-CO', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    });
-                case 'abbreviated':
-                    return this.abbreviateNumber(num);
-                case 'international':
-                default:
-                    return num.toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    });
+            if (this.errorEl) {
+                const p = this.errorEl.querySelector('p');
+                if (p) p.textContent = message;
+                this.errorEl.style.display = '';
             }
-        }
-
-        abbreviateNumber(num) {
-            const abs = Math.abs(num);
-            if (abs >= 1e12) return (num / 1e12).toFixed(1) + 'B';
-            if (abs >= 1e9) return (num / 1e9).toFixed(1) + 'MM';
-            if (abs >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-            if (abs >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-            return num.toFixed(2);
         }
 
         showToast(message) {
@@ -424,7 +447,6 @@
             toast.className = 'sysman-toast success';
             toast.textContent = message;
             toast.setAttribute('role', 'status');
-            toast.setAttribute('aria-live', 'polite');
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         }
@@ -437,11 +459,26 @@
     }
 
     /* ========================================
-       Initialize all charts on page
+       Initialize all charts with IntersectionObserver
        ======================================== */
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.sysman-chart-wrapper').forEach((wrapper) => {
-            new SismanChart(wrapper);
-        });
+        const containers = document.querySelectorAll('.sysman-chart-container');
+
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            new ChartManager(entry.target);
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                },
+                { rootMargin: '200px' }
+            );
+            containers.forEach((c) => observer.observe(c));
+        } else {
+            containers.forEach((c) => new ChartManager(c));
+        }
     });
 })();

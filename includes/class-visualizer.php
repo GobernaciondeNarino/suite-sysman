@@ -439,10 +439,5 @@ class Visualizer {
             SYSMAN_SUITE_VERSION,
             true
         );
-
-        wp_localize_script( 'sysman-frontend', 'sysmanFrontend', [
-            'restUrl'  => rest_url( 'sysman-suite/v1/' ),
-            'restNonce' => wp_create_nonce( 'wp_rest' ),
-        ] );
     }
 }

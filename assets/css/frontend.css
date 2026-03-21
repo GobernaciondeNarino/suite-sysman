@@ -1,5 +1,5 @@
 /**
- * SYSMAN Suite - Frontend Styles
+ * SYSMAN Suite - Frontend Chart Styles v1.5.0
  * Gobernación de Nariño
  */
 
@@ -11,122 +11,116 @@
     --sysman-primary-dark: #0e3a20;
     --sysman-primary-light: #2d7a4a;
     --sysman-accent: #3498db;
+    --sysman-white: #ffffff;
+    --sysman-gray-50: #fafbfc;
     --sysman-gray-100: #f8f9fa;
     --sysman-gray-200: #e9ecef;
     --sysman-gray-300: #dee2e6;
     --sysman-gray-600: #6c757d;
     --sysman-gray-800: #343a40;
+    --sysman-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     --sysman-radius: 8px;
-    --sysman-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --sysman-shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.15);
+    --sysman-radius-lg: 12px;
+    --sysman-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --sysman-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --sysman-transition: all 0.2s ease;
 }
 
 /* ========================================
-   Chart Wrapper
-   ======================================== */
-.sysman-chart-wrapper {
-    background: #fff;
-    border-radius: var(--sysman-radius);
-    box-shadow: var(--sysman-shadow);
-    margin: 20px 0;
-    overflow: hidden;
-    border: 1px solid var(--sysman-gray-200);
-}
-
-.sysman-chart-wrapper.fullscreen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 999999;
-    border-radius: 0;
-    margin: 0;
-}
-
-/* ========================================
-   Toolbar
-   ======================================== */
-.sysman-chart-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    background: var(--sysman-primary);
-    color: #fff;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.sysman-chart-title {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-}
-
-.sysman-chart-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.sysman-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    padding: 6px 10px;
-    cursor: pointer;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-}
-
-.sysman-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.sysman-btn:focus {
-    outline: 2px solid #fff;
-    outline-offset: 2px;
-}
-
-.sysman-btn .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-}
-
-/* ========================================
-   Chart Container
+   Chart Container (outer card)
    ======================================== */
 .sysman-chart-container {
     position: relative;
-    width: 100%;
+    background: var(--sysman-white);
+    border-radius: var(--sysman-radius-lg);
+    box-shadow: var(--sysman-shadow);
+    margin: 20px 0;
+    font-family: var(--sysman-font);
     overflow: hidden;
 }
 
-.sysman-chart-canvas {
+/* ========================================
+   Toolbar (top bar with text+icon buttons)
+   ======================================== */
+.sysman-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--sysman-gray-200);
+    background: var(--sysman-white);
+    flex-wrap: wrap;
+}
+
+.sysman-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: transparent;
+    border: none;
+    color: var(--sysman-gray-600);
+    font-size: 13px;
+    font-family: var(--sysman-font);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: var(--sysman-transition);
+    white-space: nowrap;
+}
+
+.sysman-toolbar-btn:hover {
+    background: var(--sysman-gray-100);
+    color: var(--sysman-gray-800);
+}
+
+.sysman-toolbar-btn:focus {
+    outline: 2px solid var(--sysman-accent);
+    outline-offset: 2px;
+}
+
+.sysman-toolbar-btn svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ========================================
+   Chart Wrapper (render area)
+   ======================================== */
+.sysman-chart-wrapper {
+    position: relative;
+    min-height: 300px;
+    padding: 16px;
+}
+
+.sysman-chart-render {
     width: 100%;
     height: 100%;
 }
 
-.sysman-chart-canvas svg {
+.sysman-chart-render svg {
+    font-family: var(--sysman-font) !important;
     width: 100%;
-    height: 100%;
+}
+
+.sysman-chart-render .d3plus-viz {
+    font-family: var(--sysman-font) !important;
 }
 
 /* ========================================
    Loading State
    ======================================== */
-.sysman-chart-loading {
+.sysman-loading {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
     color: var(--sysman-gray-600);
+    z-index: 5;
 }
 
 .sysman-spinner {
@@ -144,9 +138,32 @@
 }
 
 /* ========================================
+   Error State
+   ======================================== */
+.sysman-error-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--sysman-gray-600);
+}
+
+.sysman-error-message svg {
+    color: #e74c3c;
+    margin-bottom: 12px;
+}
+
+.sysman-error {
+    padding: 15px 20px;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: var(--sysman-radius);
+    text-align: center;
+}
+
+/* ========================================
    Modals
    ======================================== */
-.sysman-chart-modal {
+.sysman-modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -158,19 +175,19 @@
     justify-content: center;
 }
 
-.sysman-chart-modal .sysman-modal-overlay {
+.sysman-modal .sysman-modal-overlay {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.5);
 }
 
-.sysman-chart-modal .sysman-modal-content {
+.sysman-modal .sysman-modal-content {
     position: relative;
-    background: #fff;
-    border-radius: var(--sysman-radius);
+    background: var(--sysman-white);
+    border-radius: var(--sysman-radius-lg);
     box-shadow: var(--sysman-shadow-lg);
     max-width: 700px;
     width: 90%;
@@ -180,25 +197,25 @@
     overflow: hidden;
 }
 
-.sysman-chart-modal .sysman-modal-header {
+.sysman-modal .sysman-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 20px;
+    padding: 14px 20px;
     background: var(--sysman-primary);
-    color: #fff;
+    color: var(--sysman-white);
 }
 
-.sysman-chart-modal .sysman-modal-header h3 {
+.sysman-modal .sysman-modal-header h3 {
     margin: 0;
     font-size: 16px;
-    color: #fff;
+    color: var(--sysman-white);
 }
 
-.sysman-chart-modal .sysman-modal-close {
+.sysman-modal .sysman-modal-close {
     background: none;
     border: none;
-    color: #fff;
+    color: var(--sysman-white);
     font-size: 24px;
     cursor: pointer;
     line-height: 1;
@@ -206,27 +223,29 @@
     opacity: 0.8;
 }
 
-.sysman-chart-modal .sysman-modal-close:hover {
+.sysman-modal .sysman-modal-close:hover {
     opacity: 1;
 }
 
-.sysman-chart-modal .sysman-modal-close:focus {
-    outline: 2px solid #fff;
+.sysman-modal .sysman-modal-close:focus {
+    outline: 2px solid var(--sysman-white);
     outline-offset: 2px;
 }
 
-.sysman-chart-modal .sysman-modal-body {
+.sysman-modal .sysman-modal-body {
     padding: 20px;
     overflow-y: auto;
 }
 
-/* Data Table in Modal */
-.sysman-data-table {
+/* Data Table */
+.sysman-data-table,
+.sysman-detail-table {
     width: 100%;
     border-collapse: collapse;
 }
 
-.sysman-data-table th {
+.sysman-data-table th,
+.sysman-detail-table th {
     background: var(--sysman-gray-100);
     padding: 10px 12px;
     text-align: left;
@@ -234,13 +253,20 @@
     border-bottom: 2px solid var(--sysman-gray-300);
 }
 
-.sysman-data-table td {
+.sysman-data-table td,
+.sysman-detail-table td {
     padding: 8px 12px;
     border-bottom: 1px solid var(--sysman-gray-200);
 }
 
-.sysman-data-table tbody tr:hover {
-    background: var(--sysman-gray-100);
+.sysman-data-table tbody tr:hover,
+.sysman-detail-table tbody tr:hover {
+    background: var(--sysman-gray-50);
+}
+
+.sysman-detail-table th {
+    width: 120px;
+    white-space: nowrap;
 }
 
 /* ========================================
@@ -318,34 +344,6 @@
 }
 
 /* ========================================
-   Chart Footer
-   ======================================== */
-.sysman-chart-footer {
-    padding: 8px 20px;
-    background: var(--sysman-gray-100);
-    border-top: 1px solid var(--sysman-gray-200);
-}
-
-.sysman-chart-source {
-    margin: 0;
-    font-size: 11px;
-    color: var(--sysman-gray-600);
-    font-style: italic;
-}
-
-/* ========================================
-   Error State
-   ======================================== */
-.sysman-error {
-    padding: 15px 20px;
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-    border-radius: var(--sysman-radius);
-    text-align: center;
-}
-
-/* ========================================
    Toast Notifications
    ======================================== */
 .sysman-toast {
@@ -381,12 +379,18 @@
    Responsive
    ======================================== */
 @media screen and (max-width: 768px) {
-    .sysman-chart-toolbar {
-        padding: 10px 15px;
+    .sysman-toolbar {
+        padding: 8px 12px;
+        justify-content: center;
     }
 
-    .sysman-chart-title {
-        font-size: 14px;
+    .sysman-toolbar-btn {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+
+    .sysman-toolbar-btn span {
+        display: none;
     }
 
     .sysman-share-buttons {
@@ -413,12 +417,12 @@
 }
 
 @media (prefers-contrast: high) {
-    .sysman-chart-wrapper {
+    .sysman-chart-container {
         border: 2px solid #000;
     }
 
-    .sysman-btn {
-        border: 2px solid #fff;
+    .sysman-toolbar-btn {
+        border: 1px solid currentColor;
     }
 
     .sysman-data-table th {
@@ -427,7 +431,6 @@
     }
 }
 
-/* Screen reader only text */
 .sysman-sr-only {
     position: absolute;
     width: 1px;
