@@ -175,11 +175,23 @@ class Rest_Api {
         $plugin = \Sysman_Suite::instance();
         $data   = $plugin->visualizer->get_chart_data( $id );
 
-        $csv = "Etiqueta,Valor\n";
-        foreach ( $data as $row ) {
-            $label = str_replace( '"', '""', $row['label'] ?? '' );
-            $value = $row['value'] ?? 0;
-            $csv  .= "\"{$label}\",{$value}\n";
+        $has_group = ! empty( $data ) && isset( $data[0]['group'] );
+
+        if ( $has_group ) {
+            $csv = "Serie,Etiqueta,Valor\n";
+            foreach ( $data as $row ) {
+                $group = str_replace( '"', '""', $row['group'] ?? '' );
+                $label = str_replace( '"', '""', $row['label'] ?? '' );
+                $value = $row['value'] ?? 0;
+                $csv  .= "\"{$group}\",\"{$label}\",{$value}\n";
+            }
+        } else {
+            $csv = "Etiqueta,Valor\n";
+            foreach ( $data as $row ) {
+                $label = str_replace( '"', '""', $row['label'] ?? '' );
+                $value = $row['value'] ?? 0;
+                $csv  .= "\"{$label}\",{$value}\n";
+            }
         }
 
         $response = new \WP_REST_Response( $csv );

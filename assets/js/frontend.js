@@ -1,7 +1,7 @@
 /**
- * SYSMAN Suite - Frontend Chart Renderer v1.5.0
- * Gobernación de Nariño
- * Uses D3plus for chart rendering, following secop-suite reference architecture.
+ * SYSMAN Suite - Frontend Chart Renderer v2.0.0
+ * Gobernacion de Narino
+ * Uses D3plus for chart rendering with multi-series support.
  */
 (function () {
     'use strict';
@@ -14,7 +14,7 @@
             const v = Math.abs(value);
             if (v >= 1e12) return (value / 1e12).toFixed(1).replace('.', ',') + ' Billones';
             if (v >= 1e9)  return (value / 1e9).toFixed(1).replace('.', ',') + ' MMll';
-            if (v >= 1e6)  return (value / 1e6).toFixed(2).replace('.', ',') + 'MMII';
+            if (v >= 1e6)  return (value / 1e6).toFixed(2).replace('.', ',') + ' Mll';
             if (v >= 1e3)  return (value / 1e3).toFixed(1).replace('.', ',') + ' Mil';
             return value.toLocaleString('es-CO');
         },
@@ -39,10 +39,10 @@
         format(value, format) {
             if (typeof value !== 'number' || isNaN(value)) return '0';
             switch (format) {
-                case 'colombian':  return this.colombiano(value);
-                case 'abbreviated': return this.abreviado(value);
+                case 'colombian':     return this.colombiano(value);
+                case 'abbreviated':   return this.abreviado(value);
                 case 'international': return this.internacional(value);
-                default: return this.colombiano(value);
+                default:              return this.colombiano(value);
             }
         },
     };
@@ -82,13 +82,13 @@
                 { headers: { 'X-WP-Nonce': this.config.nonce } }
             );
 
-            if (!response.ok) throw new Error('Error al cargar los datos del gráfico');
+            if (!response.ok) throw new Error('Error al cargar los datos del grafico');
 
             const result = await response.json();
             this.data = result.data || [];
             this.meta = result.meta || {};
 
-            if (this.data.length === 0) throw new Error('No hay datos disponibles para este gráfico');
+            if (this.data.length === 0) throw new Error('No hay datos disponibles para este grafico');
         }
 
         renderChart() {
@@ -99,189 +99,171 @@
             const colorsStr = config.colors || '#844e80,#ff7300,#ffc53b,#3eba6a,#0080c3,#e74c3c,#9b59b6,#1abc9c';
             const colors = colorsStr.split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c));
 
-            // Prepare data for D3plus
+            // Prepare data - support multi-series (group column)
             const chartData = this.data.map((d) => ({
-                x: String(d.label || ''),
-                y: parseFloat(d.value) || 0,
-                group: String(d.label || ''),
+                label: String(d.label || ''),
+                value: parseFloat(d.value) || 0,
+                group: String(d.group || d.label || ''),
             }));
 
-            // Color scale function
+            // Color scale
+            const uniqueGroups = [...new Set(chartData.map(d => d.group))];
             const colorMap = {};
-            chartData.forEach((d, i) => {
-                if (!colorMap[d.group]) {
-                    colorMap[d.group] = colors[Object.keys(colorMap).length % colors.length];
-                }
-            });
-            const colorFn = (d) => colorMap[d.group || d.x] || colors[0];
+            uniqueGroups.forEach((g, i) => { colorMap[g] = colors[i % colors.length]; });
+            const colorFn = (d) => colorMap[d.group || d.label] || colors[0];
 
-            // Base tooltip config
+            // Tooltip config
             const tooltipConfig = {
                 tbody: [
-                    [config.xAxisTitle || 'Categoría', (d) => d.x],
-                    [config.yAxisTitle || 'Valor', (d) => NumberFormatter.fullFormat(d.y, numberFormat)],
+                    [config.xAxisTitle || 'Categoria', (d) => d.label],
+                    [config.yAxisTitle || 'Valor', (d) => NumberFormatter.fullFormat(d.value, numberFormat)],
                 ],
             };
+
+            // Add series info to tooltip if multi-series
+            if (this.meta.has_groups || chartData.some(d => d.group !== d.label)) {
+                tooltipConfig.tbody.unshift(['Serie', (d) => d.group]);
+            }
 
             // Axis configs
             const yConfig = {
                 title: config.yAxisTitle || '',
                 tickFormat: (d) => NumberFormatter.format(d, numberFormat),
             };
-            const xConfig = {
-                title: config.xAxisTitle || '',
-            };
+            const xConfig = { title: config.xAxisTitle || '' };
 
             const target = this.renderTarget;
             const showLegend = config.showLegend;
             const showTimeline = config.showTimeline;
+            const height = parseInt(config.height) || 400;
 
             try {
                 switch (config.type) {
                     case 'bar':
                         this.chart = new d3plus.BarChart()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .select(target)
-                            .color(colorFn)
-                            .tooltipConfig(tooltipConfig)
-                            .yConfig(yConfig)
-                            .xConfig(xConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES');
-
-                        if (showTimeline) {
-                            this.chart.time('x').timeline(true);
-                        }
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x')
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES');
+                        if (showTimeline) this.chart.time('label').timeline(true);
                         this.chart.render();
                         break;
 
-                    case 'line':
-                        this.chart = new d3plus.LinePlot()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .select(target)
-                            .tooltipConfig(tooltipConfig)
-                            .yConfig(yConfig)
-                            .xConfig(xConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
-                            .render();
-                        break;
-
-                    case 'area':
-                        this.chart = new d3plus.AreaPlot()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .select(target)
-                            .tooltipConfig(tooltipConfig)
-                            .yConfig(yConfig)
-                            .xConfig(xConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
-                            .render();
-                        break;
-
-                    case 'pie':
-                    case 'donut':
-                        this.chart = new d3plus.Pie()
-                            .data(chartData)
-                            .groupBy('group')
-                            .value('y')
-                            .select(target)
-                            .color(colorFn)
-                            .tooltipConfig(tooltipConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES');
-
-                        if (config.type === 'donut') {
-                            this.chart.innerRadius(80);
-                        }
-                        this.chart.render();
-                        break;
-
-                    case 'treemap':
-                        this.chart = new d3plus.Treemap()
-                            .data(chartData)
-                            .groupBy('group')
-                            .sum('y')
-                            .select(target)
-                            .color(colorFn)
-                            .tooltipConfig(tooltipConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
+                    case 'horizontal_bar':
+                        this.chart = new d3plus.BarChart()
+                            .data(chartData).groupBy('group').x('value').y('label')
+                            .discrete('y')
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(xConfig).xConfig(yConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
                             .render();
                         break;
 
                     case 'stacked_bar':
                         this.chart = new d3plus.BarChart()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .stacked(true)
-                            .select(target)
-                            .color(colorFn)
-                            .tooltipConfig(tooltipConfig)
-                            .yConfig(yConfig)
-                            .xConfig(xConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x').stacked(true)
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
                             .render();
                         break;
 
                     case 'grouped_bar':
                         this.chart = new d3plus.BarChart()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .stacked(false)
-                            .select(target)
-                            .color(colorFn)
-                            .tooltipConfig(tooltipConfig)
-                            .yConfig(yConfig)
-                            .xConfig(xConfig)
-                            .legend(showLegend || false)
-                            .legendPosition('bottom')
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x').stacked(false)
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'line':
+                        this.chart = new d3plus.LinePlot()
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x')
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'area':
+                        this.chart = new d3plus.AreaPlot()
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x')
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'stacked_area':
+                        this.chart = new d3plus.StackedArea()
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .discrete('x')
+                            .select(target).color(colorFn)
+                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'pie':
+                        this.chart = new d3plus.Pie()
+                            .data(chartData).groupBy('group').value('value')
+                            .select(target).color(colorFn).tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'donut':
+                        this.chart = new d3plus.Donut()
+                            .data(chartData).groupBy('group').value('value')
+                            .select(target).color(colorFn).tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'treemap':
+                        this.chart = new d3plus.Treemap()
+                            .data(chartData).groupBy('group').sum('value')
+                            .select(target).color(colorFn).tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
+                            .render();
+                        break;
+
+                    case 'radar':
+                        this.chart = new d3plus.Radar()
+                            .data(chartData).groupBy('group')
+                            .metric('label').value('value')
+                            .select(target).color(colorFn).tooltipConfig(tooltipConfig)
+                            .legend(showLegend || false).legendPosition('bottom')
+                            .height(height).locale('es_ES')
                             .render();
                         break;
 
                     default:
                         this.chart = new d3plus.BarChart()
-                            .data(chartData)
-                            .groupBy('group')
-                            .x('x')
-                            .y('y')
-                            .select(target)
-                            .color(colorFn)
-                            .height(parseInt(config.height) || 400)
-                            .locale('es_ES')
+                            .data(chartData).groupBy('group').x('label').y('value')
+                            .select(target).color(colorFn)
+                            .height(height).locale('es_ES')
                             .render();
                 }
             } catch (err) {
                 console.error('D3plus render error:', err);
-                this.showError('Error al renderizar el gráfico');
+                this.showError('Error al renderizar el grafico');
             }
         }
 
@@ -347,17 +329,27 @@
             const modal = this.container.querySelector('.sysman-data-modal');
             if (!modal) return;
 
+            const thead = modal.querySelector('thead tr');
             const tbody = modal.querySelector('tbody');
-            tbody.innerHTML = '';
+            const hasGroups = this.data.some(d => d.group);
 
+            // Build header
+            thead.innerHTML = '';
+            if (hasGroups) {
+                thead.innerHTML += '<th>Serie</th>';
+            }
+            thead.innerHTML += '<th>Categoria</th><th>Valor</th>';
+
+            tbody.innerHTML = '';
             this.data.forEach((row) => {
                 const tr = document.createElement('tr');
-                const label = String(row.label || '');
-                const value = parseFloat(row.value) || 0;
-                tr.innerHTML = `
-                    <td>${this.escapeHtml(label)}</td>
-                    <td>${NumberFormatter.fullFormat(value, this.config.numberFormat)}</td>
-                `;
+                let html = '';
+                if (hasGroups) {
+                    html += `<td>${this.escapeHtml(String(row.group || ''))}</td>`;
+                }
+                html += `<td>${this.escapeHtml(String(row.label || ''))}</td>`;
+                html += `<td>${NumberFormatter.fullFormat(parseFloat(row.value) || 0, this.config.numberFormat)}</td>`;
+                tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
 

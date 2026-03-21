@@ -147,7 +147,10 @@ class Visualizer {
             'data_table'       => 'sanitize_text_field',
             'group_column'     => 'sanitize_text_field',
             'value_column'     => 'sanitize_text_field',
+            'color_column'     => 'sanitize_text_field',
+            'value_column_2'   => 'sanitize_text_field',
             'aggregate'        => 'sanitize_text_field',
+            'orientation'      => 'sanitize_text_field',
             'filter_anio'      => 'absint',
             'filter_mes'       => 'absint',
             'filter_destino'   => 'sanitize_text_field',
@@ -219,6 +222,7 @@ class Visualizer {
         $table     = get_post_meta( $chart_id, '_sysman_data_table', true );
         $group_col = get_post_meta( $chart_id, '_sysman_group_column', true );
         $value_col = get_post_meta( $chart_id, '_sysman_value_column', true );
+        $color_col = get_post_meta( $chart_id, '_sysman_color_column', true );
         $aggregate = strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' );
         $filters   = get_post_meta( $chart_id, '_sysman_filters', true ) ?: [];
 
@@ -240,7 +244,14 @@ class Visualizer {
             $aggregate = 'SUM';
         }
 
-        $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        // Validate optional color/series column
+        $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+
+        if ( $has_color ) {
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`";
+        } else {
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        }
 
         // Build WHERE
         $where   = [];
@@ -296,7 +307,11 @@ class Visualizer {
             $query .= ' WHERE ' . implode( ' AND ', $where );
         }
 
-        $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+        if ( $has_color ) {
+            $query .= " GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+        } else {
+            $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+        }
 
         if ( $prepare ) {
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -337,6 +352,7 @@ class Visualizer {
             'number_format'  => get_post_meta( $chart_id, '_sysman_number_format', true ) ?: 'colombian',
             'y_axis_title'   => get_post_meta( $chart_id, '_sysman_y_axis_title', true ) ?: '',
             'x_axis_title'   => get_post_meta( $chart_id, '_sysman_x_axis_title', true ) ?: '',
+            'has_groups'     => ! empty( get_post_meta( $chart_id, '_sysman_color_column', true ) ),
             'show_timeline'  => get_post_meta( $chart_id, '_sysman_show_timeline', true ) === 'yes',
             'show_toolbar'   => get_post_meta( $chart_id, '_sysman_show_toolbar', true ) !== '',
             'toolbar_detail' => get_post_meta( $chart_id, '_sysman_toolbar_detail', true ) === 'yes',
@@ -389,19 +405,24 @@ class Visualizer {
             case 'chart_type':
                 $type   = get_post_meta( $post_id, '_sysman_chart_type', true ) ?: 'bar';
                 $labels = [
-                    'bar'         => __( 'Barras', 'sysman-suite' ),
-                    'line'        => __( 'Líneas', 'sysman-suite' ),
-                    'area'        => __( 'Área', 'sysman-suite' ),
-                    'pie'         => __( 'Pie / Torta', 'sysman-suite' ),
-                    'donut'       => __( 'Donut', 'sysman-suite' ),
-                    'treemap'     => __( 'Treemap', 'sysman-suite' ),
-                    'stacked_bar' => __( 'Barras Apiladas', 'sysman-suite' ),
-                    'grouped_bar' => __( 'Barras Agrupadas', 'sysman-suite' ),
+                    'bar'            => __( 'Barras', 'sysman-suite' ),
+                    'horizontal_bar' => __( 'Barras Horizontales', 'sysman-suite' ),
+                    'line'           => __( 'Líneas', 'sysman-suite' ),
+                    'area'           => __( 'Área', 'sysman-suite' ),
+                    'stacked_area'   => __( 'Área Apilada', 'sysman-suite' ),
+                    'pie'            => __( 'Pie / Torta', 'sysman-suite' ),
+                    'donut'          => __( 'Donut', 'sysman-suite' ),
+                    'treemap'        => __( 'Treemap', 'sysman-suite' ),
+                    'stacked_bar'    => __( 'Barras Apiladas', 'sysman-suite' ),
+                    'grouped_bar'    => __( 'Barras Agrupadas', 'sysman-suite' ),
+                    'radar'          => __( 'Radar', 'sysman-suite' ),
                 ];
                 $icons = [
-                    'bar' => 'chart-bar', 'line' => 'chart-line', 'area' => 'chart-area',
+                    'bar' => 'chart-bar', 'horizontal_bar' => 'chart-bar',
+                    'line' => 'chart-line', 'area' => 'chart-area', 'stacked_area' => 'chart-area',
                     'pie' => 'chart-pie', 'donut' => 'chart-pie', 'treemap' => 'screenoptions',
                     'stacked_bar' => 'chart-bar', 'grouped_bar' => 'chart-bar',
+                    'radar' => 'performance',
                 ];
                 $icon = $icons[ $type ] ?? 'chart-bar';
                 echo '<span class="dashicons dashicons-' . esc_attr( $icon ) . '" style="color:var(--sysman-primary,#1a5632);vertical-align:middle;margin-right:4px;"></span>';
@@ -445,7 +466,16 @@ class Visualizer {
             $aggregate = 'SUM';
         }
 
-        $query   = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        // Optional color/series column for multi-series charts
+        $color_col = sanitize_text_field( $_POST['color_column'] ?? '' );
+        $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+
+        if ( $has_color ) {
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`";
+        } else {
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        }
+
         $where   = [];
         $prepare = [];
 
@@ -470,7 +500,11 @@ class Visualizer {
             $query .= ' WHERE ' . implode( ' AND ', $where );
         }
 
-        $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+        if ( $has_color ) {
+            $query .= " GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+        } else {
+            $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+        }
 
         if ( $prepare ) {
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

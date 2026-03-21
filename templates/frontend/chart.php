@@ -203,6 +203,7 @@ $unique_id     = 'sysman-chart-' . $id;
             'numberFormat'  => $number_format,
             'yAxisTitle'    => $y_axis_title,
             'xAxisTitle'    => $x_axis_title,
+            'hasGroups'     => $meta['has_groups'] ?? false,
             'title'         => $title,
             'restUrl'       => rest_url( 'sysman-suite/v1/' ),
             'nonce'         => wp_create_nonce( 'wp_rest' ),

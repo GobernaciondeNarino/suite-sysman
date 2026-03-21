@@ -552,6 +552,53 @@
     max-width: 400px;
 }
 
+/* Vertical stacked form layout for data source section */
+.sysman-form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sysman-form-stack .sysman-form-group {
+    min-width: 0;
+}
+
+.sysman-form-stack .sysman-form-group select,
+.sysman-form-stack .sysman-form-group input[type="text"] {
+    max-width: 600px;
+}
+
+/* Inline row within stack (e.g. aggregate + orientation side by side) */
+.sysman-form-row-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.sysman-form-row-inline .sysman-form-group {
+    flex: 0 1 280px;
+}
+
+/* Field guidance alert */
+.sysman-field-guidance {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #fff8e5;
+    border: 1px solid #ffd666;
+    border-radius: var(--sysman-radius);
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--sysman-gray-800);
+}
+
+.sysman-field-guidance .dashicons {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
 .sysman-form-group--actions {
     display: flex;
     align-items: flex-end;

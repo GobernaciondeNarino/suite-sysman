@@ -10,7 +10,10 @@ $chart_type     = get_post_meta( $post->ID, '_sysman_chart_type', true ) ?: 'bar
 $data_table     = get_post_meta( $post->ID, '_sysman_data_table', true ) ?: '';
 $group_column   = get_post_meta( $post->ID, '_sysman_group_column', true ) ?: '';
 $value_column   = get_post_meta( $post->ID, '_sysman_value_column', true ) ?: '';
+$color_column   = get_post_meta( $post->ID, '_sysman_color_column', true ) ?: '';
+$value_column_2 = get_post_meta( $post->ID, '_sysman_value_column_2', true ) ?: '';
 $aggregate      = get_post_meta( $post->ID, '_sysman_aggregate', true ) ?: 'SUM';
+$orientation    = get_post_meta( $post->ID, '_sysman_orientation', true ) ?: 'vertical';
 $filter_anio    = get_post_meta( $post->ID, '_sysman_filter_anio', true ) ?: 0;
 $filter_mes     = get_post_meta( $post->ID, '_sysman_filter_mes', true ) ?: 0;
 $filter_destino = get_post_meta( $post->ID, '_sysman_filter_destino', true ) ?: '';
@@ -45,14 +48,17 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
         <div class="sysman-chart-types" role="radiogroup" aria-label="<?php esc_attr_e( 'Seleccione el tipo de gráfico', 'sysman-suite' ); ?>">
             <?php
             $chart_types = [
-                'bar'         => [ 'label' => __( 'Barras', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="4" y="20" width="8" height="16" fill="#3498db"/><rect x="16" y="10" width="8" height="26" fill="#e67e22"/><rect x="28" y="5" width="8" height="31" fill="#2ecc71"/></svg>' ],
-                'line'        => [ 'label' => __( 'Líneas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polyline points="4,32 14,18 24,24 36,8" fill="none" stroke="#3498db" stroke-width="2.5"/></svg>' ],
-                'area'        => [ 'label' => __( 'Área', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polygon points="4,36 4,28 14,16 24,22 36,8 36,36" fill="#3498db" opacity="0.3"/><polyline points="4,28 14,16 24,22 36,8" fill="none" stroke="#3498db" stroke-width="2"/></svg>' ],
-                'pie'         => [ 'label' => __( 'Pie / Torta', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="#3498db"/><path d="M20,20 L20,4 A16,16 0 0,1 34.5,28Z" fill="#e67e22"/><path d="M20,20 L34.5,28 A16,16 0 0,1 12,34Z" fill="#2ecc71"/></svg>' ],
-                'donut'       => [ 'label' => __( 'Donut', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="#e67e22"/><path d="M20,20 L20,4 A16,16 0 0,1 36,20Z" fill="#3498db"/><path d="M20,20 L8,30 A16,16 0 0,1 4,20Z" fill="#2ecc71"/><circle cx="20" cy="20" r="8" fill="white"/></svg>' ],
-                'treemap'     => [ 'label' => __( 'Treemap', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="2" y="2" width="22" height="22" fill="#3498db"/><rect x="26" y="2" width="12" height="14" fill="#e67e22"/><rect x="26" y="18" width="12" height="6" fill="#2ecc71"/><rect x="2" y="26" width="14" height="12" fill="#9b59b6"/><rect x="18" y="26" width="20" height="12" fill="#f39c12"/></svg>' ],
-                'stacked_bar' => [ 'label' => __( 'Barras Apiladas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="4" y="24" width="8" height="12" fill="#3498db"/><rect x="4" y="14" width="8" height="10" fill="#e67e22"/><rect x="16" y="18" width="8" height="18" fill="#3498db"/><rect x="16" y="6" width="8" height="12" fill="#e67e22"/><rect x="28" y="20" width="8" height="16" fill="#3498db"/><rect x="28" y="10" width="8" height="10" fill="#e67e22"/></svg>' ],
-                'grouped_bar' => [ 'label' => __( 'Barras Agrupadas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="2" y="18" width="5" height="18" fill="#3498db"/><rect x="8" y="12" width="5" height="24" fill="#e67e22"/><rect x="16" y="10" width="5" height="26" fill="#3498db"/><rect x="22" y="6" width="5" height="30" fill="#e67e22"/><rect x="30" y="22" width="5" height="14" fill="#3498db"/><rect x="36" y="16" width="5" height="20" fill="#e67e22"/></svg>' ],
+                'bar'          => [ 'label' => __( 'Barras', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="4" y="20" width="8" height="16" fill="#3498db"/><rect x="16" y="10" width="8" height="26" fill="#e67e22"/><rect x="28" y="5" width="8" height="31" fill="#2ecc71"/></svg>' ],
+                'horizontal_bar' => [ 'label' => __( 'Barras Horizontales', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="4" y="4" width="32" height="7" fill="#3498db"/><rect x="4" y="14" width="24" height="7" fill="#e67e22"/><rect x="4" y="24" width="16" height="7" fill="#2ecc71"/><rect x="4" y="34" width="20" height="5" fill="#9b59b6"/></svg>' ],
+                'stacked_bar'  => [ 'label' => __( 'Barras Apiladas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="4" y="24" width="8" height="12" fill="#3498db"/><rect x="4" y="14" width="8" height="10" fill="#e67e22"/><rect x="16" y="18" width="8" height="18" fill="#3498db"/><rect x="16" y="6" width="8" height="12" fill="#e67e22"/><rect x="28" y="20" width="8" height="16" fill="#3498db"/><rect x="28" y="10" width="8" height="10" fill="#e67e22"/></svg>' ],
+                'grouped_bar'  => [ 'label' => __( 'Barras Agrupadas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="2" y="18" width="5" height="18" fill="#3498db"/><rect x="8" y="12" width="5" height="24" fill="#e67e22"/><rect x="16" y="10" width="5" height="26" fill="#3498db"/><rect x="22" y="6" width="5" height="30" fill="#e67e22"/><rect x="30" y="22" width="5" height="14" fill="#3498db"/><rect x="36" y="16" width="5" height="20" fill="#e67e22"/></svg>' ],
+                'line'         => [ 'label' => __( 'Líneas', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polyline points="4,32 14,18 24,24 36,8" fill="none" stroke="#3498db" stroke-width="2.5"/><polyline points="4,28 14,22 24,14 36,18" fill="none" stroke="#e67e22" stroke-width="2.5"/></svg>' ],
+                'area'         => [ 'label' => __( 'Área', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polygon points="4,36 4,28 14,16 24,22 36,8 36,36" fill="#3498db" opacity="0.3"/><polyline points="4,28 14,16 24,22 36,8" fill="none" stroke="#3498db" stroke-width="2"/></svg>' ],
+                'stacked_area' => [ 'label' => __( 'Área Apilada', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polygon points="4,36 4,24 14,14 24,18 36,8 36,36" fill="#3498db" opacity="0.25"/><polygon points="4,36 4,30 14,22 24,26 36,16 36,36" fill="#e67e22" opacity="0.35"/><polyline points="4,24 14,14 24,18 36,8" fill="none" stroke="#3498db" stroke-width="1.5"/><polyline points="4,30 14,22 24,26 36,16" fill="none" stroke="#e67e22" stroke-width="1.5"/></svg>' ],
+                'pie'          => [ 'label' => __( 'Pie / Torta', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="#3498db"/><path d="M20,20 L20,4 A16,16 0 0,1 34.5,28Z" fill="#e67e22"/><path d="M20,20 L34.5,28 A16,16 0 0,1 12,34Z" fill="#2ecc71"/></svg>' ],
+                'donut'        => [ 'label' => __( 'Donut', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="#e67e22"/><path d="M20,20 L20,4 A16,16 0 0,1 36,20Z" fill="#3498db"/><path d="M20,20 L8,30 A16,16 0 0,1 4,20Z" fill="#2ecc71"/><circle cx="20" cy="20" r="8" fill="white"/></svg>' ],
+                'treemap'      => [ 'label' => __( 'Treemap', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><rect x="2" y="2" width="22" height="22" fill="#3498db"/><rect x="26" y="2" width="12" height="14" fill="#e67e22"/><rect x="26" y="18" width="12" height="6" fill="#2ecc71"/><rect x="2" y="26" width="14" height="12" fill="#9b59b6"/><rect x="18" y="26" width="20" height="12" fill="#f39c12"/></svg>' ],
+                'radar'        => [ 'label' => __( 'Radar', 'sysman-suite' ), 'svg' => '<svg viewBox="0 0 40 40"><polygon points="20,4 35,14 32,32 8,32 5,14" fill="none" stroke="#ccc" stroke-width="0.5"/><polygon points="20,10 30,17 28,29 12,29 10,17" fill="#3498db" opacity="0.3" stroke="#3498db" stroke-width="1.5"/></svg>' ],
             ];
             foreach ( $chart_types as $type => $info ) :
             ?>
@@ -78,9 +84,9 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             <span id="sysman-field-guidance-text"></span>
         </div>
 
-        <div class="sysman-form-row">
+        <div class="sysman-form-stack">
             <div class="sysman-form-group">
-                <label for="sysman_data_table"><?php esc_html_e( 'Tabla', 'sysman-suite' ); ?></label>
+                <label for="sysman_data_table"><?php esc_html_e( 'Tabla de Datos', 'sysman-suite' ); ?></label>
                 <select id="sysman_data_table" name="sysman_data_table">
                     <option value=""><?php esc_html_e( '-- Seleccionar tabla --', 'sysman-suite' ); ?></option>
                     <?php foreach ( $tables as $table_name => $label ) : ?>
@@ -92,7 +98,9 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             </div>
 
             <div class="sysman-form-group">
-                <label for="sysman_group_column"><?php esc_html_e( 'Columna de Agrupación (Eje X / Etiquetas)', 'sysman-suite' ); ?></label>
+                <label for="sysman_group_column">
+                    <?php esc_html_e( 'Columna de Agrupación (Eje X / Etiquetas)', 'sysman-suite' ); ?>
+                </label>
                 <select id="sysman_group_column" name="sysman_group_column">
                     <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
                 </select>
@@ -100,22 +108,61 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             </div>
 
             <div class="sysman-form-group">
-                <label for="sysman_value_column"><?php esc_html_e( 'Columna de Valor (Eje Y)', 'sysman-suite' ); ?></label>
+                <label for="sysman_value_column">
+                    <?php esc_html_e( 'Columna de Valor (Eje Y)', 'sysman-suite' ); ?>
+                </label>
                 <select id="sysman_value_column" name="sysman_value_column">
                     <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
                 </select>
                 <p class="description sysman-column-hint" id="sysman-value-hint"></p>
             </div>
 
-            <div class="sysman-form-group">
-                <label for="sysman_aggregate"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
-                <select id="sysman_aggregate" name="sysman_aggregate">
-                    <option value="SUM" <?php selected( $aggregate, 'SUM' ); ?>>SUM</option>
-                    <option value="COUNT" <?php selected( $aggregate, 'COUNT' ); ?>>COUNT</option>
-                    <option value="AVG" <?php selected( $aggregate, 'AVG' ); ?>>AVG</option>
-                    <option value="MAX" <?php selected( $aggregate, 'MAX' ); ?>>MAX</option>
-                    <option value="MIN" <?php selected( $aggregate, 'MIN' ); ?>>MIN</option>
+            <!-- Color/Series column: shown for stacked, grouped, multi-series charts -->
+            <div class="sysman-form-group sysman-field-color-column" id="sysman-color-column-wrap" style="display:none;">
+                <label for="sysman_color_column">
+                    <?php esc_html_e( 'Columna de Serie / Color (agrupación secundaria)', 'sysman-suite' ); ?>
+                </label>
+                <select id="sysman_color_column" name="sysman_color_column">
+                    <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
                 </select>
+                <p class="description" id="sysman-color-hint">
+                    <?php esc_html_e( 'Define las series/colores dentro de cada grupo del eje X. Ej: "destino" para diferenciar FUNCIONAMIENTO vs INVERSION.', 'sysman-suite' ); ?>
+                </p>
+            </div>
+
+            <!-- Second Y value: shown for specific types -->
+            <div class="sysman-form-group sysman-field-value2" id="sysman-value2-wrap" style="display:none;">
+                <label for="sysman_value_column_2">
+                    <?php esc_html_e( 'Segundo Valor (Eje Y2)', 'sysman-suite' ); ?>
+                </label>
+                <select id="sysman_value_column_2" name="sysman_value_column_2">
+                    <option value=""><?php esc_html_e( '-- No usar --', 'sysman-suite' ); ?></option>
+                </select>
+                <p class="description">
+                    <?php esc_html_e( 'Campo numérico adicional. Útil para comparar dos métricas en el mismo gráfico.', 'sysman-suite' ); ?>
+                </p>
+            </div>
+
+            <div class="sysman-form-row-inline">
+                <div class="sysman-form-group">
+                    <label for="sysman_aggregate"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
+                    <select id="sysman_aggregate" name="sysman_aggregate">
+                        <option value="SUM" <?php selected( $aggregate, 'SUM' ); ?>>SUM - <?php esc_html_e( 'Suma', 'sysman-suite' ); ?></option>
+                        <option value="COUNT" <?php selected( $aggregate, 'COUNT' ); ?>>COUNT - <?php esc_html_e( 'Contar', 'sysman-suite' ); ?></option>
+                        <option value="AVG" <?php selected( $aggregate, 'AVG' ); ?>>AVG - <?php esc_html_e( 'Promedio', 'sysman-suite' ); ?></option>
+                        <option value="MAX" <?php selected( $aggregate, 'MAX' ); ?>>MAX - <?php esc_html_e( 'Máximo', 'sysman-suite' ); ?></option>
+                        <option value="MIN" <?php selected( $aggregate, 'MIN' ); ?>>MIN - <?php esc_html_e( 'Mínimo', 'sysman-suite' ); ?></option>
+                    </select>
+                </div>
+
+                <!-- Orientation: shown for bar types -->
+                <div class="sysman-form-group sysman-field-orientation" id="sysman-orientation-wrap" style="display:none;">
+                    <label for="sysman_orientation"><?php esc_html_e( 'Orientación', 'sysman-suite' ); ?></label>
+                    <select id="sysman_orientation" name="sysman_orientation">
+                        <option value="vertical" <?php selected( $orientation, 'vertical' ); ?>><?php esc_html_e( 'Vertical', 'sysman-suite' ); ?></option>
+                        <option value="horizontal" <?php selected( $orientation, 'horizontal' ); ?>><?php esc_html_e( 'Horizontal', 'sysman-suite' ); ?></option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -198,7 +245,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                     <input type="number" id="sysman_chart_height" name="sysman_chart_height" value="<?php echo esc_attr( $chart_height ); ?>" min="200" max="1000" class="small-text"> px
                 </td>
             </tr>
-            <tr>
+            <tr class="sysman-field-axes">
                 <th scope="row">
                     <label for="sysman_y_axis_title"><?php esc_html_e( 'Título Eje Y', 'sysman-suite' ); ?></label>
                 </th>
@@ -206,7 +253,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                     <input type="text" id="sysman_y_axis_title" name="sysman_y_axis_title" value="<?php echo esc_attr( $y_axis_title ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Valor en Pesos Colombianos', 'sysman-suite' ); ?>">
                 </td>
             </tr>
-            <tr>
+            <tr class="sysman-field-axes">
                 <th scope="row">
                     <label for="sysman_x_axis_title"><?php esc_html_e( 'Título Eje X', 'sysman-suite' ); ?></label>
                 </th>
@@ -310,8 +357,8 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             <button type="button" class="button button-small sysman-toggle-section"><?php esc_html_e( 'Expandir', 'sysman-suite' ); ?></button>
         </div>
         <div class="sysman-collapsible-body" style="display:none;">
-            <p class="description"><?php esc_html_e( 'Si necesita una consulta SQL personalizada, puede escribirla aquí. Esta consulta reemplazará la generada automáticamente. Debe retornar columnas "label" y "value".', 'sysman-suite' ); ?></p>
-            <textarea id="sysman_custom_query" name="sysman_custom_query" class="large-text code" rows="6" placeholder="SELECT columna AS label, SUM(valor) AS value FROM tabla WHERE ... GROUP BY columna"><?php echo esc_textarea( $custom_query ); ?></textarea>
+            <p class="description"><?php esc_html_e( 'Si necesita una consulta SQL personalizada, puede escribirla aquí. Esta consulta reemplazará la generada automáticamente. Debe retornar columnas "label" y "value" (y opcionalmente "group" para gráficos multi-serie).', 'sysman-suite' ); ?></p>
+            <textarea id="sysman_custom_query" name="sysman_custom_query" class="large-text code" rows="6" placeholder="SELECT columna AS label, SUM(valor) AS value, serie AS group FROM tabla WHERE ... GROUP BY columna, serie"><?php echo esc_textarea( $custom_query ); ?></textarea>
             <p class="description">
                 <span class="dashicons dashicons-warning" aria-hidden="true" style="color:#dba617;"></span>
                 <?php esc_html_e( 'Advertencia: Las consultas personalizadas no se validan automáticamente. Use con precaución.', 'sysman-suite' ); ?>
@@ -322,5 +369,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
     <!-- Hidden fields for JS to populate -->
     <input type="hidden" id="sysman-saved-group-column" value="<?php echo esc_attr( $group_column ); ?>">
     <input type="hidden" id="sysman-saved-value-column" value="<?php echo esc_attr( $value_column ); ?>">
+    <input type="hidden" id="sysman-saved-color-column" value="<?php echo esc_attr( $color_column ); ?>">
+    <input type="hidden" id="sysman-saved-value-column-2" value="<?php echo esc_attr( $value_column_2 ); ?>">
     <input type="hidden" id="sysman-saved-filters" value="<?php echo esc_attr( wp_json_encode( $filters ) ); ?>">
 </div>
