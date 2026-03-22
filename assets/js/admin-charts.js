@@ -1,139 +1,97 @@
 /**
  * SYSMAN Suite - Admin Chart Configuration Manager
  * Gobernacion de Narino
- * v2.0.0 - Dynamic fields per chart type, multi-series support, new chart types
+ * v2.1.0 - Multiple Y-value columns, each becomes a series
  */
 (function ($) {
     'use strict';
 
     /**
-     * Chart type configurations: field requirements and guidance per type.
-     * needsColorColumn: requires a secondary grouping column (series/color)
-     * needsValue2: can use a second Y value
+     * Chart type configurations.
+     * supportsMultiY: all types support multiple Y columns (each becomes a series)
+     * needsColorColumn: only when single Y value, group by a categorical column
      * hasAxes: show axis title fields
-     * showOrientation: show horizontal/vertical toggle
      */
     const CHART_TYPE_CONFIG = {
         bar: {
             label: 'Barras',
-            groupDesc: 'Columna categorica para el eje X (ej: nombrerubro, destino, codigocuenta).',
-            valueDesc: 'Columna numerica para la altura de las barras (ej: apropiacionvigente, pagos).',
-            guidance: 'Grafico de barras verticales. Ideal para comparar valores entre categorias.',
-            needsColorColumn: false,
-            needsValue2: false,
+            groupDesc: 'Columna categorica para el eje X (ej: anio, nombrerubro, destino).',
+            valueDesc: 'Agregue 1 o mas columnas numericas. Cada una se convierte en una serie.',
+            guidance: 'Grafico de barras. Agregue multiples valores Y para comparar metricas lado a lado (ej: Apropiacion Vigente vs Pagos por año).',
             hasAxes: true,
-            showOrientation: false,
         },
         horizontal_bar: {
             label: 'Barras Horizontales',
             groupDesc: 'Columna categorica para el eje Y (las etiquetas a la izquierda).',
-            valueDesc: 'Columna numerica para la longitud de las barras.',
-            guidance: 'Barras horizontales. Ideal cuando las etiquetas son largas o hay muchas categorias.',
-            needsColorColumn: false,
-            needsValue2: false,
+            valueDesc: 'Columnas numericas para la longitud de las barras.',
+            guidance: 'Barras horizontales. Ideal cuando las etiquetas son largas. Soporta multiples valores Y.',
             hasAxes: true,
-            showOrientation: false,
         },
         stacked_bar: {
             label: 'Barras Apiladas',
-            groupDesc: 'Columna para el eje X (ej: anio, mes). Las barras se apilan en cada posicion.',
-            valueDesc: 'Columna numerica cuyo valor se apila (ej: apropiacionvigente, pagos).',
-            colorDesc: 'Columna que define las series apiladas (ej: destino, nombrerubro). Cada valor unico genera un segmento de color diferente.',
-            guidance: 'Barras apiladas: requiere Eje X + Valor Y + Columna de Serie. Cada serie se apila verticalmente. Ideal para ver composicion y total.',
-            needsColorColumn: true,
-            needsValue2: false,
+            groupDesc: 'Columna para el eje X (ej: anio). Las barras se apilan en cada posicion.',
+            valueDesc: 'Agregue 2+ columnas numericas. Cada una sera un segmento apilado.',
+            guidance: 'Barras apiladas: agregue 2 o mas valores Y. Cada valor se apila como un segmento de color diferente. Ideal para ver composicion y total.',
             hasAxes: true,
-            showOrientation: false,
         },
         grouped_bar: {
             label: 'Barras Agrupadas',
-            groupDesc: 'Columna para el eje X (ej: anio, mes). Las barras se agrupan lado a lado.',
-            valueDesc: 'Columna numerica para la altura de cada barra (ej: pagos, compromisos).',
-            colorDesc: 'Columna que define las barras dentro de cada grupo (ej: destino). Cada valor unico genera una barra separada.',
-            guidance: 'Barras agrupadas: requiere Eje X + Valor Y + Columna de Serie. Las series se muestran lado a lado. Ideal para comparar series.',
-            needsColorColumn: true,
-            needsValue2: false,
+            groupDesc: 'Columna para el eje X (ej: anio). Las barras se agrupan lado a lado.',
+            valueDesc: 'Agregue 2+ columnas numericas. Cada una sera una barra lado a lado.',
+            guidance: 'Barras agrupadas: agregue 2 o mas valores Y. Cada valor se muestra como barra separada lado a lado. Ideal para comparar series.',
             hasAxes: true,
-            showOrientation: false,
         },
         line: {
             label: 'Lineas',
-            groupDesc: 'Columna temporal o categorica para el eje X (ej: mes, anio, fecha).',
-            valueDesc: 'Columna numerica para el eje Y.',
-            colorDesc: 'Columna que define multiples lineas (ej: destino). Opcional para linea unica.',
-            guidance: 'Grafico de lineas. Ideal para tendencias en el tiempo. Puede tener multiples lineas con la columna de serie.',
-            needsColorColumn: true,
-            needsValue2: true,
+            groupDesc: 'Columna temporal o categorica para el eje X (ej: mes, anio).',
+            valueDesc: 'Agregue 1 o mas columnas numericas. Cada una sera una linea.',
+            guidance: 'Grafico de lineas. Multiples valores Y generan multiples lineas. Ideal para tendencias.',
             hasAxes: true,
-            showOrientation: false,
         },
         area: {
             label: 'Area',
             groupDesc: 'Columna temporal o categorica para el eje X.',
-            valueDesc: 'Columna numerica para el eje Y.',
-            guidance: 'Grafico de area. Rellena debajo de la linea. Ideal para mostrar volumenes.',
-            needsColorColumn: false,
-            needsValue2: false,
+            valueDesc: 'Columna numerica para el area.',
+            guidance: 'Grafico de area. Rellena debajo de la linea.',
             hasAxes: true,
-            showOrientation: false,
         },
         stacked_area: {
             label: 'Area Apilada',
             groupDesc: 'Columna temporal para el eje X (ej: mes, anio).',
-            valueDesc: 'Columna numerica para apilar.',
-            colorDesc: 'Columna que define las areas apiladas (ej: destino, nombrerubro).',
-            guidance: 'Area apilada: requiere Eje X + Valor Y + Columna de Serie. Las areas se apilan para mostrar composicion acumulada.',
-            needsColorColumn: true,
-            needsValue2: false,
+            valueDesc: 'Agregue 2+ columnas numericas para apilar.',
+            guidance: 'Area apilada: cada valor Y se apila como un area.',
             hasAxes: true,
-            showOrientation: false,
         },
         pie: {
             label: 'Pie / Torta',
             groupDesc: 'Columna que define cada porcion (ej: destino, nombrerubro).',
-            valueDesc: 'Columna numerica cuyo valor determina el tamano de cada porcion.',
-            guidance: 'Grafico de torta. Ideal para mostrar proporciones de un total.',
-            needsColorColumn: false,
-            needsValue2: false,
+            valueDesc: 'Una columna numerica para el tamano de cada porcion.',
+            guidance: 'Grafico de torta. Solo 1 valor Y.',
             hasAxes: false,
-            showOrientation: false,
         },
         donut: {
             label: 'Donut',
             groupDesc: 'Columna que define cada porcion.',
-            valueDesc: 'Columna numerica para el tamano de cada porcion.',
-            guidance: 'Similar a torta pero con centro vacio. Ideal para proporciones.',
-            needsColorColumn: false,
-            needsValue2: false,
+            valueDesc: 'Una columna numerica para el tamano de cada porcion.',
+            guidance: 'Similar a torta con centro vacio.',
             hasAxes: false,
-            showOrientation: false,
         },
         treemap: {
             label: 'Treemap',
-            groupDesc: 'Columna de categoria que define cada bloque (ej: nombrerubro, destino).',
-            valueDesc: 'Columna numerica que define el tamano proporcional de cada bloque.',
-            guidance: 'Treemap: muestra jerarquias como bloques proporcionales al valor.',
-            needsColorColumn: false,
-            needsValue2: false,
+            groupDesc: 'Columna de categoria para cada bloque.',
+            valueDesc: 'Columna numerica para el tamano de cada bloque.',
+            guidance: 'Treemap: bloques proporcionales al valor.',
             hasAxes: false,
-            showOrientation: false,
         },
         radar: {
             label: 'Radar',
-            groupDesc: 'Columna que define los ejes/dimensiones del radar (ej: nombrerubro).',
-            valueDesc: 'Columna numerica para la distancia radial en cada eje.',
-            colorDesc: 'Columna que define multiples series en el radar (ej: anio, destino).',
-            guidance: 'Radar: muestra multiples dimensiones en ejes radiales. Ideal para comparar perfiles.',
-            needsColorColumn: true,
-            needsValue2: false,
+            groupDesc: 'Columna que define los ejes del radar (ej: nombrerubro).',
+            valueDesc: 'Agregue 1 o mas columnas numericas. Cada una sera una serie en el radar.',
+            guidance: 'Radar: cada valor Y genera una serie poligonal.',
             hasAxes: false,
-            showOrientation: false,
         },
     };
 
-    /**
-     * Column classification for heatmap hints.
-     */
     const COLUMN_TYPES = {
         codigocuenta: 'text', nombrerubro: 'text', movimiento: 'text',
         destino: 'text', bpid: 'text', compania: 'text', nombrepred: 'text',
@@ -150,9 +108,6 @@
         anio: 'temporal', mes: 'temporal', fecha: 'temporal',
     };
 
-    /**
-     * Colombian number formatter for admin preview.
-     */
     const NumberFormatter = {
         format(value) {
             if (typeof value !== 'number' || isNaN(value)) return '0';
@@ -192,14 +147,19 @@
                 this.applyColumnHeatmap();
             });
 
-            $('#sysman-add-filter').on('click', () => this.addFilter());
+            // Dynamic Y-value columns
+            $('#sysman-add-value-column').on('click', () => this.addValueColumn(''));
+            $(document).on('click', '.sysman-remove-value-col', function () {
+                $(this).closest('.sysman-value-col-row').remove();
+                ChartConfigManager.updateFieldVisibility();
+            });
 
+            $('#sysman-add-filter').on('click', () => this.addFilter());
             $(document).on('click', '.sysman-remove-filter', function () {
                 $(this).closest('.sysman-filter-row').remove();
             });
 
             $('#sysman_chart_colors').on('input change', () => this.updateColorPreview());
-
             $('#sysman-refresh-preview').on('click', () => this.refreshPreview());
 
             $(document).on('click', '.sysman-toggle-section', function () {
@@ -214,32 +174,70 @@
         },
 
         /**
-         * Show/hide dynamic fields based on chart type selection.
+         * Get all selected Y-value columns.
          */
+        getValueColumns() {
+            const cols = [];
+            $('.sysman-value-col-select').each(function () {
+                const v = $(this).val();
+                if (v) cols.push(v);
+            });
+            return cols;
+        },
+
+        /**
+         * Add a Y-value column row.
+         */
+        addValueColumn(selectedValue) {
+            const index = $('.sysman-value-col-row').length;
+            const exclude = ['id', 'fecha_importacion'];
+            const filtered = this.currentColumns.filter(c => !exclude.includes(c));
+
+            let options = '<option value="">-- Seleccionar columna --</option>';
+            filtered.forEach(col => {
+                const label = this.formatColumnName(col);
+                const colType = COLUMN_TYPES[col] || 'unknown';
+                const bg = colType === 'numeric' ? ' style="background-color:#d4edda"' :
+                           colType === 'temporal' ? ' style="background-color:#fff3cd"' :
+                           colType === 'text' ? ' style="background-color:#f8d7da"' : '';
+                const sel = col === selectedValue ? ' selected' : '';
+                options += `<option value="${col}"${bg}${sel}>${label}</option>`;
+            });
+
+            const html = `
+                <div class="sysman-value-col-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+                    <span class="sysman-value-col-badge" style="background:var(--sysman-primary,#1a5632);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">Y${index + 1}</span>
+                    <select name="sysman_value_columns[]" class="sysman-value-col-select" style="flex:1;max-width:500px;">
+                        ${options}
+                    </select>
+                    <button type="button" class="button sysman-remove-value-col" aria-label="Eliminar" style="padding:0 8px;color:#dc3232;">&times;</button>
+                </div>`;
+            $('#sysman-value-columns-list').append(html);
+            this.renumberValueBadges();
+            this.updateFieldVisibility();
+        },
+
+        renumberValueBadges() {
+            $('.sysman-value-col-badge').each(function (i) {
+                $(this).text('Y' + (i + 1));
+            });
+        },
+
         updateFieldVisibility() {
             const type = this.getSelectedChartType();
             const config = CHART_TYPE_CONFIG[type];
             if (!config) return;
 
-            // Color/series column
-            if (config.needsColorColumn) {
+            const valueCount = this.getValueColumns().length;
+
+            // Color column: only show when 1 value column AND not pie/donut/treemap
+            // When multiple Y columns exist, the series are automatically the column names
+            const showColor = valueCount <= 1 && !['pie', 'donut', 'treemap'].includes(type);
+            if (showColor) {
                 $('#sysman-color-column-wrap').slideDown(200);
             } else {
                 $('#sysman-color-column-wrap').slideUp(200);
-            }
-
-            // Second Y value
-            if (config.needsValue2) {
-                $('#sysman-value2-wrap').slideDown(200);
-            } else {
-                $('#sysman-value2-wrap').slideUp(200);
-            }
-
-            // Orientation (for bar type only)
-            if (config.showOrientation) {
-                $('#sysman-orientation-wrap').slideDown(200);
-            } else {
-                $('#sysman-orientation-wrap').slideUp(200);
+                $('#sysman_color_column').val('');
             }
 
             // Axes fields
@@ -260,10 +258,6 @@
             $('#sysman-group-hint').text(config.groupDesc);
             $('#sysman-value-hint').text(config.valueDesc);
 
-            if (config.colorDesc) {
-                $('#sysman-color-hint').text(config.colorDesc);
-            }
-
             this.applyColumnHeatmap();
         },
 
@@ -279,16 +273,6 @@
                 if (colType === 'text') $(this).css('background-color', '#d4edda');
                 else if (colType === 'temporal') $(this).css('background-color', isTimeSeries ? '#d4edda' : '#fff3cd');
                 else if (colType === 'numeric') $(this).css('background-color', '#f8d7da');
-            });
-
-            $('#sysman_value_column option, #sysman_value_column_2 option').each(function () {
-                const col = $(this).val();
-                if (!col) return;
-                const colType = COLUMN_TYPES[col] || 'unknown';
-                $(this).css('background-color', '');
-                if (colType === 'numeric') $(this).css('background-color', '#d4edda');
-                else if (colType === 'temporal') $(this).css('background-color', '#fff3cd');
-                else if (colType === 'text') $(this).css('background-color', '#f8d7da');
             });
         },
 
@@ -317,54 +301,51 @@
 
         populateColumnSelects(columns) {
             const exclude = ['id', 'fecha_importacion'];
-            const filtered = columns.filter((c) => !exclude.includes(c));
+            const filtered = columns.filter(c => !exclude.includes(c));
 
             const savedGroup  = $('#sysman-saved-group-column').val();
-            const savedValue  = $('#sysman-saved-value-column').val();
             const savedColor  = $('#sysman-saved-color-column').val();
-            const savedValue2 = $('#sysman-saved-value-column-2').val();
+
+            // Saved value columns (JSON array)
+            let savedValues = [];
+            try {
+                savedValues = JSON.parse($('#sysman-saved-value-columns').val() || '[]');
+            } catch (e) { /* ignore */ }
 
             // Group column
             const groupSelect = $('#sysman_group_column');
             groupSelect.empty().append('<option value="">-- Seleccionar columna --</option>');
-            filtered.forEach((col) => {
+            filtered.forEach(col => {
                 const opt = $('<option>').val(col).text(this.formatColumnName(col));
                 if (col === savedGroup) opt.prop('selected', true);
                 groupSelect.append(opt);
             });
 
-            // Value column
-            const valueSelect = $('#sysman_value_column');
-            valueSelect.empty().append('<option value="">-- Seleccionar columna --</option>');
-            filtered.forEach((col) => {
-                const opt = $('<option>').val(col).text(this.formatColumnName(col));
-                if (col === savedValue) opt.prop('selected', true);
-                valueSelect.append(opt);
-            });
-
             // Color/series column
             const colorSelect = $('#sysman_color_column');
-            colorSelect.empty().append('<option value="">-- Sin serie (datos simples) --</option>');
-            filtered.forEach((col) => {
+            colorSelect.empty().append('<option value="">-- Sin serie adicional --</option>');
+            filtered.forEach(col => {
                 const opt = $('<option>').val(col).text(this.formatColumnName(col));
                 if (col === savedColor) opt.prop('selected', true);
                 colorSelect.append(opt);
             });
 
-            // Second value column
-            const value2Select = $('#sysman_value_column_2');
-            value2Select.empty().append('<option value="">-- No usar --</option>');
-            filtered.forEach((col) => {
-                const opt = $('<option>').val(col).text(this.formatColumnName(col));
-                if (col === savedValue2) opt.prop('selected', true);
-                value2Select.append(opt);
-            });
+            // Y-value columns: rebuild from saved
+            $('#sysman-value-columns-list').empty();
+            if (savedValues.length > 0) {
+                savedValues.forEach(v => this.addValueColumn(v));
+            } else {
+                // Add one empty row by default
+                this.addValueColumn('');
+            }
+            // Clear saved so we don't re-read on next column load
+            $('#sysman-saved-value-columns').val('[]');
 
             // Filter columns
             $('.sysman-filter-column').each(function () {
                 const current = $(this).val();
                 $(this).empty().append('<option value="">Columna</option>');
-                filtered.forEach((col) => {
+                filtered.forEach(col => {
                     const opt = $('<option>').val(col).text(ChartConfigManager.formatColumnName(col));
                     if (col === current) opt.prop('selected', true);
                     $(this).append(opt);
@@ -402,14 +383,14 @@
 
             const colors = input.val().split(',').map(c => c.trim()).filter(c => /^#[0-9a-fA-F]{3,8}$/.test(c));
             preview.empty();
-            colors.forEach((color) => {
+            colors.forEach(color => {
                 preview.append($('<span class="sysman-color-swatch">').css('background-color', color).attr('title', color));
             });
         },
 
         /**
-         * Render live D3plus preview in admin.
-         * Uses dedicated AJAX endpoint that builds query from current form values.
+         * Render live D3plus preview.
+         * Sends all Y columns to the backend; the backend builds a UNION query.
          */
         refreshPreview() {
             const area = $('#sysman-chart-preview-area');
@@ -417,10 +398,10 @@
 
             const dataTable   = $('#sysman_data_table').val();
             const groupColumn = $('#sysman_group_column').val();
-            const valueColumn = $('#sysman_value_column').val();
+            const valueColumns = this.getValueColumns();
 
-            if (!dataTable || !groupColumn || !valueColumn) {
-                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y columna de valor para ver la vista previa.</p>');
+            if (!dataTable || !groupColumn || valueColumns.length === 0) {
+                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y al menos un valor Y.</p>');
                 return;
             }
 
@@ -435,9 +416,8 @@
                     preview_nonce:  sysmanCharts.previewNonce,
                     data_table:     dataTable,
                     group_column:   groupColumn,
-                    value_column:   valueColumn,
+                    value_columns:  valueColumns,
                     color_column:   $('#sysman_color_column').val() || '',
-                    value_column_2: $('#sysman_value_column_2').val() || '',
                     aggregate:      $('#sysman_aggregate').val() || 'SUM',
                     chart_type:     this.getSelectedChartType(),
                     chart_height:   $('#sysman_chart_height').val() || 400,
@@ -465,10 +445,6 @@
             });
         },
 
-        /**
-         * Render D3plus chart in admin preview area.
-         * Supports all chart types including multi-series.
-         */
         renderD3PlusPreview(container, data, meta) {
             container.empty();
             const canvasId = 'sysman-admin-preview-canvas';
@@ -480,35 +456,27 @@
             const height = parseInt(meta.chart_height) || 400;
             const hasGroups = data.some(d => d.group && d.group !== d.label);
 
-            // Build chart data based on whether we have group column
-            const chartData = data.map((d) => ({
+            const chartData = data.map(d => ({
                 label: String(d.label || ''),
                 value: parseFloat(d.value) || 0,
                 group: String(d.group || d.label || ''),
             }));
 
-            // Color mapping
             const uniqueGroups = [...new Set(chartData.map(d => d.group))];
             const colorMap = {};
             uniqueGroups.forEach((g, i) => { colorMap[g] = colors[i % colors.length]; });
-            const colorFn = (d) => colorMap[d.group || d.label] || colors[0];
+            const colorFn = d => colorMap[d.group || d.label] || colors[0];
 
-            const yConfig = {
-                title: meta.y_axis_title || '',
-                tickFormat: (d) => NumberFormatter.format(d),
-            };
+            const yConfig = { title: meta.y_axis_title || '', tickFormat: d => NumberFormatter.format(d) };
             const xConfig = { title: meta.x_axis_title || '' };
 
             const tooltipConfig = {
                 tbody: [
-                    [meta.x_axis_title || 'Categoria', (d) => d.label],
-                    [meta.y_axis_title || 'Valor', (d) => (d.value || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })],
+                    [meta.x_axis_title || 'Categoria', d => d.label],
+                    [meta.y_axis_title || 'Valor', d => (d.value || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })],
                 ],
             };
-
-            if (hasGroups) {
-                tooltipConfig.tbody.unshift(['Serie', (d) => d.group]);
-            }
+            if (hasGroups) tooltipConfig.tbody.unshift(['Serie', d => d.group]);
 
             const selector = `#${canvasId}`;
 
@@ -516,74 +484,60 @@
                 switch (chartType) {
                     case 'bar':
                         new d3plus.BarChart()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x')
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x')
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'horizontal_bar':
                         new d3plus.BarChart()
-                            .data(chartData).groupBy('group').x('value').y('label')
-                            .discrete('y')
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(xConfig).xConfig(yConfig)
+                            .data(chartData).groupBy('group').x('value').y('label').discrete('y')
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(xConfig).xConfig(yConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'stacked_bar':
                         new d3plus.BarChart()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x').stacked(true)
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x').stacked(true)
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'grouped_bar':
                         new d3plus.BarChart()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x').stacked(false)
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x').stacked(false)
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'line':
                         new d3plus.LinePlot()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x')
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x')
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'area':
                         new d3plus.AreaPlot()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x')
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x')
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'stacked_area':
                         new d3plus.StackedArea()
-                            .data(chartData).groupBy('group').x('label').y('value')
-                            .discrete('x')
-                            .select(selector).color(colorFn)
-                            .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
+                            .data(chartData).groupBy('group').x('label').y('value').discrete('x')
+                            .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
+                            .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'pie':
                         new d3plus.Pie()
                             .data(chartData).groupBy('group').value('value')
@@ -591,7 +545,6 @@
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'donut':
                         new d3plus.Donut()
                             .data(chartData).groupBy('group').value('value')
@@ -599,7 +552,6 @@
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'treemap':
                         new d3plus.Treemap()
                             .data(chartData).groupBy('group').sum('value')
@@ -607,16 +559,13 @@
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     case 'radar':
                         new d3plus.Radar()
-                            .data(chartData).groupBy('group')
-                            .metric('label').value('value')
+                            .data(chartData).groupBy('group').metric('label').value('value')
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
                             .height(height).locale('es_ES').render();
                         break;
-
                     default:
                         new d3plus.BarChart()
                             .data(chartData).groupBy('group').x('label').y('value')
@@ -647,7 +596,7 @@
                 valorcredito: 'Valor Credito', saldoporejecutaresp: 'Saldo por Ejecutar',
                 comprobante_afectado: 'Comprobante Afectado', tipo_cpte: 'Tipo Comprobante',
             };
-            return labels[col] || col.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            return labels[col] || col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         },
     };
 

@@ -9,9 +9,8 @@ $tables = $plugin->database->get_available_tables();
 $chart_type     = get_post_meta( $post->ID, '_sysman_chart_type', true ) ?: 'bar';
 $data_table     = get_post_meta( $post->ID, '_sysman_data_table', true ) ?: '';
 $group_column   = get_post_meta( $post->ID, '_sysman_group_column', true ) ?: '';
-$value_column   = get_post_meta( $post->ID, '_sysman_value_column', true ) ?: '';
+$value_columns  = get_post_meta( $post->ID, '_sysman_value_columns', true ) ?: [];
 $color_column   = get_post_meta( $post->ID, '_sysman_color_column', true ) ?: '';
-$value_column_2 = get_post_meta( $post->ID, '_sysman_value_column_2', true ) ?: '';
 $aggregate      = get_post_meta( $post->ID, '_sysman_aggregate', true ) ?: 'SUM';
 $orientation    = get_post_meta( $post->ID, '_sysman_orientation', true ) ?: 'vertical';
 $filter_anio    = get_post_meta( $post->ID, '_sysman_filter_anio', true ) ?: 0;
@@ -107,39 +106,34 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                 <p class="description sysman-column-hint" id="sysman-group-hint"></p>
             </div>
 
+            <!-- Dynamic Y-value columns -->
             <div class="sysman-form-group">
-                <label for="sysman_value_column">
-                    <?php esc_html_e( 'Columna de Valor (Eje Y)', 'sysman-suite' ); ?>
+                <label>
+                    <?php esc_html_e( 'Columnas de Valor (Eje Y)', 'sysman-suite' ); ?>
                 </label>
-                <select id="sysman_value_column" name="sysman_value_column">
-                    <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
-                </select>
                 <p class="description sysman-column-hint" id="sysman-value-hint"></p>
+                <div id="sysman-value-columns-list">
+                    <!-- JS will populate saved values here -->
+                </div>
+                <button type="button" id="sysman-add-value-column" class="button" style="margin-top:8px;">
+                    <span class="dashicons dashicons-plus-alt2" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
+                    <?php esc_html_e( 'Agregar Valor Y', 'sysman-suite' ); ?>
+                </button>
+                <p class="description" style="margin-top:6px;">
+                    <?php esc_html_e( 'Cada columna de valor genera una serie independiente en el gráfico. Ej: agregar "Apropiación Vigente" y "Apropiación Inicial" para comparar ambas métricas por año.', 'sysman-suite' ); ?>
+                </p>
             </div>
 
-            <!-- Color/Series column: shown for stacked, grouped, multi-series charts -->
+            <!-- Color/Series column: optional, for grouping by a categorical column instead -->
             <div class="sysman-form-group sysman-field-color-column" id="sysman-color-column-wrap" style="display:none;">
                 <label for="sysman_color_column">
                     <?php esc_html_e( 'Columna de Serie / Color (agrupación secundaria)', 'sysman-suite' ); ?>
                 </label>
                 <select id="sysman_color_column" name="sysman_color_column">
-                    <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
+                    <option value=""><?php esc_html_e( '-- Sin serie adicional --', 'sysman-suite' ); ?></option>
                 </select>
                 <p class="description" id="sysman-color-hint">
-                    <?php esc_html_e( 'Define las series/colores dentro de cada grupo del eje X. Ej: "destino" para diferenciar FUNCIONAMIENTO vs INVERSION.', 'sysman-suite' ); ?>
-                </p>
-            </div>
-
-            <!-- Second Y value: shown for specific types -->
-            <div class="sysman-form-group sysman-field-value2" id="sysman-value2-wrap" style="display:none;">
-                <label for="sysman_value_column_2">
-                    <?php esc_html_e( 'Segundo Valor (Eje Y2)', 'sysman-suite' ); ?>
-                </label>
-                <select id="sysman_value_column_2" name="sysman_value_column_2">
-                    <option value=""><?php esc_html_e( '-- No usar --', 'sysman-suite' ); ?></option>
-                </select>
-                <p class="description">
-                    <?php esc_html_e( 'Campo numérico adicional. Útil para comparar dos métricas en el mismo gráfico.', 'sysman-suite' ); ?>
+                    <?php esc_html_e( 'Solo visible si usa 1 valor Y. Define series por una columna categórica (ej: destino). Si usa múltiples valores Y, las series se crean automáticamente.', 'sysman-suite' ); ?>
                 </p>
             </div>
 
@@ -368,8 +362,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
 
     <!-- Hidden fields for JS to populate -->
     <input type="hidden" id="sysman-saved-group-column" value="<?php echo esc_attr( $group_column ); ?>">
-    <input type="hidden" id="sysman-saved-value-column" value="<?php echo esc_attr( $value_column ); ?>">
+    <input type="hidden" id="sysman-saved-value-columns" value="<?php echo esc_attr( wp_json_encode( $value_columns ) ); ?>">
     <input type="hidden" id="sysman-saved-color-column" value="<?php echo esc_attr( $color_column ); ?>">
-    <input type="hidden" id="sysman-saved-value-column-2" value="<?php echo esc_attr( $value_column_2 ); ?>">
     <input type="hidden" id="sysman-saved-filters" value="<?php echo esc_attr( wp_json_encode( $filters ) ); ?>">
 </div>

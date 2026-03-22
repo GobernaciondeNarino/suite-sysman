@@ -146,9 +146,7 @@ class Visualizer {
             'chart_type'       => 'sanitize_text_field',
             'data_table'       => 'sanitize_text_field',
             'group_column'     => 'sanitize_text_field',
-            'value_column'     => 'sanitize_text_field',
             'color_column'     => 'sanitize_text_field',
-            'value_column_2'   => 'sanitize_text_field',
             'aggregate'        => 'sanitize_text_field',
             'orientation'      => 'sanitize_text_field',
             'filter_anio'      => 'absint',
@@ -177,6 +175,14 @@ class Visualizer {
             } else {
                 delete_post_meta( $post_id, "_sysman_{$field}" );
             }
+        }
+
+        // Handle value_columns array (multiple Y columns)
+        if ( isset( $_POST['sysman_value_columns'] ) && is_array( $_POST['sysman_value_columns'] ) ) {
+            $value_columns = array_values( array_filter( array_map( 'sanitize_text_field', $_POST['sysman_value_columns'] ) ) );
+            update_post_meta( $post_id, '_sysman_value_columns', $value_columns );
+        } else {
+            delete_post_meta( $post_id, '_sysman_value_columns' );
         }
 
         // Handle custom query (sanitize but allow SQL)
@@ -208,56 +214,14 @@ class Visualizer {
     }
 
     /**
-     * Build a secure SQL query from chart configuration.
+     * Build WHERE clause parts from chart filters.
      */
-    public function build_chart_query( int $chart_id ): ?string {
+    private function build_where_from_meta( int $chart_id, string $table ): array {
         global $wpdb;
 
-        // Check for custom query first
-        $custom_query = get_post_meta( $chart_id, '_sysman_custom_query', true );
-        if ( ! empty( $custom_query ) ) {
-            return $custom_query;
-        }
-
-        $table     = get_post_meta( $chart_id, '_sysman_data_table', true );
-        $group_col = get_post_meta( $chart_id, '_sysman_group_column', true );
-        $value_col = get_post_meta( $chart_id, '_sysman_value_column', true );
-        $color_col = get_post_meta( $chart_id, '_sysman_color_column', true );
-        $aggregate = strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' );
-        $filters   = get_post_meta( $chart_id, '_sysman_filters', true ) ?: [];
-
-        // Validate table
-        if ( ! $this->database->validate_table( $table ) ) {
-            return null;
-        }
-
-        // Validate columns
-        if ( ! $this->database->validate_column( $table, $group_col ) ) {
-            return null;
-        }
-        if ( ! $this->database->validate_column( $table, $value_col ) ) {
-            return null;
-        }
-
-        // Validate aggregate
-        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
-            $aggregate = 'SUM';
-        }
-
-        // Validate optional color/series column
-        $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
-
-        if ( $has_color ) {
-            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`";
-        } else {
-            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
-        }
-
-        // Build WHERE
         $where   = [];
         $prepare = [];
 
-        // Year/month filters
         $filter_anio = (int) get_post_meta( $chart_id, '_sysman_filter_anio', true );
         $filter_mes  = (int) get_post_meta( $chart_id, '_sysman_filter_mes', true );
 
@@ -276,7 +240,7 @@ class Visualizer {
             $prepare[] = $filter_destino;
         }
 
-        // Custom filters
+        $filters = get_post_meta( $chart_id, '_sysman_filters', true ) ?: [];
         foreach ( $filters as $filter ) {
             $col = $filter['column'] ?? '';
             $op  = strtoupper( $filter['operator'] ?? '=' );
@@ -293,29 +257,129 @@ class Visualizer {
                 $where[]   = "`{$col}` {$op} %s";
                 $prepare[] = '%' . $wpdb->esc_like( $val ) . '%';
             } elseif ( $op === 'IN' || $op === 'NOT IN' ) {
-                $values  = array_map( 'trim', explode( ',', $val ) );
+                $values       = array_map( 'trim', explode( ',', $val ) );
                 $placeholders = implode( ', ', array_fill( 0, count( $values ), '%s' ) );
-                $where[] = "`{$col}` {$op} ({$placeholders})";
-                $prepare = array_merge( $prepare, $values );
+                $where[]      = "`{$col}` {$op} ({$placeholders})";
+                $prepare      = array_merge( $prepare, $values );
             } else {
                 $where[]   = "`{$col}` {$op} %s";
                 $prepare[] = $val;
             }
         }
 
-        if ( $where ) {
-            $query .= ' WHERE ' . implode( ' AND ', $where );
+        return [ $where, $prepare ];
+    }
+
+    /**
+     * Build a secure SQL query from chart configuration.
+     * Supports multiple Y-value columns via UNION ALL.
+     */
+    public function build_chart_query( int $chart_id ): ?string {
+        global $wpdb;
+
+        // Check for custom query first
+        $custom_query = get_post_meta( $chart_id, '_sysman_custom_query', true );
+        if ( ! empty( $custom_query ) ) {
+            return $custom_query;
         }
 
+        $table      = get_post_meta( $chart_id, '_sysman_data_table', true );
+        $group_col  = get_post_meta( $chart_id, '_sysman_group_column', true );
+        $value_cols = get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [];
+        $color_col  = get_post_meta( $chart_id, '_sysman_color_column', true );
+        $aggregate  = strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' );
+
+        if ( ! $this->database->validate_table( $table ) ) {
+            return null;
+        }
+        if ( ! $this->database->validate_column( $table, $group_col ) ) {
+            return null;
+        }
+        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
+            $aggregate = 'SUM';
+        }
+
+        // Validate value columns
+        $valid_value_cols = [];
+        foreach ( $value_cols as $vc ) {
+            if ( $this->database->validate_column( $table, $vc ) ) {
+                $valid_value_cols[] = $vc;
+            }
+        }
+        if ( empty( $valid_value_cols ) ) {
+            return null;
+        }
+
+        // Build WHERE
+        [ $where, $prepare ] = $this->build_where_from_meta( $chart_id, $table );
+        $where_clause = $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
+
+        // Multi-column Y: each column becomes a series via UNION ALL
+        if ( count( $valid_value_cols ) > 1 ) {
+            return $this->build_multi_y_query( $table, $group_col, $valid_value_cols, $aggregate, $where_clause, $prepare );
+        }
+
+        // Single Y column
+        $value_col = $valid_value_cols[0];
+        $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+
         if ( $has_color ) {
-            $query .= " GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
         } else {
-            $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`{$where_clause} GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
         }
 
         if ( $prepare ) {
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
             return $wpdb->prepare( $query, ...$prepare );
+        }
+
+        return $query;
+    }
+
+    /**
+     * Build UNION ALL query for multiple Y-value columns.
+     * Each column becomes a named series (group).
+     */
+    private function build_multi_y_query( string $table, string $group_col, array $value_cols, string $aggregate, string $where_clause, array $prepare ): ?string {
+        global $wpdb;
+
+        $column_labels = [
+            'apropiacioninicial'      => 'Apropiacion Inicial',
+            'adicion'                 => 'Adicion',
+            'reduccion'              => 'Reduccion',
+            'credito'                => 'Credito',
+            'contracredito'          => 'Contracredito',
+            'aplazamiento'           => 'Aplazamiento',
+            'desplazamiento'         => 'Desplazamiento',
+            'apropiacionvigente'     => 'Apropiacion Vigente',
+            'disponibilidades'       => 'Disponibilidades',
+            'saldodisponible'        => 'Saldo Disponible',
+            'compromisos'            => 'Compromisos',
+            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
+            'obligacion'             => 'Obligacion',
+            'pagos'                  => 'Pagos',
+            'obligacionesporpagar'   => 'Obligaciones por Pagar',
+            'valordebito'            => 'Valor Debito',
+            'valorcredito'           => 'Valor Credito',
+            'saldoporejecutaresp'    => 'Saldo por Ejecutar',
+        ];
+
+        $unions      = [];
+        $all_prepare = [];
+
+        foreach ( $value_cols as $col ) {
+            $label = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
+            $sub   = "SELECT `{$group_col}` AS label, {$aggregate}(`{$col}`) AS value, '{$label}' AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`";
+            $unions[] = "({$sub})";
+            $all_prepare = array_merge( $all_prepare, $prepare );
+        }
+
+        $query = implode( ' UNION ALL ', $unions ) . " ORDER BY label, `group` LIMIT 1000";
+
+        if ( $all_prepare ) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            return $wpdb->prepare( $query, ...$all_prepare );
         }
 
         return $query;
@@ -352,7 +416,7 @@ class Visualizer {
             'number_format'  => get_post_meta( $chart_id, '_sysman_number_format', true ) ?: 'colombian',
             'y_axis_title'   => get_post_meta( $chart_id, '_sysman_y_axis_title', true ) ?: '',
             'x_axis_title'   => get_post_meta( $chart_id, '_sysman_x_axis_title', true ) ?: '',
-            'has_groups'     => ! empty( get_post_meta( $chart_id, '_sysman_color_column', true ) ),
+            'has_groups'     => count( get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [] ) > 1 || ! empty( get_post_meta( $chart_id, '_sysman_color_column', true ) ),
             'show_timeline'  => get_post_meta( $chart_id, '_sysman_show_timeline', true ) === 'yes',
             'show_toolbar'   => get_post_meta( $chart_id, '_sysman_show_toolbar', true ) !== '',
             'toolbar_detail' => get_post_meta( $chart_id, '_sysman_toolbar_detail', true ) === 'yes',
@@ -450,7 +514,6 @@ class Visualizer {
 
         $table     = sanitize_text_field( $_POST['data_table'] ?? '' );
         $group_col = sanitize_text_field( $_POST['group_column'] ?? '' );
-        $value_col = sanitize_text_field( $_POST['value_column'] ?? '' );
         $aggregate = strtoupper( sanitize_text_field( $_POST['aggregate'] ?? 'SUM' ) );
 
         if ( ! $this->database->validate_table( $table ) ) {
@@ -459,23 +522,27 @@ class Visualizer {
         if ( ! $this->database->validate_column( $table, $group_col ) ) {
             wp_send_json_error( [ 'message' => 'Columna de agrupación no válida' ] );
         }
-        if ( ! $this->database->validate_column( $table, $value_col ) ) {
-            wp_send_json_error( [ 'message' => 'Columna de valor no válida' ] );
-        }
         if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
             $aggregate = 'SUM';
         }
 
-        // Optional color/series column for multi-series charts
-        $color_col = sanitize_text_field( $_POST['color_column'] ?? '' );
-        $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
-
-        if ( $has_color ) {
-            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`";
-        } else {
-            $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`";
+        // Collect value columns (array from JS)
+        $raw_value_cols = $_POST['value_columns'] ?? [];
+        if ( ! is_array( $raw_value_cols ) ) {
+            $raw_value_cols = [ $raw_value_cols ];
+        }
+        $value_cols = [];
+        foreach ( $raw_value_cols as $vc ) {
+            $vc = sanitize_text_field( $vc );
+            if ( $vc && $this->database->validate_column( $table, $vc ) ) {
+                $value_cols[] = $vc;
+            }
+        }
+        if ( empty( $value_cols ) ) {
+            wp_send_json_error( [ 'message' => 'Seleccione al menos una columna de valor' ] );
         }
 
+        // Build WHERE
         $where   = [];
         $prepare = [];
 
@@ -496,19 +563,31 @@ class Visualizer {
             $prepare[] = $filter_destino;
         }
 
-        if ( $where ) {
-            $query .= ' WHERE ' . implode( ' AND ', $where );
-        }
+        $where_clause = $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
 
-        if ( $has_color ) {
-            $query .= " GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+        // Multiple Y columns: UNION ALL
+        if ( count( $value_cols ) > 1 ) {
+            $query = $this->build_multi_y_query( $table, $group_col, $value_cols, $aggregate, $where_clause, $prepare );
         } else {
-            $query .= " GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+            // Single Y column
+            $value_col = $value_cols[0];
+            $color_col = sanitize_text_field( $_POST['color_column'] ?? '' );
+            $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+
+            if ( $has_color ) {
+                $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+            } else {
+                $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`{$where_clause} GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+            }
+
+            if ( $prepare ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $query = $wpdb->prepare( $query, ...$prepare );
+            }
         }
 
-        if ( $prepare ) {
-            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-            $query = $wpdb->prepare( $query, ...$prepare );
+        if ( ! $query ) {
+            wp_send_json_error( [ 'message' => 'Error al construir la consulta' ] );
         }
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
