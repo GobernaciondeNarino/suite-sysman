@@ -1,7 +1,7 @@
 /**
  * SYSMAN Suite - Admin Chart Configuration Manager
  * Gobernacion de Narino
- * v2.1.0 - Multiple Y-value columns, each becomes a series
+ * v2.1.1 - Fix: event delegation for dynamic Y-value column buttons
  */
 (function ($) {
     'use strict';
@@ -147,20 +147,21 @@
                 this.applyColumnHeatmap();
             });
 
-            // Dynamic Y-value columns
-            $('#sysman-add-value-column').on('click', () => this.addValueColumn(''));
+            // Dynamic Y-value columns (use event delegation for robustness)
+            $(document).on('click', '#sysman-add-value-column', () => this.addValueColumn(''));
             $(document).on('click', '.sysman-remove-value-col', function () {
                 $(this).closest('.sysman-value-col-row').remove();
                 ChartConfigManager.updateFieldVisibility();
             });
+            $(document).on('change', '.sysman-value-col-select', () => this.updateFieldVisibility());
 
-            $('#sysman-add-filter').on('click', () => this.addFilter());
+            $(document).on('click', '#sysman-add-filter', () => this.addFilter());
             $(document).on('click', '.sysman-remove-filter', function () {
                 $(this).closest('.sysman-filter-row').remove();
             });
 
             $('#sysman_chart_colors').on('input change', () => this.updateColorPreview());
-            $('#sysman-refresh-preview').on('click', () => this.refreshPreview());
+            $(document).on('click', '#sysman-refresh-preview', () => this.refreshPreview());
 
             $(document).on('click', '.sysman-toggle-section', function () {
                 const body = $(this).closest('.sysman-collapsible').find('.sysman-collapsible-body');
