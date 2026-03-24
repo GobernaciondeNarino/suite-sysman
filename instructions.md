@@ -3,10 +3,33 @@ You are an expert WordPress Security & Quality Engineer with deep specialization
 
 
 ## Review
-You will need to capture the data from (the repositories indicate which tables were created and the fields from other plugins with data import functions):
+Update and create data import options with the APIs, create and update tables, and the corresponding modules for proper functionality:
 
-https://github.com/GobernaciondeNarino/sisman-suite/blob/claude/sisman-wordpress-plugin-nzOmo/includes/class-database.php
-https://github.com/GobernaciondeNarino/secop-suite/blob/main/includes/class-database.php
+EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=1
+AUXILIAR PRESUPUESTAL POR CUENTAS
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=2&tipo_cpte=RES
+LISTADO DE TERCEROS
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&numinforme=3
+PLAN PRESUPUESTAL
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=4
+PERSONAL ACTIVO DE NOMINA
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&numinforme=5
+EJECUCION DE INGRESOS
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=6
+
+
+-------------------------------- Educacion -------------------------------------------------------------------------------
+PLAN PRESUPUESTAL SED
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=1&numinforme=4
+EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA SED
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=1
+ECUCION DE INGRESOS SED
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=6
+AUXILIAR PRESUPUESTAL POR CUENTAS SED
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=2&tipo_cpte=RES
+LISTADO DE TERCEROS SED
+https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&numinforme=3
 
 ## Documentation & References
 
@@ -20,37 +43,10 @@ https://github.com/GobernaciondeNarino/secop-suite/blob/main/includes/class-data
 | SECOP II API | https://www.datos.gov.co/resource/jbjy-vk9h.json |
 | OWASP Top 10 | https://owasp.org/www-project-top-ten/ |
 | Colombia DANE Codes | https://www.dane.gov.co/index.php/territorio/codigos-divipola |
-| Sistema financiero | https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2024&mes=1&numinforme=1
-| AUXILIAR PRESUPUESTAL POR CUENTAS | https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2024&mes=1&numinforme=2&tipo_cpte=RES
-| PLAN PRESUPUESTAL | https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2024&mes=1&numinforme=4
 
 ## Update
 
-### v1.1.0 — Mejoras identificadas e implementadas
 
-#### 1. Admin JS — Integración completa con REST API
-- **Problema:** `admin.js` solo manejaba cache flush, shortcode builder y tabs, pero NO tenía handlers para los botones "Cargar Datos", "Analizar", "Proyectar" y "Evaluar" en las páginas descriptivo, diagnóstico, predictivo y prescriptivo.
-- **Solución:** Se agregaron funciones `initDescriptive()`, `initDiagnostic()`, `initPredictive()`, `initPrescriptive()` y `initDashboardKpis()` que fetch data desde la REST API (`dss/v1/*`) y renderizan gráficos D3plus y KPIs dinámicamente.
-
-#### 2. Dashboard.js — Transformación de datos REST → D3plus
-- **Problema:** Los métodos `buildChart()` esperaban datos planos pero la REST API devuelve respuestas anidadas (`{data: {kpis, monthly, by_rubro}}`).
-- **Solución:** Se creó capa de transformación `DSSDataTransformer` que adapta respuestas REST a formatos D3plus:
-  - `descriptive.monthly` → `[{mes: "Ene", apropiacion: N, pagos: N}]` para BarChart/LinePlot
-  - `descriptive.by_rubro` → `[{rubro: "X", total: N}]` para Treemap
-  - `descriptive.contracts_by_type` → `[{tipo: "X", value: N}]` para Donut
-  - `diagnostic.variations` → stacked data para StackedBar
-  - `diagnostic.scatter` → scatter data para Plot
-
-#### 3. Database whitelist — Columnas faltantes de SECOP
-- **Problema:** La whitelist de `secop_contracts` no incluía columnas importantes como `modalidad_de_contratacion`, `sector`, `nombre_entidad`, `departamento`.
-- **Solución:** Se añadieron las columnas usadas por el AnalyticsEngine para consultas de agregación y filtrado.
-
-#### 4. Seguridad y mejores prácticas
-- El plugin ya sigue buenas prácticas OWASP: prepared statements, nonce verification, capability checks, table/column whitelists.
-- Se verifica que `wp_add_inline_script` use `esc_url()` para el fallback CDN.
-- Rate limiting implementado correctamente con transients.
-
-#### 5. Versión incrementada a 1.1.0
 
 ## Actions
 - Verify the plugin's functionality
