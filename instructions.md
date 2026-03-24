@@ -5,31 +5,27 @@ You are an expert WordPress Security & Quality Engineer with deep specialization
 ## Review
 Update and create data import options with the APIs, create and update tables, and the corresponding modules for proper functionality:
 
-EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA
+- EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=1
-AUXILIAR PRESUPUESTAL POR CUENTAS
+- AUXILIAR PRESUPUESTAL POR CUENTAS
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=2&tipo_cpte=RES
-LISTADO DE TERCEROS
-https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&numinforme=3
-PLAN PRESUPUESTAL
+- PLAN PRESUPUESTAL
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=4
-PERSONAL ACTIVO DE NOMINA
+- PERSONAL ACTIVO DE NOMINA
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&numinforme=5
-EJECUCION DE INGRESOS
+- EJECUCION DE INGRESOS
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio=2025&mes=11&numinforme=6
 
 
--------------------------------- Educacion -------------------------------------------------------------------------------
-PLAN PRESUPUESTAL SED
+-------------------------------- Educacion SED-------------------------------------------------------------------------------
+- PLAN PRESUPUESTAL SED
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=1&numinforme=4
-EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA SED
+- EJECUCION PRESUPUESTAL DE GASTOS ACUMULADA SED
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=1
-ECUCION DE INGRESOS SED
+- ECUCION DE INGRESOS SED
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=6
-AUXILIAR PRESUPUESTAL POR CUENTAS SED
+- AUXILIAR PRESUPUESTAL POR CUENTAS SED
 https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&anio=2025&mes=3&numinforme=2&tipo_cpte=RES
-LISTADO DE TERCEROS SED
-https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compania=007&numinforme=3
 
 ## Documentation & References
 
