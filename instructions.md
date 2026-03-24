@@ -56,3 +56,4 @@ https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compan
 - Implement the improvements
 - Update the code
 - Update the repository, maintaining the plugin version increment
+- After performing all the actions, review the document https://github.com/GobernaciondeNarino/sisman-suite/blob/claude/sisman-wordpress-plugin-nzOmo/instructions.md.
