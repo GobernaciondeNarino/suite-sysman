@@ -7,8 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Importer {
 
-    private const API_BASE_URL = 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar';
-    private const TIMEOUT      = 120;
+    private const DEFAULT_API_URL = 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar';
+    private const TIMEOUT        = 120;
 
     private Database $database;
     private Logger   $logger;
@@ -38,7 +38,8 @@ class Importer {
             'numinforme' => $numinforme,
         ], $extra );
 
-        return self::API_BASE_URL . '?' . http_build_query( $params );
+        $base_url = get_option( 'sysman_api_base_url', self::DEFAULT_API_URL );
+        return $base_url . '?' . http_build_query( $params );
     }
 
     /**

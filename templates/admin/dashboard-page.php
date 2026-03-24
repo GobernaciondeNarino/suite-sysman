@@ -245,6 +245,10 @@ $next_cron  = wp_next_scheduled( 'sysman_scheduled_import' );
                         <span class="dashicons dashicons-media-text" aria-hidden="true"></span>
                         <span><?php esc_html_e( 'Ver Logs', 'sysman-suite' ); ?></span>
                     </a>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-settings' ) ); ?>" class="sysman-quick-action">
+                        <span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>
+                        <span><?php esc_html_e( 'Configuración', 'sysman-suite' ); ?></span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -331,7 +335,13 @@ $next_cron  = wp_next_scheduled( 'sysman_scheduled_import' );
                 </table>
 
                 <h3><?php esc_html_e( 'URL Base', 'sysman-suite' ); ?></h3>
-                <code class="sysman-code-block">https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar</code>
+                <code class="sysman-code-block"><?php echo esc_html( get_option( 'sysman_api_base_url', 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar' ) ); ?></code>
+                <p class="description" style="margin-top:4px;">
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-settings' ) ); ?>">
+                        <span class="dashicons dashicons-admin-generic" aria-hidden="true" style="font-size:14px;width:14px;height:14px;vertical-align:middle;"></span>
+                        <?php esc_html_e( 'Modificar en Configuración', 'sysman-suite' ); ?>
+                    </a>
+                </p>
 
                 <h3><?php esc_html_e( 'Parámetros', 'sysman-suite' ); ?></h3>
                 <table class="sysman-mini-table">

@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     1.5.0
+ * Version:     2.2.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '2.1.0' );
+define( 'SYSMAN_SUITE_VERSION', '2.2.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -79,6 +79,9 @@ final class Sysman_Suite {
         add_action( 'admin_enqueue_scripts', [ $this, 'admin_assets' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_init', [ $this, 'maybe_create_tables' ] );
+
+        // Settings connection test
+        add_action( 'wp_ajax_sysman_test_connections', [ $this, 'ajax_test_connections' ] );
 
         // Cron
         add_action( 'sysman_scheduled_import', [ $this->importer, 'run_scheduled_import' ] );
@@ -174,6 +177,15 @@ final class Sysman_Suite {
             'sysman-logs',
             [ $this, 'render_logs_page' ]
         );
+
+        add_submenu_page(
+            'sysman-suite',
+            __( 'Configuración', 'sysman-suite' ),
+            __( 'Configuración', 'sysman-suite' ),
+            'manage_options',
+            'sysman-settings',
+            [ $this, 'render_settings_page' ]
+        );
     }
 
     public function render_dashboard_page(): void {
@@ -192,12 +204,17 @@ final class Sysman_Suite {
         include SYSMAN_SUITE_PATH . 'templates/admin/logs-page.php';
     }
 
+    public function render_settings_page(): void {
+        include SYSMAN_SUITE_PATH . 'templates/admin/settings-page.php';
+    }
+
     public function admin_assets( string $hook ): void {
         $plugin_pages = [
             'toplevel_page_sysman-suite',
             'sysman-suite_page_sysman-import',
             'sysman-suite_page_sysman-records',
             'sysman-suite_page_sysman-logs',
+            'sysman-suite_page_sysman-settings',
         ];
 
         if ( ! in_array( $hook, $plugin_pages, true ) ) {
@@ -239,9 +256,11 @@ final class Sysman_Suite {
         // Chart config assets for CPT edit screen
         $screen = get_current_screen();
         if ( $screen && 'sysman_chart' === $screen->post_type ) {
-            // D3.js and D3plus for live admin preview
-            wp_enqueue_script( 'd3-v5', 'https://d3js.org/d3.v5.min.js', [], '5.16.0', true );
-            wp_enqueue_script( 'd3plus', 'https://d3plus.org/js/d3plus.v2.0.full.min.js', [ 'd3-v5' ], '2.0.0', true );
+            // D3.js and D3plus for live admin preview (URLs from settings)
+            $d3_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
+            $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://d3plus.org/js/d3plus.v2.0.full.min.js' );
+            wp_enqueue_script( 'd3-v5', $d3_url, [], '5.16.0', true );
+            wp_enqueue_script( 'd3plus', $d3plus_url, [ 'd3-v5' ], '2.0.0', true );
 
             wp_enqueue_script(
                 'sysman-admin-charts',
@@ -257,6 +276,78 @@ final class Sysman_Suite {
                 'previewNonce' => wp_create_nonce( 'sysman_chart_preview' ),
             ] );
         }
+    }
+
+    /**
+     * AJAX: Test configured connections.
+     */
+    public function ajax_test_connections(): void {
+        check_ajax_referer( 'sysman_test_connections' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $results = [];
+
+        // Test SYSMAN API
+        $api_url = sanitize_url( $_POST['api_url'] ?? '' );
+        if ( $api_url ) {
+            $test_url  = $api_url . '?compania=001&anio=' . date( 'Y' ) . '&mes=1&numinforme=1';
+            $response  = wp_remote_get( $test_url, [ 'timeout' => 15, 'sslverify' => false ] );
+            $results[] = [
+                'label'   => 'API SYSMAN',
+                'ok'      => ! is_wp_error( $response ) && in_array( wp_remote_retrieve_response_code( $response ), [ 200, 201 ], true ),
+                'message' => is_wp_error( $response )
+                    ? $response->get_error_message()
+                    : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+            ];
+        }
+
+        // Test D3.js CDN
+        $d3_url = sanitize_url( $_POST['d3_url'] ?? '' );
+        if ( $d3_url ) {
+            $response  = wp_remote_head( $d3_url, [ 'timeout' => 10 ] );
+            $results[] = [
+                'label'   => 'D3.js CDN',
+                'ok'      => ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ),
+                'message' => is_wp_error( $response )
+                    ? $response->get_error_message()
+                    : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+            ];
+        }
+
+        // Test D3Plus CDN
+        $d3plus_url = sanitize_url( $_POST['d3plus_url'] ?? '' );
+        if ( $d3plus_url ) {
+            $response  = wp_remote_head( $d3plus_url, [ 'timeout' => 10 ] );
+            $results[] = [
+                'label'   => 'D3Plus CDN',
+                'ok'      => ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ),
+                'message' => is_wp_error( $response )
+                    ? $response->get_error_message()
+                    : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+            ];
+        }
+
+        // Test GitHub API
+        $github_repo = sanitize_text_field( $_POST['github_repo'] ?? '' );
+        if ( $github_repo ) {
+            $gh_url    = 'https://api.github.com/repos/' . $github_repo;
+            $response  = wp_remote_get( $gh_url, [
+                'timeout' => 10,
+                'headers' => [ 'Accept' => 'application/vnd.github.v3+json', 'User-Agent' => 'SYSMAN-Suite/' . SYSMAN_SUITE_VERSION ],
+            ] );
+            $results[] = [
+                'label'   => 'GitHub (' . $github_repo . ')',
+                'ok'      => ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ),
+                'message' => is_wp_error( $response )
+                    ? $response->get_error_message()
+                    : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+            ];
+        }
+
+        wp_send_json_success( $results );
     }
 
     public function register_settings(): void {
@@ -279,6 +370,28 @@ final class Sysman_Suite {
             'type'              => 'string',
             'default'           => 'daily',
             'sanitize_callback' => 'sanitize_text_field',
+        ] );
+
+        // API & CDN URL settings
+        register_setting( 'sysman_settings', 'sysman_api_base_url', [
+            'type'              => 'string',
+            'default'           => 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar',
+            'sanitize_callback' => 'esc_url_raw',
+        ] );
+        register_setting( 'sysman_settings', 'sysman_github_repo', [
+            'type'              => 'string',
+            'default'           => 'GobernaciondeNarino/sysman-suite',
+            'sanitize_callback' => 'sanitize_text_field',
+        ] );
+        register_setting( 'sysman_settings', 'sysman_d3_cdn_url', [
+            'type'              => 'string',
+            'default'           => 'https://d3js.org/d3.v5.min.js',
+            'sanitize_callback' => 'esc_url_raw',
+        ] );
+        register_setting( 'sysman_settings', 'sysman_d3plus_cdn_url', [
+            'type'              => 'string',
+            'default'           => 'https://d3plus.org/js/d3plus.v2.0.full.min.js',
+            'sanitize_callback' => 'esc_url_raw',
         ] );
     }
 }

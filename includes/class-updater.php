@@ -11,9 +11,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Updater {
 
-    private const GITHUB_REPO  = 'GobernaciondeNarino/sysman-suite';
+    private const DEFAULT_GITHUB_REPO = 'GobernaciondeNarino/sysman-suite';
     private const CACHE_KEY    = 'sysman_suite_update_info';
     private const CACHE_EXPIRY = 12 * HOUR_IN_SECONDS;
+
+    private function get_github_repo(): string {
+        return get_option( 'sysman_github_repo', self::DEFAULT_GITHUB_REPO );
+    }
 
     public function __construct() {
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_for_updates' ] );
@@ -62,7 +66,7 @@ class Updater {
                 'slug'        => 'sysman-suite',
                 'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $current_version,
-                'url'         => 'https://github.com/' . self::GITHUB_REPO,
+                'url'         => 'https://github.com/' . $this->get_github_repo(),
             ];
         }
 
@@ -88,7 +92,7 @@ class Updater {
             'version'         => $remote['version'],
             'author'          => '<a href="https://narino.gov.co">Gobernación de Nariño</a>',
             'author_profile'  => 'https://narino.gov.co',
-            'homepage'        => 'https://github.com/' . self::GITHUB_REPO,
+            'homepage'        => 'https://github.com/' . $this->get_github_repo(),
             'requires'        => $remote['requires'] ?? '6.0',
             'tested'          => $remote['tested'] ?? '',
             'requires_php'    => $remote['requires_php'] ?? '8.1',
@@ -114,7 +118,7 @@ class Updater {
         }
 
         $response = wp_remote_get(
-            'https://api.github.com/repos/' . self::GITHUB_REPO . '/releases/latest',
+            'https://api.github.com/repos/' . $this->get_github_repo() . '/releases/latest',
             [
                 'timeout' => 15,
                 'headers' => [
@@ -224,9 +228,9 @@ class Updater {
             return $links;
         }
 
-        $links[] = '<a href="https://github.com/' . self::GITHUB_REPO . '/releases">' .
+        $links[] = '<a href="https://github.com/' . $this->get_github_repo() . '/releases">' .
             esc_html__( 'Registro de cambios', 'sysman-suite' ) . '</a>';
-        $links[] = '<a href="https://github.com/' . self::GITHUB_REPO . '/issues">' .
+        $links[] = '<a href="https://github.com/' . $this->get_github_repo() . '/issues">' .
             esc_html__( 'Reportar problema', 'sysman-suite' ) . '</a>';
 
         return $links;
