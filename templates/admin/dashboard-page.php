@@ -81,7 +81,7 @@ $next_cron  = wp_next_scheduled( 'sysman_scheduled_import' );
                 <span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>
             </div>
             <div class="sysman-dash-stat-body">
-                <span class="sysman-dash-stat-value"><?php echo esc_html( $db_status['existing_count'] ); ?>/3</span>
+                <span class="sysman-dash-stat-value"><?php echo esc_html( $db_status['existing_count'] ); ?>/<?php echo count( $stats ); ?></span>
                 <span class="sysman-dash-stat-label"><?php esc_html_e( 'Tablas Activas', 'sysman-suite' ); ?></span>
             </div>
         </div>

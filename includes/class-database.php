@@ -129,6 +129,78 @@ class Database {
 
         dbDelta( $sql_plan );
 
+        // Table 4: Personal Activo de Nómina (numinforme=5)
+        $table_personal = $wpdb->prefix . 'sysman_personal_nomina';
+        $sql_personal = "CREATE TABLE {$table_personal} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            anio INT NOT NULL DEFAULT 0,
+            compania VARCHAR(10) NOT NULL DEFAULT '001',
+            iddeempleado VARCHAR(20) NOT NULL DEFAULT '',
+            apellido1 VARCHAR(200) NOT NULL DEFAULT '',
+            apellido2 VARCHAR(200) NOT NULL DEFAULT '',
+            nombres VARCHAR(200) NOT NULL DEFAULT '',
+            numerodcto VARCHAR(30) NOT NULL DEFAULT '',
+            expedida VARCHAR(50) NOT NULL DEFAULT '',
+            fechancto VARCHAR(20) NOT NULL DEFAULT '',
+            fechadeingreso VARCHAR(20) NOT NULL DEFAULT '',
+            fechaderetiro VARCHAR(20) NOT NULL DEFAULT '',
+            iddecargo VARCHAR(20) NOT NULL DEFAULT '',
+            nombredelcargo VARCHAR(300) NOT NULL DEFAULT '',
+            iddecategoria VARCHAR(20) NOT NULL DEFAULT '',
+            nombrecategoria VARCHAR(200) NOT NULL DEFAULT '',
+            escalafon VARCHAR(10) NOT NULL DEFAULT '',
+            nombreescalafon VARCHAR(100) NOT NULL DEFAULT '',
+            grado VARCHAR(10) NOT NULL DEFAULT '',
+            decarrera VARCHAR(10) NOT NULL DEFAULT '',
+            salariobaseibc DECIMAL(20,2) NOT NULL DEFAULT 0,
+            dependencianombre VARCHAR(500) NOT NULL DEFAULT '',
+            emailcorporativo VARCHAR(200) NOT NULL DEFAULT '',
+            emailpersonal VARCHAR(200) NOT NULL DEFAULT '',
+            direccion VARCHAR(500) NOT NULL DEFAULT '',
+            telefonos VARCHAR(200) NOT NULL DEFAULT '',
+            fechacumplimientobonificacion VARCHAR(20) NOT NULL DEFAULT '',
+            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_anio (anio),
+            KEY idx_compania (compania),
+            KEY idx_numerodcto (numerodcto),
+            KEY idx_nombredelcargo (nombredelcargo(100)),
+            KEY idx_dependencia (dependencianombre(100))
+        ) {$charset};";
+
+        dbDelta( $sql_personal );
+
+        // Table 5: Ejecución de Ingresos (numinforme=6)
+        $table_ingresos = $wpdb->prefix . 'sysman_ejecucion_ingresos';
+        $sql_ingresos = "CREATE TABLE {$table_ingresos} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            anio INT NOT NULL DEFAULT 0,
+            mes INT NOT NULL DEFAULT 0,
+            compania VARCHAR(10) NOT NULL DEFAULT '001',
+            cuenta VARCHAR(50) NOT NULL DEFAULT '',
+            codigo VARCHAR(50) NOT NULL DEFAULT '',
+            nombre VARCHAR(500) NOT NULL DEFAULT '',
+            movimiento VARCHAR(10) NOT NULL DEFAULT '',
+            tiporecurso VARCHAR(100) NOT NULL DEFAULT '',
+            fuenterecurso VARCHAR(100) NOT NULL DEFAULT '',
+            apropiado DECIMAL(20,2) NOT NULL DEFAULT 0,
+            modificaciones DECIMAL(20,2) NOT NULL DEFAULT 0,
+            totalpresupuesto DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosanteriores DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosmes DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosacumulados DECIMAL(20,2) NOT NULL DEFAULT 0,
+            porrecaudar DECIMAL(20,2) NOT NULL DEFAULT 0,
+            porcrecaudado DECIMAL(10,2) NOT NULL DEFAULT 0,
+            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_anio_mes (anio, mes),
+            KEY idx_compania (compania),
+            KEY idx_cuenta (cuenta),
+            KEY idx_codigo (codigo)
+        ) {$charset};";
+
+        dbDelta( $sql_ingresos );
+
         $this->logger->log( 'Tablas de base de datos creadas/actualizadas correctamente.' );
     }
 
@@ -138,9 +210,11 @@ class Database {
     public function get_available_tables(): array {
         global $wpdb;
         return [
-            $wpdb->prefix . 'sysman_ejecucion_gastos'  => __( 'Ejecución Presupuestal de Gastos', 'sysman-suite' ),
-            $wpdb->prefix . 'sysman_auxiliar_cuentas'   => __( 'Auxiliar Presupuestal por Cuentas', 'sysman-suite' ),
-            $wpdb->prefix . 'sysman_plan_presupuestal'  => __( 'Plan Presupuestal', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_ejecucion_gastos'    => __( 'Ejecución Presupuestal de Gastos', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_auxiliar_cuentas'     => __( 'Auxiliar Presupuestal por Cuentas', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_plan_presupuestal'    => __( 'Plan Presupuestal', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_personal_nomina'      => __( 'Personal Activo de Nómina', 'sysman-suite' ),
+            $wpdb->prefix . 'sysman_ejecucion_ingresos'   => __( 'Ejecución de Ingresos', 'sysman-suite' ),
         ];
     }
 
@@ -242,6 +316,60 @@ class Database {
             'valorcredito'         => 'valorcredito',
             'saldoporejecutaresp'  => 'saldoporejecutaresp',
             'comprobante_afectado' => 'comprobante_afectado',
+        ];
+    }
+
+    /**
+     * Get the field map for personal/nomina table (API field name => DB column).
+     */
+    public function get_personal_field_map(): array {
+        return [
+            'iddeempleado'                  => 'iddeempleado',
+            'apellido1'                     => 'apellido1',
+            'apellido2'                     => 'apellido2',
+            'nombres'                       => 'nombres',
+            'numerodcto'                    => 'numerodcto',
+            'expedida'                      => 'expedida',
+            'fechancto'                     => 'fechancto',
+            'fechadeingreso'                => 'fechadeingreso',
+            'fechaderetiro'                 => 'fechaderetiro',
+            'iddecargo'                     => 'iddecargo',
+            'nombredelcargo'                => 'nombredelcargo',
+            'iddecategoria'                 => 'iddecategoria',
+            'nombrecategoria'               => 'nombrecategoria',
+            'escalafon'                     => 'escalafon',
+            'nombreescalafon'               => 'nombreescalafon',
+            'grado'                         => 'grado',
+            'decarrera'                     => 'decarrera',
+            'salariobaseibc'                => 'salariobaseibc',
+            'dependenciaNombre'             => 'dependencianombre',
+            'emailcorporativo'              => 'emailcorporativo',
+            'emailpersonal'                 => 'emailpersonal',
+            'direccion'                     => 'direccion',
+            'telefonos'                     => 'telefonos',
+            'fechacumplimientobonificacion' => 'fechacumplimientobonificacion',
+        ];
+    }
+
+    /**
+     * Get the field map for ingresos table (API field name => DB column).
+     */
+    public function get_ingresos_field_map(): array {
+        return [
+            'cuenta'             => 'cuenta',
+            'codigo'             => 'codigo',
+            'nombre'             => 'nombre',
+            'movimiento'         => 'movimiento',
+            'tipoRecurso'        => 'tiporecurso',
+            'fuenteRecurso'      => 'fuenterecurso',
+            'apropiado'          => 'apropiado',
+            'modificaciones'     => 'modificaciones',
+            'totalPresupuesto'   => 'totalpresupuesto',
+            'recaudosAnteriores' => 'recaudosanteriores',
+            'recaudosMes'        => 'recaudosmes',
+            'recaudosAcumulados' => 'recaudosacumulados',
+            'porRecaudar'        => 'porrecaudar',
+            'porcRecaudado'      => 'porcrecaudado',
         ];
     }
 
@@ -371,6 +499,119 @@ class Database {
     }
 
     /**
+     * Insert records into personal_nomina table (numinforme=5).
+     * Note: Personal data has no 'mes' field.
+     */
+    public function insert_personal_records( array $records, int $anio, string $compania ): int {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'sysman_personal_nomina';
+        $field_map  = $this->get_personal_field_map();
+        $inserted   = 0;
+
+        if ( ! $this->ensure_table_exists( $table_name ) ) {
+            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
+            return 0;
+        }
+
+        // Delete existing records for same year and company
+        $wpdb->delete( $table_name, [
+            'anio'     => $anio,
+            'compania' => $compania,
+        ], [ '%d', '%s' ] );
+
+        foreach ( $records as $index => $record ) {
+            if ( 0 === $index ) {
+                $record_keys = implode( ', ', array_keys( $record ) );
+                $this->logger->log( "Claves del primer registro API (personal): {$record_keys}" );
+            }
+
+            $data = [
+                'anio'     => $anio,
+                'compania' => $compania,
+            ];
+
+            foreach ( $field_map as $api_field => $db_column ) {
+                if ( isset( $record[ $api_field ] ) ) {
+                    $value = $record[ $api_field ];
+                    if ( 'salariobaseibc' === $db_column ) {
+                        $data[ $db_column ] = floatval( $value );
+                    } else {
+                        $data[ $db_column ] = sanitize_text_field( $value );
+                    }
+                }
+            }
+
+            $result = $wpdb->insert( $table_name, $data );
+            if ( false === $result ) {
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
+                break;
+            }
+            $inserted++;
+        }
+
+        $this->logger->log( "Insertados {$inserted} registros de personal (Año: {$anio}, Compañía: {$compania})." );
+        return $inserted;
+    }
+
+    /**
+     * Insert records into ejecucion_ingresos table (numinforme=6).
+     */
+    public function insert_ingresos_records( array $records, int $anio, int $mes, string $compania ): int {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'sysman_ejecucion_ingresos';
+        $field_map  = $this->get_ingresos_field_map();
+        $numeric_cols = [ 'apropiado', 'modificaciones', 'totalpresupuesto', 'recaudosanteriores', 'recaudosmes', 'recaudosacumulados', 'porrecaudar', 'porcrecaudado' ];
+        $inserted   = 0;
+
+        if ( ! $this->ensure_table_exists( $table_name ) ) {
+            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
+            return 0;
+        }
+
+        // Delete existing records for same year and company
+        $wpdb->delete( $table_name, [
+            'anio'     => $anio,
+            'compania' => $compania,
+        ], [ '%d', '%s' ] );
+
+        foreach ( $records as $index => $record ) {
+            if ( 0 === $index ) {
+                $record_keys = implode( ', ', array_keys( $record ) );
+                $this->logger->log( "Claves del primer registro API (ingresos): {$record_keys}" );
+            }
+
+            $data = [
+                'anio'     => $anio,
+                'mes'      => $mes,
+                'compania' => $compania,
+            ];
+
+            foreach ( $field_map as $api_field => $db_column ) {
+                if ( isset( $record[ $api_field ] ) ) {
+                    $value = $record[ $api_field ];
+                    if ( in_array( $db_column, $numeric_cols, true ) ) {
+                        $data[ $db_column ] = floatval( $value );
+                    } else {
+                        $data[ $db_column ] = sanitize_text_field( $value ?? '' );
+                    }
+                }
+            }
+
+            $result = $wpdb->insert( $table_name, $data );
+            if ( false === $result ) {
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
+                break;
+            }
+            $inserted++;
+        }
+
+        $this->logger->log( "Insertados {$inserted} registros de ingresos (Año: {$anio}, Mes: {$mes})." );
+        return $inserted;
+    }
+
+    /**
      * Check which tables actually exist in the database.
      */
     public function check_tables_status(): array {
@@ -459,7 +700,11 @@ class Database {
         if ( ! empty( $args['search'] ) ) {
             $search_like = '%' . $wpdb->esc_like( $args['search'] ) . '%';
             // Search in named text columns
-            $search_columns = [ 'nombrerubro', 'nombrepred', 'tercero', 'descripcion', 'codigocuenta', 'numero', 'rubro' ];
+            $search_columns = [
+                'nombrerubro', 'nombrepred', 'tercero', 'descripcion', 'codigocuenta', 'numero', 'rubro',
+                'nombres', 'apellido1', 'apellido2', 'numerodcto', 'nombredelcargo', 'dependencianombre',
+                'nombre', 'cuenta', 'codigo',
+            ];
             $search_parts   = [];
             foreach ( $search_columns as $col ) {
                 if ( $this->validate_column( $table, $col ) ) {

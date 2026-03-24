@@ -106,6 +106,21 @@
         valordebito: 'numeric', valorcredito: 'numeric',
         saldoporejecutaresp: 'numeric', numero: 'numeric',
         anio: 'temporal', mes: 'temporal', fecha: 'temporal',
+        // Personal Nómina
+        iddeempleado: 'text', apellido1: 'text', apellido2: 'text', nombres: 'text',
+        numerodcto: 'text', expedida: 'text', fechancto: 'temporal', fechadeingreso: 'temporal',
+        fechaderetiro: 'temporal', iddecargo: 'text', nombredelcargo: 'text',
+        iddecategoria: 'text', nombrecategoria: 'text', escalafon: 'text',
+        nombreescalafon: 'text', grado: 'text', decarrera: 'text',
+        salariobaseibc: 'numeric', dependencianombre: 'text',
+        emailcorporativo: 'text', emailpersonal: 'text', direccion: 'text', telefonos: 'text',
+        fechacumplimientobonificacion: 'temporal',
+        // Ingresos
+        cuenta: 'text', codigo: 'text', nombre: 'text',
+        tiporecurso: 'text', fuenterecurso: 'text',
+        apropiado: 'numeric', modificaciones: 'numeric', totalpresupuesto: 'numeric',
+        recaudosanteriores: 'numeric', recaudosmes: 'numeric', recaudosacumulados: 'numeric',
+        porrecaudar: 'numeric', porcrecaudado: 'numeric',
     };
 
     const NumberFormatter = {
@@ -596,6 +611,23 @@
                 descripcion: 'Descripcion', valordebito: 'Valor Debito',
                 valorcredito: 'Valor Credito', saldoporejecutaresp: 'Saldo por Ejecutar',
                 comprobante_afectado: 'Comprobante Afectado', tipo_cpte: 'Tipo Comprobante',
+                // Personal
+                iddeempleado: 'ID Empleado', apellido1: 'Primer Apellido', apellido2: 'Segundo Apellido',
+                nombres: 'Nombres', numerodcto: 'Num. Documento', expedida: 'Expedida',
+                fechancto: 'Fecha Nacimiento', fechadeingreso: 'Fecha Ingreso', fechaderetiro: 'Fecha Retiro',
+                iddecargo: 'ID Cargo', nombredelcargo: 'Cargo', iddecategoria: 'ID Categoria',
+                nombrecategoria: 'Categoria', escalafon: 'Escalafon', nombreescalafon: 'Nombre Escalafon',
+                grado: 'Grado', decarrera: 'Carrera', salariobaseibc: 'Salario Base IBC',
+                dependencianombre: 'Dependencia', emailcorporativo: 'Email Corporativo',
+                emailpersonal: 'Email Personal', direccion: 'Direccion', telefonos: 'Telefonos',
+                fechacumplimientobonificacion: 'Cumplimiento Bonificacion',
+                // Ingresos
+                cuenta: 'Cuenta', codigo: 'Codigo', nombre: 'Nombre',
+                tiporecurso: 'Tipo Recurso', fuenterecurso: 'Fuente Recurso',
+                apropiado: 'Apropiado', modificaciones: 'Modificaciones',
+                totalpresupuesto: 'Total Presupuesto', recaudosanteriores: 'Recaudos Anteriores',
+                recaudosmes: 'Recaudos Mes', recaudosacumulados: 'Recaudos Acumulados',
+                porrecaudar: 'Por Recaudar', porcrecaudado: '% Recaudado',
             };
             return labels[col] || col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         },

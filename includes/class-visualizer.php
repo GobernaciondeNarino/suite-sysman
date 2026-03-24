@@ -363,6 +363,17 @@ class Visualizer {
             'valordebito'            => 'Valor Debito',
             'valorcredito'           => 'Valor Credito',
             'saldoporejecutaresp'    => 'Saldo por Ejecutar',
+            // Personal
+            'salariobaseibc'         => 'Salario Base IBC',
+            // Ingresos
+            'apropiado'              => 'Apropiado',
+            'modificaciones'         => 'Modificaciones',
+            'totalpresupuesto'       => 'Total Presupuesto',
+            'recaudosanteriores'     => 'Recaudos Anteriores',
+            'recaudosmes'            => 'Recaudos Mes',
+            'recaudosacumulados'     => 'Recaudos Acumulados',
+            'porrecaudar'            => 'Por Recaudar',
+            'porcrecaudado'          => '% Recaudado',
         ];
 
         $unions      = [];

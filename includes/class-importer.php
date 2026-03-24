@@ -17,6 +17,8 @@ class Importer {
         'ejecucion' => 'Ejecución Presupuestal de Gastos',
         'auxiliar'   => 'Auxiliar Presupuestal por Cuentas',
         'plan'       => 'Plan Presupuestal',
+        'personal'   => 'Personal Activo de Nómina',
+        'ingresos'   => 'Ejecución de Ingresos',
     ];
 
     public function __construct( Database $database, Logger $logger ) {
@@ -188,19 +190,83 @@ class Importer {
     }
 
     /**
+     * Import Personal Activo de Nómina (numinforme=5).
+     * Note: This report does NOT use the 'mes' parameter.
+     */
+    public function import_personal( string $compania, int $anio ): array {
+        $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['personal'] . ' ---' );
+
+        // Build URL without 'mes' parameter
+        $base_url = get_option( 'sysman_api_base_url', self::DEFAULT_API_URL );
+        $url = $base_url . '?' . http_build_query( [
+            'compania'   => $compania,
+            'anio'       => $anio,
+            'numinforme' => 5,
+        ] );
+
+        $result = $this->fetch_api( $url );
+
+        if ( ! $result['success'] ) {
+            return $result;
+        }
+
+        $inserted = $this->database->insert_personal_records( $result['data'], $anio, $compania );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en personal." );
+
+        return [
+            'success'  => true,
+            'imported' => $inserted,
+            'total'    => count( $result['data'] ),
+            'report'   => 'personal',
+        ];
+    }
+
+    /**
+     * Import Ejecución de Ingresos (numinforme=6).
+     */
+    public function import_ingresos( string $compania, int $anio, int $mes ): array {
+        $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['ingresos'] . ' ---' );
+
+        $url    = $this->build_url( $compania, $anio, $mes, 6 );
+        $result = $this->fetch_api( $url );
+
+        if ( ! $result['success'] ) {
+            return $result;
+        }
+
+        $inserted = $this->database->insert_ingresos_records( $result['data'], $anio, $mes, $compania );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en ingresos." );
+
+        return [
+            'success'  => true,
+            'imported' => $inserted,
+            'total'    => count( $result['data'] ),
+            'report'   => 'ingresos',
+        ];
+    }
+
+    /**
      * Run all imports.
      */
     public function import_all( string $compania, int $anio, int $mes ): array {
         $results = [];
 
-        $this->update_status( 1, 3, 'Conectando con API SYSMAN...', 'ejecucion' );
+        $this->update_status( 1, 5, 'Conectando con API SYSMAN...', 'ejecucion' );
         $results['ejecucion'] = $this->import_ejecucion( $compania, $anio, $mes );
 
-        $this->update_status( 2, 3, 'Conectando con API SYSMAN...', 'auxiliar' );
+        $this->update_status( 2, 5, 'Conectando con API SYSMAN...', 'auxiliar' );
         $results['auxiliar'] = $this->import_auxiliar( $compania, $anio, $mes );
 
-        $this->update_status( 3, 3, 'Conectando con API SYSMAN...', 'plan' );
+        $this->update_status( 3, 5, 'Conectando con API SYSMAN...', 'plan' );
         $results['plan'] = $this->import_plan( $compania, $anio, $mes );
+
+        $this->update_status( 4, 5, 'Conectando con API SYSMAN...', 'personal' );
+        $results['personal'] = $this->import_personal( $compania, $anio );
+
+        $this->update_status( 5, 5, 'Conectando con API SYSMAN...', 'ingresos' );
+        $results['ingresos'] = $this->import_ingresos( $compania, $anio, $mes );
 
         delete_transient( 'sysman_import_status' );
 
@@ -265,6 +331,16 @@ class Importer {
                 $this->update_status( 1, 1, 'Importando...', 'plan' );
                 $results = [ 'plan' => $this->import_plan( $compania, $anio, $mes ) ];
                 if ( ! $results['plan']['success'] ) $error_count++;
+                break;
+            case 'personal':
+                $this->update_status( 1, 1, 'Importando...', 'personal' );
+                $results = [ 'personal' => $this->import_personal( $compania, $anio ) ];
+                if ( ! $results['personal']['success'] ) $error_count++;
+                break;
+            case 'ingresos':
+                $this->update_status( 1, 1, 'Importando...', 'ingresos' );
+                $results = [ 'ingresos' => $this->import_ingresos( $compania, $anio, $mes ) ];
+                if ( ! $results['ingresos']['success'] ) $error_count++;
                 break;
             default:
                 $results = $this->import_all( $compania, $anio, $mes );

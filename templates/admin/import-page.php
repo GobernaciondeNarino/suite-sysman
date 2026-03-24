@@ -54,8 +54,13 @@ $meses = [
                 <div class="sysman-form-row">
                     <div class="sysman-form-group">
                         <label for="sysman-compania"><?php esc_html_e( 'Compañía', 'sysman-suite' ); ?></label>
-                        <input type="text" id="sysman-compania" value="<?php echo esc_attr( $compania ); ?>" class="regular-text" aria-describedby="compania-desc">
-                        <p id="compania-desc" class="description"><?php esc_html_e( 'Código de la compañía (ej: 001)', 'sysman-suite' ); ?></p>
+                        <select id="sysman-compania" aria-describedby="compania-desc">
+                            <option value="001" <?php selected( $compania, '001' ); ?>>001 - <?php esc_html_e( 'Gobernación de Nariño', 'sysman-suite' ); ?></option>
+                            <option value="007" <?php selected( $compania, '007' ); ?>>007 - <?php esc_html_e( 'SED (Secretaría de Educación)', 'sysman-suite' ); ?></option>
+                            <option value="custom"><?php esc_html_e( 'Otra...', 'sysman-suite' ); ?></option>
+                        </select>
+                        <input type="text" id="sysman-compania-custom" value="" class="regular-text" placeholder="<?php esc_attr_e( 'Código de compañía', 'sysman-suite' ); ?>" style="display:none;margin-top:6px;">
+                        <p id="compania-desc" class="description"><?php esc_html_e( 'Entidad para la importación de datos', 'sysman-suite' ); ?></p>
                     </div>
 
                     <div class="sysman-form-group">
@@ -83,6 +88,8 @@ $meses = [
                             <option value="ejecucion"><?php esc_html_e( 'Ejecución Presupuestal de Gastos', 'sysman-suite' ); ?></option>
                             <option value="auxiliar"><?php esc_html_e( 'Auxiliar Presupuestal por Cuentas', 'sysman-suite' ); ?></option>
                             <option value="plan"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></option>
+                            <option value="personal"><?php esc_html_e( 'Personal Activo de Nómina', 'sysman-suite' ); ?></option>
+                            <option value="ingresos"><?php esc_html_e( 'Ejecución de Ingresos', 'sysman-suite' ); ?></option>
                         </select>
                         <p id="report-desc" class="description"><?php esc_html_e( 'Tipo de informe a importar', 'sysman-suite' ); ?></p>
                     </div>
@@ -117,17 +124,27 @@ $meses = [
                 <div id="sysman-import-steps" class="sysman-import-steps" style="display:none;">
                     <div class="sysman-step" data-step="1">
                         <div class="sysman-step-indicator">1</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Ejecución Presupuestal', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Ejecución Gastos', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="2">
                         <div class="sysman-step-indicator">2</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Auxiliar Presupuestal', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Auxiliar Cuentas', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="3">
                         <div class="sysman-step-indicator">3</div>
                         <span class="sysman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></span>
+                    </div>
+                    <div class="sysman-step-connector"></div>
+                    <div class="sysman-step" data-step="4">
+                        <div class="sysman-step-indicator">4</div>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Personal Nómina', 'sysman-suite' ); ?></span>
+                    </div>
+                    <div class="sysman-step-connector"></div>
+                    <div class="sysman-step" data-step="5">
+                        <div class="sysman-step-indicator">5</div>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Ingresos', 'sysman-suite' ); ?></span>
                     </div>
                 </div>
 

@@ -42,6 +42,37 @@ https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar?compan
 
 ## Update
 
+### v2.3.0 — Nuevos informes, multi-compañía y mejoras (2026-03-24)
+
+#### 1. Nuevos informes (numinforme=5 y numinforme=6)
+- [x] **Personal Activo de Nómina** (numinforme=5): nueva tabla `wp_sysman_personal_nomina` con 25 campos del API (iddeempleado, nombres, apellidos, cargo, categoría, escalafón, salario, dependencia, etc.). Nota: este informe NO usa parámetro `mes`.
+- [x] **Ejecución de Ingresos** (numinforme=6): nueva tabla `wp_sysman_ejecucion_ingresos` con campos de recaudo (apropiado, modificaciones, totalPresupuesto, recaudos, porRecaudar, porcRecaudado).
+- [x] Métodos de importación: `import_personal()`, `import_ingresos()` en class-importer.php
+- [x] Métodos de inserción: `insert_personal_records()`, `insert_ingresos_records()` en class-database.php
+- [x] Field maps: `get_personal_field_map()`, `get_ingresos_field_map()` en class-database.php
+
+#### 2. Soporte multi-compañía (001 Gobernación, 007 SED)
+- [x] Selector de compañía con opciones predefinidas: 001 (Gobernación de Nariño), 007 (SED - Secretaría de Educación)
+- [x] Campo libre para otros códigos de compañía
+- [x] Importación respeta compañía seleccionada en todas las consultas
+
+#### 3. Actualización de la UI de importación
+- [x] Selector de compañía reemplaza campo de texto libre por dropdown con opciones + campo personalizado
+- [x] Dropdown de informes incluye los 5 tipos + opción "Todos"
+- [x] Indicadores de pasos actualizados a 5 pasos
+- [x] Labels de resultados actualizados para los 5 informes en admin-import.js
+
+#### 4. Mejoras en visualización de datos
+- [x] Las 5 tablas disponibles para gráficos en el selector de fuente de datos
+- [x] Labels de columnas para campos de Personal y de Ingresos en admin-charts.js
+- [x] Column types (numeric/text) registrados para los nuevos campos
+- [x] Dashboard muestra estado de las 5 tablas
+
+#### 5. Mejoras de configuración (implementadas en v2.2.0)
+- [x] Página de Configuración con URLs de API, GitHub y CDN editables
+- [x] Botón de verificación de conexión para todas las URLs
+- [x] Todas las URLs se leen desde `wp_options` con valores por defecto
+
 
 
 ## Actions

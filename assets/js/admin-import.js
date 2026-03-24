@@ -16,12 +16,30 @@
 
         bindEvents() {
             $('#sysman-import-btn').on('click', () => this.startImport());
-            $('#sysman-report').on('change', () => this.toggleAuxiliarOptions());
+            $('#sysman-report').on('change', () => this.toggleReportOptions());
+            $('#sysman-compania').on('change', () => this.toggleCustomCompania());
         },
 
-        toggleAuxiliarOptions() {
+        toggleReportOptions() {
             const report = $('#sysman-report').val();
             $('.sysman-auxiliar-options').toggle(report === 'auxiliar');
+        },
+
+        toggleCustomCompania() {
+            const val = $('#sysman-compania').val();
+            if (val === 'custom') {
+                $('#sysman-compania-custom').show().focus();
+            } else {
+                $('#sysman-compania-custom').hide().val('');
+            }
+        },
+
+        getCompania() {
+            const val = $('#sysman-compania').val();
+            if (val === 'custom') {
+                return $('#sysman-compania-custom').val() || '001';
+            }
+            return val;
         },
 
         startImport() {
@@ -46,7 +64,7 @@
             const data = {
                 action: 'sysman_start_import',
                 nonce: sysmanAdmin.nonce,
-                compania: $('#sysman-compania').val(),
+                compania: this.getCompania(),
                 anio: $('#sysman-anio').val(),
                 mes: $('#sysman-mes').val(),
                 report: $('#sysman-report').val(),
@@ -180,6 +198,8 @@
                     ejecucion: 'Ejecución Presupuestal de Gastos',
                     auxiliar: 'Auxiliar Presupuestal por Cuentas',
                     plan: 'Plan Presupuestal',
+                    personal: 'Personal Activo de Nómina',
+                    ingresos: 'Ejecución de Ingresos',
                 };
 
                 const table = $('<table class="sysman-results-table"><thead><tr>' +
@@ -511,6 +531,45 @@
                 comprobante_afectado: 'Comprobante Afectado',
                 tipo_cpte: 'Tipo Comprobante',
                 fecha_importacion: 'Fecha Importación',
+                // Personal Nómina
+                iddeempleado: 'ID Empleado',
+                apellido1: 'Primer Apellido',
+                apellido2: 'Segundo Apellido',
+                nombres: 'Nombres',
+                numerodcto: 'Número Documento',
+                expedida: 'Expedida',
+                fechancto: 'Fecha Nacimiento',
+                fechadeingreso: 'Fecha Ingreso',
+                fechaderetiro: 'Fecha Retiro',
+                iddecargo: 'ID Cargo',
+                nombredelcargo: 'Cargo',
+                iddecategoria: 'ID Categoría',
+                nombrecategoria: 'Categoría',
+                escalafon: 'Escalafón',
+                nombreescalafon: 'Nombre Escalafón',
+                grado: 'Grado',
+                decarrera: 'Carrera',
+                salariobaseibc: 'Salario Base IBC',
+                dependencianombre: 'Dependencia',
+                emailcorporativo: 'Email Corporativo',
+                emailpersonal: 'Email Personal',
+                direccion: 'Dirección',
+                telefonos: 'Teléfonos',
+                fechacumplimientobonificacion: 'Cumplimiento Bonificación',
+                // Ingresos
+                cuenta: 'Cuenta',
+                codigo: 'Código',
+                nombre: 'Nombre',
+                tiporecurso: 'Tipo Recurso',
+                fuenterecurso: 'Fuente Recurso',
+                apropiado: 'Apropiado',
+                modificaciones: 'Modificaciones',
+                totalpresupuesto: 'Total Presupuesto',
+                recaudosanteriores: 'Recaudos Anteriores',
+                recaudosmes: 'Recaudos Mes',
+                recaudosacumulados: 'Recaudos Acumulados',
+                porrecaudar: 'Por Recaudar',
+                porcrecaudado: '% Recaudado',
             };
             return labels[col] || col.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         },
@@ -521,6 +580,8 @@
                 'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
                 'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
                 'pagos', 'obligacionesporpagar', 'valordebito', 'valorcredito', 'saldoporejecutaresp',
+                'salariobaseibc', 'apropiado', 'modificaciones', 'totalpresupuesto',
+                'recaudosanteriores', 'recaudosmes', 'recaudosacumulados', 'porrecaudar', 'porcrecaudado',
             ];
             return numericCols.includes(col);
         },
