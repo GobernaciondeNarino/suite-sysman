@@ -10,7 +10,7 @@ Convenciones: namespace `GobernacionNarino\`, prefijo de opciones `gn_`, `sslver
 
 Agregar al plugin `sisman-suite` un módulo llamado **"Ejecución"** que permita crear N seguimientos independientes ("Nuevo") y, dentro de cada uno, navegar mediante acordeones anidados la trazabilidad presupuestal completa de una dependencia: **Dependencia → Rubros → Ejecución consolidada → Disponibilidades (DIS) → Reservas (RES)**.
 
-Toda la información se sirve desde tablas locales MySQL (`_sysman_plan_presupuestal` y `_sysman_ejecucion_gastos`). Antes de implementar el módulo se debe **actualizar el schema de las tablas** para que contengan todos los campos retornados por las APIs SYSMAN, y se deben **resincronizar los datos** desde los endpoints oficiales.
+Toda la información se sirve desde tablas locales MySQL (`_sysman_plan_presupuestal`. `_sysman_ejecucion_gastos` y `_sysman_auxiliar_cuentas`). Antes de implementar el módulo se debe **actualizar el schema de las tablas** para que contengan todos los campos retornados por las APIs SYSMAN, y se deben **resincronizar los datos** desde los endpoints oficiales.
 
 ---
 
