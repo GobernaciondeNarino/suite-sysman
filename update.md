@@ -548,4 +548,4 @@ Antes del paso a producción, confirmar con Jonnathan:
 
 ---
 
-**Fin del plan. Claude Code debe ejecutar las fases en orden, validando aceptación de cada una antes de avanzar a la siguiente.**
+**Fin del plan. Claude Code debe ejecutar las fases en orden, validando aceptación de cada una antes de avanzar a la siguiente. La Tabla _sysman_plan_presupuestal hay que recostruirla totalmente. Toda la informacion de este modulo debe trabajar con el año actual**
