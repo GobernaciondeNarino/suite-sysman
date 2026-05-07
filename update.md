@@ -15,8 +15,10 @@ Toda la información se sirve desde tablas locales MySQL:
 | Tabla local | Origen API | Contenido |
 |-------------|-----------|-----------|
 | `{prefix}sysman_plan_presupuestal` | `numinforme=4` | Catálogo de rubros / Plan Presupuestal |
-| `{prefix}sysman_ejecucion_gastos` | `numinforme=1` **y** `numinforme=2&tipo_cpte=DIS` | Ejecución consolidada por rubro + Disponibilidades |
-| `{prefix}sysman_auxiliar_cuentas` | `numinforme=2&tipo_cpte=RES` | Reservas / Compromisos (movimientos RES) |
+| `{prefix}sysman_ejecucion_gastos` | `numinforme=1` | Ejecución consolidada por rubro (apropiaciones, compromisos, pagos) |
+| `{prefix}sysman_auxiliar_cuentas` | `numinforme=2` (todos los `tipo_cpte`) | Movimientos / comprobantes — DIS, RES, OBL, EGR, etc. Se discriminan por el campo `tipocpte` ya presente en cada registro. |
+
+> **Importante:** los movimientos DIS y RES viven en la **misma tabla** (`sysman_auxiliar_cuentas`) y vienen del **mismo endpoint** (`numinforme=2`). Lo único que cambia entre ambos es el parámetro de URL `tipo_cpte` al sincronizar (filtra qué traer del API) y el filtro `WHERE tipocpte='...'` al consultar.
 
 Antes de implementar el módulo se debe **actualizar el schema de las tres tablas** para que contengan todos los campos retornados por las APIs SYSMAN, y se deben **resincronizar los datos** desde los endpoints oficiales.
 
@@ -47,8 +49,8 @@ El módulo se compone de:
 
 | Capa | Responsabilidad |
 |------|-----------------|
-| **Migration** | Actualiza/crea las **3 tablas**: `_sysman_plan_presupuestal`, `_sysman_ejecucion_gastos` y `_sysman_auxiliar_cuentas` con todos los campos de las APIs. |
-| **Syncer** | Cuatro clases: `PlanPresupuestalSyncer` (→ plan_presupuestal), `EjecucionConsolidadaSyncer` (→ ejecucion_gastos), `MovimientosDisSyncer` (→ ejecucion_gastos), `MovimientosResSyncer` (→ **auxiliar_cuentas**). Usan los endpoints SYSMAN, almacenan en tablas locales, cachean con transients. |
+| **Migration** | Crea/actualiza las **3 tablas**: `sysman_plan_presupuestal`, `sysman_ejecucion_gastos` y `sysman_auxiliar_cuentas` con todos los campos de las APIs. |
+| **Syncer** | Tres clases: `PlanPresupuestalSyncer` (→ plan_presupuestal), `EjecucionConsolidadaSyncer` (→ ejecucion_gastos), `MovimientosSyncer` (→ **auxiliar_cuentas**, parametrizable por `tipo_cpte`: DIS, RES, etc.). Usan los endpoints SYSMAN, almacenan en tablas locales, cachean con transients. |
 | **CPT** | `gn_ejecucion` — un post por cada "Nuevo" del módulo. Guarda como meta la dependencia seleccionada y configuración de la vista. |
 | **REST internos** | Endpoints WP REST API bajo `/wp-json/gn-sisman/v1/ejecucion/...` que sirven cada nivel del acordeón con carga lazy. |
 | **Admin UI** | Página de admin con listado de seguimientos, botón "Nuevo", editor (selector de dependencia) y vista de acordeón. |
@@ -99,27 +101,20 @@ Fuente: `https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobN
 
 ### 3.2 Schema esperado de `{prefix}sysman_ejecucion_gastos`
 
-Esta tabla **soporta dos formas de registro** porque dos endpoints distintos alimentan información relacionada:
+Esta tabla almacena **exclusivamente la ejecución consolidada por rubro** proveniente del endpoint `numinforme=1`. Un registro por cuenta presupuestal con apropiaciones, modificaciones y ejecución agregada al periodo (mes/año).
 
-- **Modo CONSOLIDADO** (`numinforme=1`): un registro por cuenta presupuestal, con apropiaciones y ejecución agregada.
-- **Modo MOVIMIENTO DIS** (`numinforme=2&tipo_cpte=DIS`): un registro por Disponibilidad Presupuestal.
+> **Los movimientos (DIS, RES, etc.) NO viven aquí — van todos a `sysman_auxiliar_cuentas` (§3.3).**
 
-> **Las RES (Reservas) NO se almacenan aquí — van a `sysman_auxiliar_cuentas` (§3.3).**
-
-Schema unificado propuesto con discriminador `record_type`:
-
-| Columna | Tipo | Origen |
-|---------|------|--------|
-| `id` | BIGINT UNSIGNED AUTO_INCREMENT PK | — |
-| `record_type` | ENUM('CONSOLIDADO','DIS') | Discriminador |
-| `compania` | VARCHAR(8) | Ambos |
-| `anio` | SMALLINT UNSIGNED | Ambos |
-| `mes` | TINYINT UNSIGNED | Ambos |
-| **— Campos de numinforme=1 (CONSOLIDADO) —** | | |
-| `codigocuenta` | VARCHAR(255) | **Índice — clave para join con plan_presupuestal.codigo** |
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `id` | BIGINT UNSIGNED AUTO_INCREMENT PK | |
+| `compania` | VARCHAR(8) | Índice |
+| `anio` | SMALLINT UNSIGNED | Índice |
+| `mes` | TINYINT UNSIGNED | Índice |
+| `codigocuenta` | VARCHAR(255) | **🔑 Índice — clave para join con `plan_presupuestal.codigo`** |
 | `nombrerubro` | TEXT | |
-| `movimiento` | VARCHAR(8) | |
-| `destino` | VARCHAR(64) | |
+| `movimiento` | VARCHAR(8) | SI / NO |
+| `destino` | VARCHAR(64) | FUNCIONAMIENTO / INVERSION / DEUDA |
 | `bpid` | VARCHAR(64) | |
 | `apropiacioninicial` | DECIMAL(20,2) | |
 | `adicion` | DECIMAL(20,2) | |
@@ -136,37 +131,17 @@ Schema unificado propuesto con discriminador `record_type`:
 | `obligacion` | DECIMAL(20,2) | |
 | `pagos` | DECIMAL(20,2) | |
 | `obligacionesporpagar` | DECIMAL(20,2) | |
-| **— Campos de numinforme=2 tipo_cpte=DIS —** | | |
-| `numero` | VARCHAR(32) | **Índice** — número de la disponibilidad |
-| `nombrepred` | TEXT | |
-| `idprede` | VARCHAR(64) | |
-| `nombreplan` | TEXT | |
-| `rubro` | VARCHAR(255) | **Índice — debe coincidir con codigocuenta para join** |
-| `fecha` | DATE | Índice |
-| `tipocpte` | VARCHAR(8) | Siempre `DIS` para registros con record_type='DIS' |
-| `tercero` | VARCHAR(64) | |
-| `nombretercero` | VARCHAR(255) | |
-| `descripcion` | TEXT | |
-| `nrodocumento` | VARCHAR(64) | |
-| `valordebito` | DECIMAL(20,2) | |
-| `valorcredito` | DECIMAL(20,2) | |
-| `debitoafectado` | DECIMAL(20,2) | |
-| `creditoafectado` | DECIMAL(20,2) | |
-| `modificaciondebito` | DECIMAL(20,2) | |
-| `modificacioncredito` | DECIMAL(20,2) | |
-| `saldoporejecutaresp` | DECIMAL(20,2) | |
-| `tipocpteafect` | VARCHAR(8) | |
-| `cmpteafectado` | VARCHAR(32) | |
 | `synced_at` | DATETIME | |
 
-**Índices críticos:**
-- `(record_type, codigocuenta)` — para nivel 3 (consolidado por rubro)
-- `(record_type, rubro)` — para nivel 4 (DIS por rubro)
-- `(numero)` — para que la cadena DIS→RES pueda resolver `numero` rápido
+**Índice único compuesto sugerido:** `(compania, anio, mes, codigocuenta)` — garantiza idempotencia en la sincronización.
 
-### 3.3 Schema esperado de `{prefix}sysman_auxiliar_cuentas` (RES)
+### 3.3 Schema esperado de `{prefix}sysman_auxiliar_cuentas`
 
-Esta tabla almacena **exclusivamente los movimientos RES** (Reservas / Compromisos / Registros Presupuestales) provenientes del endpoint `numinforme=2&tipo_cpte=RES`. Es estructuralmente idéntica al bloque MOVIMIENTO de §3.2 pero vive separada porque corresponde al "auxiliar de cuentas" en la nomenclatura SYSMAN.
+Esta tabla almacena **todos los movimientos / comprobantes** provenientes del endpoint `numinforme=2`, sin importar su tipo. El discriminador es el campo `tipocpte` que ya viene en cada registro del API: `DIS` (Disponibilidades), `RES` (Reservas / Compromisos), y eventualmente `OBL` (Obligaciones), `EGR` (Egresos / Pagos), etc.
+
+**El módulo Ejecución usa esta misma tabla para los niveles 4 y 5 del acordeón:**
+- Nivel 4 (Disponibilidades): `WHERE tipocpte='DIS' AND rubro=:codigocuenta`
+- Nivel 5 (Reservas): `WHERE tipocpte='RES' AND cmpteafectado=:numero_dis`
 
 | Columna | Tipo | Notas |
 |---------|------|-------|
@@ -174,13 +149,13 @@ Esta tabla almacena **exclusivamente los movimientos RES** (Reservas / Compromis
 | `compania` | VARCHAR(8) | Índice |
 | `anio` | SMALLINT UNSIGNED | Índice |
 | `mes` | TINYINT UNSIGNED | Índice |
-| `numero` | VARCHAR(32) | **Índice** — número de la RES |
+| `numero` | VARCHAR(32) | **🔑 Índice — número del comprobante (ej. `2026011242`)** |
 | `nombrepred` | TEXT | |
 | `idprede` | VARCHAR(64) | |
 | `nombreplan` | TEXT | |
-| `rubro` | VARCHAR(255) | Índice — código de cuenta presupuestal |
+| `rubro` | VARCHAR(255) | **🔑 Índice — código de cuenta presupuestal; se cruza con `ejecucion_gastos.codigocuenta` en el nivel 4** |
 | `fecha` | DATE | Índice |
-| `tipocpte` | VARCHAR(8) | Siempre `RES` (validar al insertar) |
+| `tipocpte` | VARCHAR(8) | **🔑 Índice — DIS / RES / OBL / EGR. Discriminador principal de la tabla** |
 | `tercero` | VARCHAR(64) | |
 | `nombretercero` | VARCHAR(255) | |
 | `descripcion` | TEXT | |
@@ -192,13 +167,14 @@ Esta tabla almacena **exclusivamente los movimientos RES** (Reservas / Compromis
 | `modificaciondebito` | DECIMAL(20,2) | |
 | `modificacioncredito` | DECIMAL(20,2) | |
 | `saldoporejecutaresp` | DECIMAL(20,2) | |
-| `tipocpteafect` | VARCHAR(8) | Normalmente `DIS` |
-| `cmpteafectado` | VARCHAR(32) | **🔑 Índice CRÍTICO — apunta al `numero` de la DIS afectada. Es la clave de cruce con `sysman_ejecucion_gastos.numero` para el nivel 5 del acordeón.** |
+| `tipocpteafect` | VARCHAR(8) | Tipo del comprobante afectado (ej. una RES afecta a una DIS) |
+| `cmpteafectado` | VARCHAR(32) | **🔑 Índice CRÍTICO — apunta al `numero` del comprobante afectado. En las RES vale el `numero` de la DIS que están afectando. Es la clave de cruce del nivel 5 del acordeón.** |
 | `synced_at` | DATETIME | |
 
-**Índices críticos para el rendimiento del nivel 5:**
-- `(cmpteafectado)` — clave única para resolver "qué RES afectaron a esta DIS"
-- `(compania, anio, mes, cmpteafectado)` — versión compuesta cuando se filtra por periodo
+**Índices críticos para el rendimiento del acordeón:**
+- `(tipocpte, rubro)` — para resolver rápidamente el nivel 4 (DIS por rubro)
+- `(tipocpte, cmpteafectado)` — para resolver rápidamente el nivel 5 (RES que afectan a una DIS)
+- `(compania, anio, mes, tipocpte, numero)` UNIQUE — garantiza idempotencia en la sincronización
 
 ### 3.4 Migración con `dbDelta`
 
@@ -242,16 +218,30 @@ Engancharlo en activación del plugin **y** en `admin_init` para upgrades autom�
 
 ### 4.1 Endpoints (URL base: `https://narino-gob.sysman.com.co`)
 
-| Syncer | URL completa | Tabla destino | Discriminador |
-|--------|--------------|---------------|---------------|
-| `PlanPresupuestalSyncer` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=4` | `sysman_plan_presupuestal` | — |
-| `EjecucionConsolidadaSyncer` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=1` | `sysman_ejecucion_gastos` | `record_type='CONSOLIDADO'` |
-| `MovimientosDisSyncer` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=2&tipo_cpte=DIS` | `sysman_ejecucion_gastos` | `record_type='DIS'` |
-| `MovimientosResSyncer` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=2&tipo_cpte=RES` | **`sysman_auxiliar_cuentas`** | — (todos los registros son RES) |
+| Syncer | Tabla destino | URL completa |
+|--------|---------------|--------------|
+| `PlanPresupuestalSyncer` | `sysman_plan_presupuestal` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=4` |
+| `EjecucionConsolidadaSyncer` | `sysman_ejecucion_gastos` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=1` |
+| `MovimientosSyncer` (DIS) | `sysman_auxiliar_cuentas` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=2&tipo_cpte=DIS` |
+| `MovimientosSyncer` (RES) | `sysman_auxiliar_cuentas` | `/sysmanApi/autoservicio/v1/informesGobNar?compania=001&anio={anio}&mes={mes}&numinforme=2&tipo_cpte=RES` |
 
-> **OJO** — el parámetro de la URL es `tipo_cpte` (con guion bajo), pero el campo en la respuesta JSON es `tipocpte` (sin guion). Mantener esa diferencia en código.
+`MovimientosSyncer` es **una sola clase** con un método parametrizable:
+
+```php
+public function sync( $compania, $anio, $mes, $tipoCpte ) {
+    // tipoCpte = 'DIS' | 'RES' | 'OBL' | 'EGR' ...
+    // 1. Llama al API con &tipo_cpte={$tipoCpte}
+    // 2. Borra solo los registros del periodo y tipo: 
+    //    DELETE FROM auxiliar_cuentas WHERE compania=? AND anio=? AND mes=? AND tipocpte=?
+    // 3. Inserta en lotes de 500
+}
+```
+
+Esto evita duplicar código y deja la puerta abierta para futuros tipos (OBL, EGR, etc.) sin cambios estructurales.
+
+> **OJO 1** — el parámetro de la URL es `tipo_cpte` (con guion bajo), pero el campo en la respuesta JSON es `tipocpte` (sin guion). Mantener esa diferencia en código.
 >
-> **OJO 2** — RES y DIS comparten estructura de columnas pero **viven en tablas distintas**. No mezclarlos. El cruce DIS↔RES se resuelve en el repositorio mediante un JOIN entre `sysman_ejecucion_gastos.numero` (donde `record_type='DIS'`) y `sysman_auxiliar_cuentas.cmpteafectado`.
+> **OJO 2** — DIS y RES viven en la **misma tabla** `sysman_auxiliar_cuentas`, diferenciados por la columna `tipocpte`. **Toda consulta que las distinga debe filtrar por `WHERE tipocpte='DIS'` o `WHERE tipocpte='RES'`** según corresponda. El cruce DIS↔RES se resuelve dentro de la misma tabla mediante `auto-join`: `auxiliar_cuentas AS dis JOIN auxiliar_cuentas AS res ON res.cmpteafectado = dis.numero AND dis.tipocpte='DIS' AND res.tipocpte='RES'`.
 
 ### 4.2 Cliente HTTP base
 
@@ -300,15 +290,14 @@ sisman-suite/
 │   │   ├── EjecucionModule.php          (bootstrap del módulo)
 │   │   ├── PostType.php                 (registra CPT gn_ejecucion)
 │   │   ├── RestController.php           (registra endpoints REST)
-│   │   ├── Repository.php               (consultas SQL — incluye JOIN DIS↔RES)
+│   │   ├── Repository.php               (consultas SQL — incluye auto-join DIS↔RES)
 │   │   └── AccordionRenderer.php        (HTML del acordeón)
 │   ├── Api/
 │   │   └── SysmanClient.php
 │   ├── Sync/
 │   │   ├── PlanPresupuestalSyncer.php       → sysman_plan_presupuestal
-│   │   ├── EjecucionConsolidadaSyncer.php   → sysman_ejecucion_gastos (CONSOLIDADO)
-│   │   ├── MovimientosDisSyncer.php         → sysman_ejecucion_gastos (DIS)
-│   │   └── MovimientosResSyncer.php         → sysman_auxiliar_cuentas (RES)
+│   │   ├── EjecucionConsolidadaSyncer.php   → sysman_ejecucion_gastos
+│   │   └── MovimientosSyncer.php            → sysman_auxiliar_cuentas (parametrizable: DIS, RES, ...)
 │   └── Migration/
 │       └── Schema_v2.php
 ├── admin/
@@ -344,9 +333,9 @@ Namespace: `gn-sisman/v1`. Todos requieren `current_user_can('edit_posts')` mín
 |--------|------|------------|----------|
 | GET | `/dependencias` | `anio`, `mes` | Lista distinct de `nombreDependencia` desde `sysman_plan_presupuestal`. |
 | GET | `/ejecucion/{post_id}/rubros` | — | Rubros del plan presupuestal de la dependencia del post. Tabla: `sysman_plan_presupuestal`. Campos: `codigo, nombre, destino, naturaleza, codigoBPIN, sector, programa, subPrograma, codigoProducto`. |
-| GET | `/ejecucion/{post_id}/consolidado` | `codigo` (rubro) | 1 fila desde `sysman_ejecucion_gastos` con `record_type='CONSOLIDADO' AND codigocuenta=:codigo`. Campos: `apropiacioninicial, apropiacionvigente, disponibilidades, saldodisponible, compromisos`. |
-| GET | `/ejecucion/{post_id}/dis` | `codigocuenta` | N filas desde `sysman_ejecucion_gastos` con `record_type='DIS' AND rubro=:codigocuenta`. Campos: `nombreplan, numero, nombretercero, valordebito, saldoporejecutaresp, fecha`. |
-| GET | `/ejecucion/{post_id}/res` | `numero_dis` | N filas desde **`sysman_auxiliar_cuentas`** con `cmpteafectado=:numero_dis` (y opcionalmente `tipocpte='RES'` como salvaguarda). Campos: `numero, nombretercero, descripcion, nrodocumento, valordebito, saldoporejecutaresp, fecha`. |
+| GET | `/ejecucion/{post_id}/consolidado` | `codigo` (rubro) | 1 fila desde `sysman_ejecucion_gastos` con `codigocuenta=:codigo`. Campos: `apropiacioninicial, apropiacionvigente, disponibilidades, saldodisponible, compromisos`. |
+| GET | `/ejecucion/{post_id}/dis` | `codigocuenta` | N filas desde **`sysman_auxiliar_cuentas`** con `tipocpte='DIS' AND rubro=:codigocuenta`. Campos: `nombreplan, numero, nombretercero, valordebito, saldoporejecutaresp, fecha`. |
+| GET | `/ejecucion/{post_id}/res` | `numero_dis` | N filas desde **`sysman_auxiliar_cuentas`** con `tipocpte='RES' AND cmpteafectado=:numero_dis`. Campos: `numero, nombretercero, descripcion, nrodocumento, valordebito, saldoporejecutaresp, fecha`. |
 
 Cada endpoint debe:
 - Validar nonce REST (`X-WP-Nonce`).
@@ -506,7 +495,7 @@ Menú: `Sisman Suite → Ejecución` (subpágina).
   - Mes (select 1–12)
   - **Dependencia** (select alimentado por `/dependencias?anio=X&mes=Y` — se actualiza al cambiar año/mes)
   - Botón "Guardar"
-  - Botón "Sincronizar datos ahora" → dispara los **4 syncers** para ese (anio, mes): `PlanPresupuestal`, `EjecucionConsolidada`, `MovimientosDis`, `MovimientosRes`.
+  - Botón "Sincronizar datos ahora" → ejecuta secuencialmente: `PlanPresupuestalSyncer::sync()`, `EjecucionConsolidadaSyncer::sync()`, `MovimientosSyncer::sync(... 'DIS')` y `MovimientosSyncer::sync(... 'RES')`. (3 clases, 4 llamadas).
 - **Vista detalle** (`ejecucion-view.php`): renderiza el acordeón a través de `AccordionRenderer::render($post_id)`.
 
 Encolar JS y CSS solo en estas tres pantallas usando `get_current_screen()`.
@@ -518,8 +507,8 @@ Encolar JS y CSS solo en estas tres pantallas usando `get_current_screen()`.
 Claude Code debe verificar y reportar:
 
 1. **Migración**: las **3 tablas** (`sysman_plan_presupuestal`, `sysman_ejecucion_gastos`, `sysman_auxiliar_cuentas`) creadas/actualizadas con todas las columnas listadas en §3. `DESCRIBE` de las tres tablas en el log.
-2. **Sincronización**: los **4 syncers** ejecutan sin errores contra sus endpoints. Conteo de filas insertadas reportado por syncer y por tabla destino.
-3. **Endpoints REST**: cada uno responde `200 OK` con datos esperados. Probar con curl + nonce. Verificar especialmente que `/res` consulta `sysman_auxiliar_cuentas` y no `sysman_ejecucion_gastos`.
+2. **Sincronización**: los **3 syncers** corren sin errores (con `MovimientosSyncer` ejecutado dos veces: una para `DIS` y otra para `RES`). Conteo de filas insertadas reportado por syncer/tipo. Verificar con `SELECT tipocpte, COUNT(*) FROM {prefix}sysman_auxiliar_cuentas GROUP BY tipocpte` que aparezcan **al menos** los tipos `DIS` y `RES`.
+3. **Endpoints REST**: cada uno responde `200 OK` con datos esperados. Probar con curl + nonce. **Verificar especialmente que tanto `/dis` como `/res` consultan `sysman_auxiliar_cuentas`** (no `sysman_ejecucion_gastos`), filtrando cada uno por `tipocpte` correspondiente.
 4. **Flujo completo del acordeón** con un caso real:
    - Crear "Nuevo" → seleccionar **SECRETARIA TIC INNOVACION Y GOBIERNO ABIERTO**.
    - Verificar que aparecen rubros de esa dependencia.
@@ -551,17 +540,12 @@ Claude Code debe verificar y reportar:
 
 Antes del paso a producción, confirmar con Jonnathan:
 
-1. **Nivel 5 — clave de cruce DIS↔RES (confirmar literal)**: el plan implementa el cruce estándar del flujo presupuestal colombiano: las RES en `sysman_auxiliar_cuentas` cuyo campo `cmpteafectado` coincide con el `numero` de la DIS expandida en el nivel 4. Esto resuelve "qué reservas afectaron esta disponibilidad". Si la regla de negocio esperada es distinta (por ejemplo, cruzar por `rubro` de la RES en lugar de por `cmpteafectado`), ajustar únicamente el `WHERE` del endpoint `/res` en `RestController.php`. La separación de tablas (DIS en `sysman_ejecucion_gastos` vs RES en `sysman_auxiliar_cuentas`) ya está confirmada por Jonnathan y no debe modificarse.
-2. **Validación de tablas existentes**: en la Fase 1 (inspección), si Claude Code encuentra que `sysman_auxiliar_cuentas` ya existe con columnas adicionales (por ejemplo, OBL, EGR, NOM u otros tipos de comprobante distintos de RES), **no eliminar esas columnas** — solo agregar las faltantes y filtrar por `tipocpte='RES'` en las consultas del módulo Ejecución.
+1. **Nivel 5 — clave de cruce DIS↔RES (confirmar literal)**: el plan implementa el cruce estándar del flujo presupuestal colombiano: las RES (registros con `tipocpte='RES'` en `sysman_auxiliar_cuentas`) cuyo campo `cmpteafectado` coincide con el `numero` de la DIS expandida en el nivel 4. Esto resuelve "qué reservas afectaron esta disponibilidad". Si la regla de negocio esperada es distinta (por ejemplo, cruzar por `rubro` en lugar de por `cmpteafectado`), ajustar únicamente el `WHERE` del endpoint `/res` en `RestController.php`. La arquitectura de tablas (DIS y RES en la misma `sysman_auxiliar_cuentas`, discriminadas por `tipocpte`) ya está confirmada por Jonnathan y no debe modificarse.
+2. **Validación de tablas existentes**: en la Fase 1 (inspección), si Claude Code encuentra que `sysman_auxiliar_cuentas` ya contiene otros tipos de comprobante (OBL, EGR, NOM, etc.) además de DIS y RES, **no eliminarlos** — el módulo Ejecución filtra explícitamente por `tipocpte IN ('DIS','RES')` y respeta el resto de los datos.
 3. **Compañía**: actualmente fijada en `001`. Si se requiere multi-compañía, agregar selector y persistir en meta del CPT.
-4. **Periodo histórico**: la sincronización actual reemplaza datos por (compania, anio, mes) vía `TRUNCATE` segmentado. Si se necesita histórico acumulado mes a mes, el modelo ya lo permite — cambiar a `INSERT ... ON DUPLICATE KEY UPDATE` con UNIQUE compuesto.
-5. **Otros tipos de comprobante**: si en una versión futura se requiere visualizar OBL (obligaciones) o EGR (egresos/pagos) como nivel 6 del acordeón, ya hay arquitectura preparada — agregar `MovimientosOblSyncer` y `MovimientosEgrSyncer` siguiendo el mismo patrón, decidiendo si van a `sysman_auxiliar_cuentas` o a una nueva tabla.
+4. **Periodo histórico**: la sincronización borra los registros del periodo y tipo antes de insertar (`DELETE WHERE compania=? AND anio=? AND mes=? AND tipocpte=?`). Esto garantiza idempotencia sin perder histórico de otros meses. Si en algún caso se necesita preservar todo el histórico crudo, cambiar a `INSERT ... ON DUPLICATE KEY UPDATE` con UNIQUE compuesto.
+5. **Otros tipos de comprobante**: si en una versión futura se requiere visualizar OBL (obligaciones) o EGR (egresos/pagos) como nivel 6 del acordeón, **no se necesitan tablas ni syncers nuevos** — basta con invocar `MovimientosSyncer::sync(..., 'OBL')` o `'EGR'` y agregar los endpoints REST correspondientes.
 
 ---
 
----
-
-**Fin del plan. Claude Code debe ejecutar las fases en orden, validando aceptación de cada una antes de avanzar a la siguiente. La tabla _sysman_plan_presupuestal es importante recostruirla en su totalidad**
-
-
-
+**Fin del plan. Claude Code debe ejecutar las fases en orden, validando aceptación de cada una antes de avanzar a la siguiente.**
