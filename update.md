@@ -2,7 +2,37 @@
 
 **Plan de implementación para Claude Code**
 Repositorio: `https://github.com/GobernaciondeNarino/sisman-suite`
-Convenciones: namespace `GobernacionNarino\`, prefijo de opciones `gn_`, `sslverify: false`, transients para caché, PSR-4, paleta institucional `#1a5276` / `#E8A020` / `#003087`.
+Convenciones: namespace `SysmanSuite\`, prefijo de opciones `gn_`, `sslverify: false`, transients para caché, PSR-4, paleta institucional `#1a5276` / `#E8A020` / `#003087`.
+
+---
+
+## Update — v4.0.0 (2026-05-08)
+
+### Estado: Implementado
+
+Todas las fases del plan han sido ejecutadas. A continuación el resumen de cambios:
+
+### Módulo Ejecución
+- 10 clases PHP en `includes/Ejecucion/`: Schema, SysmanClient, PlanPresupuestalSyncer, EjecucionConsolidadaSyncer, MovimientosSyncer, EjecucionModule, PostType, RestController, Repository, AccordionRenderer
+- 3 templates admin: `ejecucion-list.php`, `ejecucion-edit.php`, `ejecucion-view.php`
+- Frontend: `ejecucion.js` (vanilla JS, carga lazy) + `ejecucion.css` (paleta institucional)
+- CPT `gn_ejecucion` con meta: `_gn_dependencia`, `_gn_anio`, `_gn_mes`, `_gn_compania`
+- 5 endpoints REST bajo `gn-sisman/v1/`: dependencias, rubros, consolidado, dis, res
+- Shortcode `[gn_ejecucion id="X"]`
+
+### Schema v4.1.0
+- `sysman_plan_presupuestal`: 22 campos de datos (codigo, nombre, destino, naturaleza, movimiento, tipovigencia, sector, programa, subprograma, codigoproducto, codigobpin, codigoccpet, codigocpcdane, codigofuente, codigoccpetregalias, politicapublica, detallesectorial, tiporecurso, codigosia, dependencia, nombredependencia, codigoequiv)
+- `sysman_ejecucion_gastos`: 20 campos de datos (apropiaciones, compromisos, pagos, etc.)
+- `sysman_auxiliar_cuentas`: 20 campos de datos (DIS, RES, OBL, EGR en la misma tabla, discriminados por `tipocpte`)
+- Migracion forzada via DROP + CREATE para garantizar esquema correcto
+- `class-database.php` alineado con `Schema.php` para evitar conflictos de columnas
+
+### Correcciones criticas
+- **Envelope SYSMAN**: SysmanClient extrae `cuerpo` del envelope `{codigo, mensaje, cuerpo}`
+- **tipo_cpte dropdown**: valores corregidos a DIS, RES, OBL, EGR (antes CDP, RP, PAG)
+- **Auxiliar import scoping**: DELETE filtra por `tipocpte` para que DIS no borre RES y viceversa
+- **Error checking**: inserciones batch ahora detectan y reportan errores de MySQL
+- **Column name conflict**: `tipo_cpte` (underscore) reemplazado por `tipocpte` (sin underscore) en toda la base de datos
 
 ---
 
