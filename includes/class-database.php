@@ -63,31 +63,41 @@ class Database {
         dbDelta( $sql_ejecucion );
 
         // Table 2: Auxiliar Presupuestal por Cuentas (numinforme=2)
+        // Must match includes/Ejecucion/Schema.php::create_auxiliar_cuentas()
         $table_auxiliar = $wpdb->prefix . 'sysman_auxiliar_cuentas';
         $sql_auxiliar = "CREATE TABLE {$table_auxiliar} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            anio INT NOT NULL DEFAULT 0,
-            mes INT NOT NULL DEFAULT 0,
-            compania VARCHAR(10) NOT NULL DEFAULT '001',
-            tipo_cpte VARCHAR(20) NOT NULL DEFAULT '',
-            numero VARCHAR(50) NOT NULL DEFAULT '',
-            nombrepred VARCHAR(500) NOT NULL DEFAULT '',
-            idprede VARCHAR(50) NOT NULL DEFAULT '',
-            rubro VARCHAR(100) NOT NULL DEFAULT '',
+            compania VARCHAR(8) NOT NULL DEFAULT '001',
+            anio SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            mes TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            numero VARCHAR(32) NOT NULL DEFAULT '',
+            nombrepred TEXT,
+            idprede VARCHAR(64) NOT NULL DEFAULT '',
+            nombreplan TEXT,
+            rubro VARCHAR(255) NOT NULL DEFAULT '',
             fecha VARCHAR(20) NOT NULL DEFAULT '',
-            tercero VARCHAR(500) NOT NULL DEFAULT '',
+            tipocpte VARCHAR(8) NOT NULL DEFAULT '',
+            tercero VARCHAR(64) NOT NULL DEFAULT '',
+            nombretercero VARCHAR(255) NOT NULL DEFAULT '',
             descripcion TEXT,
+            nrodocumento VARCHAR(64) NOT NULL DEFAULT '',
             valordebito DECIMAL(20,2) NOT NULL DEFAULT 0,
             valorcredito DECIMAL(20,2) NOT NULL DEFAULT 0,
+            debitoafectado DECIMAL(20,2) NOT NULL DEFAULT 0,
+            creditoafectado DECIMAL(20,2) NOT NULL DEFAULT 0,
+            modificaciondebito DECIMAL(20,2) NOT NULL DEFAULT 0,
+            modificacioncredito DECIMAL(20,2) NOT NULL DEFAULT 0,
             saldoporejecutaresp DECIMAL(20,2) NOT NULL DEFAULT 0,
-            comprobante_afectado VARCHAR(50) NOT NULL DEFAULT '',
-            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            tipocpteafect VARCHAR(8) NOT NULL DEFAULT '',
+            cmpteafectado VARCHAR(32) NOT NULL DEFAULT '',
+            synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_anio_mes (anio, mes),
+            KEY idx_compania_anio_mes (compania, anio, mes),
             KEY idx_numero (numero),
             KEY idx_rubro (rubro),
-            KEY idx_tercero (tercero(100)),
-            KEY idx_tipo_cpte (tipo_cpte)
+            KEY idx_tipocpte_rubro (tipocpte, rubro),
+            KEY idx_tipocpte_cmpte (tipocpte, cmpteafectado),
+            KEY idx_unique_lookup (compania, anio, mes, tipocpte, numero)
         ) {$charset};";
 
         dbDelta( $sql_auxiliar );

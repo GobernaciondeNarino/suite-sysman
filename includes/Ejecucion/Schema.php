@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Schema {
 
-    const VERSION = '4.0.0';
+    const VERSION = '4.1.0';
 
     public static function run(): void {
         $current = get_option( 'gn_sisman_schema_version', '0' );
@@ -17,17 +17,14 @@ class Schema {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
 
-        // plan_presupuestal: full rebuild — old schema had wrong fields (ejecucion-style).
+        // plan_presupuestal: full rebuild to ensure correct field set.
         $table_pp = $wpdb->prefix . 'sysman_plan_presupuestal';
         $wpdb->query( "DROP TABLE IF EXISTS {$table_pp}" );
 
-        // auxiliar_cuentas: drop legacy columns from old class-database.php schema
+        // auxiliar_cuentas: full rebuild — old class-database.php used wrong column
+        // names (tipo_cpte vs tipocpte) and was missing many columns.
         $table_ac = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table_ac}'" ) === $table_ac ) {
-            self::drop_column_if_exists( $wpdb, $table_ac, 'tipo_cpte' );
-            self::drop_column_if_exists( $wpdb, $table_ac, 'comprobante_afectado' );
-            self::drop_column_if_exists( $wpdb, $table_ac, 'fecha_importacion' );
-        }
+        $wpdb->query( "DROP TABLE IF EXISTS {$table_ac}" );
 
         self::create_plan_presupuestal( $wpdb, $charset );
         self::create_ejecucion_gastos( $wpdb, $charset );
@@ -40,17 +37,6 @@ class Schema {
             "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_gn\\_sisman\\_pp\\_dependencias\\_%' "
             . "OR option_name LIKE '\\_transient\\_timeout\\_gn\\_sisman\\_pp\\_dependencias\\_%'"
         );
-    }
-
-    private static function drop_column_if_exists( $wpdb, string $table, string $column ): void {
-        $exists = $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
-            $table, $column
-        ) );
-        if ( (int) $exists > 0 ) {
-            $wpdb->query( "ALTER TABLE {$table} DROP COLUMN {$column}" );
-        }
     }
 
     private static function create_plan_presupuestal( $wpdb, string $charset ): void {

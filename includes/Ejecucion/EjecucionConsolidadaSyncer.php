@@ -100,7 +100,10 @@ class EjecucionConsolidadaSyncer {
             }
 
             $sql = "INSERT INTO {$table} ({$col_list}) VALUES " . implode( ',', $placeholders );
-            $wpdb->query( $wpdb->prepare( $sql, $values ) );
+            $result = $wpdb->query( $wpdb->prepare( $sql, $values ) );
+            if ( false === $result ) {
+                return new \WP_Error( 'sysman_db', $wpdb->last_error ?: 'Error al insertar en ejecucion_gastos' );
+            }
             $inserted += count( $batch );
         }
 
