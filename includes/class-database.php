@@ -305,17 +305,26 @@ class Database {
      */
     public function get_auxiliar_field_map(): array {
         return [
-            'numero'               => 'numero',
-            'nombrepred'           => 'nombrepred',
-            'idprede'              => 'idprede',
-            'rubro'                => 'rubro',
-            'fecha'                => 'fecha',
-            'tercero'              => 'tercero',
-            'descripcion'          => 'descripcion',
-            'valordebito'          => 'valordebito',
-            'valorcredito'         => 'valorcredito',
-            'saldoporejecutaresp'  => 'saldoporejecutaresp',
-            'comprobante_afectado' => 'comprobante_afectado',
+            'numero'              => 'numero',
+            'nombrepred'          => 'nombrepred',
+            'idprede'             => 'idprede',
+            'nombreplan'          => 'nombreplan',
+            'rubro'               => 'rubro',
+            'fecha'               => 'fecha',
+            'tipocpte'            => 'tipocpte',
+            'tercero'             => 'tercero',
+            'nombretercero'       => 'nombretercero',
+            'descripcion'         => 'descripcion',
+            'nrodocumento'        => 'nrodocumento',
+            'valordebito'         => 'valordebito',
+            'valorcredito'        => 'valorcredito',
+            'debitoafectado'      => 'debitoafectado',
+            'creditoafectado'     => 'creditoafectado',
+            'modificaciondebito'  => 'modificaciondebito',
+            'modificacioncredito' => 'modificacioncredito',
+            'saldoporejecutaresp' => 'saldoporejecutaresp',
+            'tipocpteafect'       => 'tipocpteafect',
+            'cmpteafectado'       => 'cmpteafectado',
         ];
     }
 
@@ -448,6 +457,10 @@ class Database {
 
         $table_name = $wpdb->prefix . 'sysman_auxiliar_cuentas';
         $field_map  = $this->get_auxiliar_field_map();
+        $numeric_cols = [
+            'valordebito', 'valorcredito', 'debitoafectado', 'creditoafectado',
+            'modificaciondebito', 'modificacioncredito', 'saldoporejecutaresp',
+        ];
         $inserted   = 0;
 
         if ( ! $this->ensure_table_exists( $table_name ) ) {
@@ -455,30 +468,28 @@ class Database {
             return 0;
         }
 
-        // Delete existing records for same year and company to avoid duplicates
-        $wpdb->delete( $table_name, [
-            'anio'     => $anio,
-            'compania' => $compania,
-        ], [ '%d', '%s' ] );
+        // Delete only records matching year, month, company AND tipo_cpte
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$table_name} WHERE compania = %s AND anio = %d AND mes = %d AND tipocpte = %s",
+            $compania, $anio, $mes, $tipo_cpte
+        ) );
 
         foreach ( $records as $index => $record ) {
-            // Log the first record's keys for debugging field mapping
             if ( 0 === $index ) {
                 $record_keys = implode( ', ', array_keys( $record ) );
                 $this->logger->log( "Claves del primer registro API (auxiliar): {$record_keys}" );
             }
 
             $data = [
-                'anio'      => $anio,
-                'mes'       => $mes,
-                'compania'  => $compania,
-                'tipo_cpte' => $tipo_cpte,
+                'anio'     => $anio,
+                'mes'      => $mes,
+                'compania' => $compania,
             ];
 
             foreach ( $field_map as $api_field => $db_column ) {
                 if ( isset( $record[ $api_field ] ) ) {
                     $value = $record[ $api_field ];
-                    if ( in_array( $db_column, [ 'valordebito', 'valorcredito', 'saldoporejecutaresp' ], true ) ) {
+                    if ( in_array( $db_column, $numeric_cols, true ) ) {
                         $data[ $db_column ] = floatval( $value );
                     } else {
                         $data[ $db_column ] = sanitize_text_field( $value );

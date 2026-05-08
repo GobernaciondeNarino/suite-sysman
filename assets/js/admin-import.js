@@ -197,6 +197,8 @@
                 const reportLabels = {
                     ejecucion: 'Ejecución Presupuestal de Gastos',
                     auxiliar: 'Auxiliar Presupuestal por Cuentas',
+                    auxiliar_dis: 'Auxiliar — Disponibilidades (DIS)',
+                    auxiliar_res: 'Auxiliar — Reservas (RES)',
                     plan: 'Plan Presupuestal',
                     personal: 'Personal Activo de Nómina',
                     ingresos: 'Ejecución de Ingresos',
@@ -529,8 +531,20 @@
                 valorcredito: 'Valor Crédito',
                 saldoporejecutaresp: 'Saldo por Ejecutar',
                 comprobante_afectado: 'Comprobante Afectado',
+                tipocpte: 'Tipo Comprobante',
                 tipo_cpte: 'Tipo Comprobante',
+                nombretercero: 'Nombre Tercero',
+                nombreplan: 'Nombre Plan',
+                nrodocumento: 'Nro. Documento',
+                debitoafectado: 'Débito Afectado',
+                creditoafectado: 'Crédito Afectado',
+                modificaciondebito: 'Modificación Débito',
+                modificacioncredito: 'Modificación Crédito',
+                tipocpteafect: 'Tipo Cpte. Afectado',
+                cmpteafectado: 'Comprobante Afectado',
+                comprobante_afectado: 'Comprobante Afectado',
                 fecha_importacion: 'Fecha Importación',
+                synced_at: 'Última Sincronización',
                 // Personal Nómina
                 iddeempleado: 'ID Empleado',
                 apellido1: 'Primer Apellido',
@@ -577,9 +591,10 @@
         isNumericColumn(col) {
             const numericCols = [
                 'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
-                'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+                'aplazamiento', 'desplazamiento', 'desplazaminento', 'apropiacionvigente', 'disponibilidades',
                 'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
                 'pagos', 'obligacionesporpagar', 'valordebito', 'valorcredito', 'saldoporejecutaresp',
+                'debitoafectado', 'creditoafectado', 'modificaciondebito', 'modificacioncredito',
                 'salariobaseibc', 'apropiado', 'modificaciones', 'totalpresupuesto',
                 'recaudosanteriores', 'recaudosmes', 'recaudosacumulados', 'porrecaudar', 'porcrecaudado',
             ];

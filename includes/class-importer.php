@@ -253,19 +253,22 @@ class Importer {
     public function import_all( string $compania, int $anio, int $mes ): array {
         $results = [];
 
-        $this->update_status( 1, 5, 'Conectando con API SYSMAN...', 'ejecucion' );
+        $this->update_status( 1, 6, 'Conectando con API SYSMAN...', 'ejecucion' );
         $results['ejecucion'] = $this->import_ejecucion( $compania, $anio, $mes );
 
-        $this->update_status( 2, 5, 'Conectando con API SYSMAN...', 'auxiliar' );
-        $results['auxiliar'] = $this->import_auxiliar( $compania, $anio, $mes );
+        $this->update_status( 2, 6, 'Importando Disponibilidades...', 'auxiliar' );
+        $results['auxiliar_dis'] = $this->import_auxiliar( $compania, $anio, $mes, 'DIS' );
 
-        $this->update_status( 3, 5, 'Conectando con API SYSMAN...', 'plan' );
+        $this->update_status( 3, 6, 'Importando Reservas...', 'auxiliar' );
+        $results['auxiliar_res'] = $this->import_auxiliar( $compania, $anio, $mes, 'RES' );
+
+        $this->update_status( 4, 6, 'Conectando con API SYSMAN...', 'plan' );
         $results['plan'] = $this->import_plan( $compania, $anio, $mes );
 
-        $this->update_status( 4, 5, 'Conectando con API SYSMAN...', 'personal' );
+        $this->update_status( 5, 6, 'Conectando con API SYSMAN...', 'personal' );
         $results['personal'] = $this->import_personal( $compania, $anio );
 
-        $this->update_status( 5, 5, 'Conectando con API SYSMAN...', 'ingresos' );
+        $this->update_status( 6, 6, 'Conectando con API SYSMAN...', 'ingresos' );
         $results['ingresos'] = $this->import_ingresos( $compania, $anio, $mes );
 
         delete_transient( 'sysman_import_status' );

@@ -99,11 +99,10 @@ $meses = [
                     <div class="sysman-form-group">
                         <label for="sysman-tipo-cpte"><?php esc_html_e( 'Tipo de Comprobante', 'sysman-suite' ); ?></label>
                         <select id="sysman-tipo-cpte">
-                            <option value="RES">RES - Resolución</option>
-                            <option value="CDP">CDP - Certificado Disponibilidad</option>
-                            <option value="RP">RP - Registro Presupuestal</option>
-                            <option value="OBL">OBL - Obligación</option>
-                            <option value="PAG">PAG - Pago</option>
+                            <option value="DIS"><?php esc_html_e( 'DIS - Disponibilidades (CDP)', 'sysman-suite' ); ?></option>
+                            <option value="RES"><?php esc_html_e( 'RES - Reservas (Registro Presupuestal)', 'sysman-suite' ); ?></option>
+                            <option value="OBL"><?php esc_html_e( 'OBL - Obligaciones', 'sysman-suite' ); ?></option>
+                            <option value="EGR"><?php esc_html_e( 'EGR - Egresos (Pagos)', 'sysman-suite' ); ?></option>
                         </select>
                     </div>
                 </div>
@@ -129,21 +128,26 @@ $meses = [
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="2">
                         <div class="sysman-step-indicator">2</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Auxiliar Cuentas', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Disponibilidades', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="3">
                         <div class="sysman-step-indicator">3</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Reservas', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="4">
                         <div class="sysman-step-indicator">4</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Personal Nómina', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="5">
                         <div class="sysman-step-indicator">5</div>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Personal Nómina', 'sysman-suite' ); ?></span>
+                    </div>
+                    <div class="sysman-step-connector"></div>
+                    <div class="sysman-step" data-step="6">
+                        <div class="sysman-step-indicator">6</div>
                         <span class="sysman-step-label"><?php esc_html_e( 'Ingresos', 'sysman-suite' ); ?></span>
                     </div>
                 </div>
