@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Schema {
 
-    const VERSION = '4.2.0';
+    const VERSION = '4.3.0';
 
     public static function run(): void {
         $current = get_option( 'gn_sisman_schema_version', '0' );
@@ -60,6 +60,7 @@ class Schema {
             codigobpin VARCHAR(64) NOT NULL DEFAULT '',
             codigoccpet VARCHAR(64) NOT NULL DEFAULT '',
             codigocpcdane VARCHAR(64) NOT NULL DEFAULT '',
+            codigounidadejecutora VARCHAR(32) NOT NULL DEFAULT '',
             codigofuente VARCHAR(32) NOT NULL DEFAULT '',
             codigoccpetregalias VARCHAR(64) NOT NULL DEFAULT '',
             politicapublica VARCHAR(255) NOT NULL DEFAULT '',

@@ -49,6 +49,7 @@ class PlanPresupuestalSyncer {
             'codigoBPIN'          => 'codigobpin',
             'codigoCCPET'         => 'codigoccpet',
             'codigoCPCDANE'       => 'codigocpcdane',
+            'codigoUnidadEjecutora' => 'codigounidadejecutora',
             'codigoFuente'        => 'codigofuente',
             'codigoCCPETRegalias' => 'codigoccpetregalias',
             'politicaPublica'     => 'politicapublica',
