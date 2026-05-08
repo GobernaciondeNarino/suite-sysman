@@ -92,42 +92,8 @@ class Database {
 
         dbDelta( $sql_auxiliar );
 
-        // Table 3: Plan Presupuestal (numinforme=4)
-        $table_plan = $wpdb->prefix . 'sysman_plan_presupuestal';
-        $sql_plan = "CREATE TABLE {$table_plan} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            anio INT NOT NULL DEFAULT 0,
-            mes INT NOT NULL DEFAULT 0,
-            compania VARCHAR(10) NOT NULL DEFAULT '001',
-            codigocuenta VARCHAR(50) NOT NULL DEFAULT '',
-            nombrerubro VARCHAR(500) NOT NULL DEFAULT '',
-            movimiento VARCHAR(10) NOT NULL DEFAULT '',
-            destino VARCHAR(100) NOT NULL DEFAULT '',
-            bpid VARCHAR(50) NOT NULL DEFAULT '0',
-            apropiacioninicial DECIMAL(20,2) NOT NULL DEFAULT 0,
-            adicion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            reduccion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            credito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            contracredito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            aplazamiento DECIMAL(20,2) NOT NULL DEFAULT 0,
-            desplazamiento DECIMAL(20,2) NOT NULL DEFAULT 0,
-            apropiacionvigente DECIMAL(20,2) NOT NULL DEFAULT 0,
-            disponibilidades DECIMAL(20,2) NOT NULL DEFAULT 0,
-            saldodisponible DECIMAL(20,2) NOT NULL DEFAULT 0,
-            compromisos DECIMAL(20,2) NOT NULL DEFAULT 0,
-            disponibilidadesabiertas DECIMAL(20,2) NOT NULL DEFAULT 0,
-            obligacion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            pagos DECIMAL(20,2) NOT NULL DEFAULT 0,
-            obligacionesporpagar DECIMAL(20,2) NOT NULL DEFAULT 0,
-            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_anio_mes (anio, mes),
-            KEY idx_codigocuenta (codigocuenta),
-            KEY idx_destino (destino),
-            KEY idx_compania (compania)
-        ) {$charset};";
-
-        dbDelta( $sql_plan );
+        // Table 3: Plan Presupuestal (numinforme=4) — schema is owned by SysmanSuite\Ejecucion\Schema
+        // (see includes/Ejecucion/Schema.php). Do not recreate here.
 
         // Table 4: Personal Activo de Nómina (numinforme=5)
         $table_personal = $wpdb->prefix . 'sysman_personal_nomina';

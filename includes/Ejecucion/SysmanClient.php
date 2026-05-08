@@ -43,6 +43,15 @@ class SysmanClient {
             return new \WP_Error( 'sysman_json', 'JSON inválido' );
         }
 
+        // SYSMAN API envelope: { codigo: 0, mensaje: "OK", cuerpo: [...] }
+        if ( isset( $body['codigo'] ) ) {
+            if ( (int) $body['codigo'] !== 0 ) {
+                $msg = $body['mensaje'] ?? 'Error desconocido';
+                return new \WP_Error( 'sysman_api', $msg );
+            }
+            return $body['cuerpo'] ?? [];
+        }
+
         return $body;
     }
 }
