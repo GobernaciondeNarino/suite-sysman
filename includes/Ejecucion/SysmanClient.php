@@ -25,7 +25,7 @@ class SysmanClient {
         $url = add_query_arg( $args, $this->get_base_url() );
 
         $response = wp_remote_get( $url, [
-            'timeout'   => 120,
+            'timeout'   => 300,
             'sslverify' => false,
         ] );
 

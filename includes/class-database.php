@@ -63,47 +63,16 @@ class Database {
         dbDelta( $sql_ejecucion );
 
         // Table 2: Auxiliar Presupuestal por Cuentas (numinforme=2)
-        // Must match includes/Ejecucion/Schema.php::create_auxiliar_cuentas()
         $table_auxiliar = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        $sql_auxiliar = "CREATE TABLE {$table_auxiliar} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            compania VARCHAR(8) NOT NULL DEFAULT '001',
-            anio SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-            mes TINYINT UNSIGNED NOT NULL DEFAULT 0,
-            numero VARCHAR(32) NOT NULL DEFAULT '',
-            nombrepred TEXT,
-            idprede VARCHAR(64) NOT NULL DEFAULT '',
-            nombreplan TEXT,
-            rubro VARCHAR(255) NOT NULL DEFAULT '',
-            fecha VARCHAR(20) NOT NULL DEFAULT '',
-            tipocpte VARCHAR(8) NOT NULL DEFAULT '',
-            tercero VARCHAR(64) NOT NULL DEFAULT '',
-            nombretercero VARCHAR(255) NOT NULL DEFAULT '',
-            descripcion TEXT,
-            nrodocumento VARCHAR(64) NOT NULL DEFAULT '',
-            valordebito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            valorcredito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            debitoafectado DECIMAL(20,2) NOT NULL DEFAULT 0,
-            creditoafectado DECIMAL(20,2) NOT NULL DEFAULT 0,
-            modificaciondebito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            modificacioncredito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            saldoporejecutaresp DECIMAL(20,2) NOT NULL DEFAULT 0,
-            tipocpteafect VARCHAR(8) NOT NULL DEFAULT '',
-            cmpteafectado VARCHAR(32) NOT NULL DEFAULT '',
-            synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_compania_anio_mes (compania, anio, mes),
-            KEY idx_numero (numero),
-            KEY idx_rubro (rubro),
-            KEY idx_tipocpte_rubro (tipocpte, rubro),
-            KEY idx_tipocpte_cmpte (tipocpte, cmpteafectado),
-            KEY idx_unique_lookup (compania, anio, mes, tipocpte, numero)
-        ) {$charset};";
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_auxiliar ) ) !== $table_auxiliar ) {
+            $wpdb->query( \SysmanSuite\Ejecucion\Schema::auxiliar_cuentas_sql( $wpdb->prefix, $charset ) );
+        }
 
-        dbDelta( $sql_auxiliar );
-
-        // Table 3: Plan Presupuestal (numinforme=4) — schema is owned by SysmanSuite\Ejecucion\Schema
-        // (see includes/Ejecucion/Schema.php). Do not recreate here.
+        // Table 3: Plan Presupuestal (numinforme=4)
+        $table_plan = $wpdb->prefix . 'sysman_plan_presupuestal';
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_plan ) ) !== $table_plan ) {
+            $wpdb->query( \SysmanSuite\Ejecucion\Schema::plan_presupuestal_sql( $wpdb->prefix, $charset ) );
+        }
 
         // Table 4: Personal Activo de Nómina (numinforme=5)
         $table_personal = $wpdb->prefix . 'sysman_personal_nomina';

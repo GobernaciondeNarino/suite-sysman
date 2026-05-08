@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Importer {
 
     private const DEFAULT_API_URL = 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar';
-    private const TIMEOUT        = 120;
+    private const TIMEOUT        = 300;
 
     private Database $database;
     private Logger   $logger;
@@ -53,7 +53,7 @@ class Importer {
 
         $response = wp_remote_get( $url, [
             'timeout'   => self::TIMEOUT,
-            'sslverify' => true,
+            'sslverify' => false,
             'headers'   => [
                 'Accept' => 'application/json',
             ],
