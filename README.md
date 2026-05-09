@@ -226,6 +226,18 @@ sisman-suite/
 
 ## Changelog
 
+### 4.2.0
+- Correccion de URL del menu Ejecucion: redireccionaba a pagina 404 (`wp-admin/sysman-ejecucion` en vez de `admin.php?page=sysman-ejecucion`)
+- Ajuste de prioridad en `admin_menu` para garantizar orden de registro correcto
+
+### 4.1.0
+- Correccion de creacion de tabla `plan_presupuestal` (uso de `$wpdb->query` en vez de `dbDelta`)
+- Timeout de API incrementado a 300 segundos para importaciones grandes
+- Campo `codigoUnidadEjecutora` agregado al plan presupuestal (23 campos completos)
+- Schema v4.3.0 con indices optimizados y prefijos de longitud
+- Verificacion de errores en inserciones batch
+- `sslverify` deshabilitado globalmente para certificados institucionales
+
 ### 4.0.0
 - Nuevo modulo **Ejecucion** con acordeones anidados (Dependencia > Rubros > Consolidada > DIS > RES)
 - Custom Post Type `gn_ejecucion` para seguimientos independientes

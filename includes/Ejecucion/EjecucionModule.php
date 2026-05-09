@@ -28,7 +28,7 @@ class EjecucionModule {
         $this->post_type->register();
         $this->rest->register();
 
-        add_action( 'admin_menu', [ $this, 'admin_menu' ] );
+        add_action( 'admin_menu', [ $this, 'admin_menu' ], 20 );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
         add_action( 'wp_ajax_gn_ejecucion_save', [ $this, 'ajax_save' ] );
