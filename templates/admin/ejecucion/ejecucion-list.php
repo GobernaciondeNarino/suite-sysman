@@ -50,10 +50,11 @@ $meses = [
                 <table class="wp-list-table widefat fixed striped">
                     <thead>
                         <tr>
-                            <th style="width:30%;"><?php esc_html_e( 'Título', 'sysman-suite' ); ?></th>
+                            <th style="width:25%;"><?php esc_html_e( 'Título', 'sysman-suite' ); ?></th>
                             <th><?php esc_html_e( 'Dependencia', 'sysman-suite' ); ?></th>
                             <th style="width:120px;"><?php esc_html_e( 'Periodo', 'sysman-suite' ); ?></th>
                             <th style="width:80px;"><?php esc_html_e( 'Compañía', 'sysman-suite' ); ?></th>
+                            <th style="width:220px;"><?php esc_html_e( 'Shortcode', 'sysman-suite' ); ?></th>
                             <th style="width:160px;"><?php esc_html_e( 'Última Actualización', 'sysman-suite' ); ?></th>
                             <th style="width:180px;"><?php esc_html_e( 'Acciones', 'sysman-suite' ); ?></th>
                         </tr>
@@ -71,6 +72,9 @@ $meses = [
                             <td><?php echo esc_html( $dep ); ?></td>
                             <td><?php echo esc_html( $mes_name . ' ' . $anio ); ?></td>
                             <td><?php echo esc_html( $comp ); ?></td>
+                            <td>
+                                <code class="gn-shortcode-copy" title="<?php esc_attr_e( 'Clic para copiar', 'sysman-suite' ); ?>" style="cursor:pointer;padding:4px 8px;background:#f0f0f1;border-radius:3px;font-size:12px;user-select:all;">[gn_ejecucion id="<?php echo esc_attr( $p->ID ); ?>"]</code>
+                            </td>
                             <td><?php echo esc_html( get_the_modified_date( 'd/m/Y H:i', $p ) ); ?></td>
                             <td>
                                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion&action=view&id=' . $p->ID ) ); ?>" class="button button-small" title="<?php esc_attr_e( 'Ver', 'sysman-suite' ); ?>">
@@ -94,6 +98,18 @@ $meses = [
 
 <script>
 jQuery(function($) {
+    $('.gn-shortcode-copy').on('click', function() {
+        var $el = $(this);
+        var text = $el.text();
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function() {
+                var orig = $el.text();
+                $el.text('<?php echo esc_js( __( '¡Copiado!', 'sysman-suite' ) ); ?>').css('background', '#d1fae5');
+                setTimeout(function(){ $el.text(orig).css('background', ''); }, 1500);
+            });
+        }
+    });
+
     $('.gn-ejec-delete-btn').on('click', function() {
         if (!confirm('<?php echo esc_js( __( '¿Eliminar este seguimiento?', 'sysman-suite' ) ); ?>')) return;
         var $btn = $(this);

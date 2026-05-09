@@ -109,6 +109,17 @@ $current_year = (int) date( 'Y' );
                     </tr>
                 </table>
 
+                <div id="gn-ejec-shortcode-box" style="margin-top:1rem;padding:1rem;background:#f0f6ff;border:1px solid #c3dafe;border-radius:6px;display:<?php echo $is_new ? 'none' : 'flex'; ?>;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span class="dashicons dashicons-shortcode" style="color:#1a5276;font-size:20px;width:20px;height:20px;"></span>
+                    <span style="font-weight:600;color:#1a5276;"><?php esc_html_e( 'Shortcode:', 'sysman-suite' ); ?></span>
+                    <code id="gn-ejec-shortcode-text" style="padding:6px 12px;background:#fff;border:1px solid #d1d5db;border-radius:4px;font-size:13px;user-select:all;">[gn_ejecucion id="<?php echo $is_new ? '' : esc_attr( $post_id ); ?>"]</code>
+                    <button type="button" id="gn-ejec-copy-shortcode" class="button button-small">
+                        <span class="dashicons dashicons-clipboard" style="vertical-align:middle;margin-top:-2px;"></span>
+                        <?php esc_html_e( 'Copiar', 'sysman-suite' ); ?>
+                    </button>
+                    <span class="description"><?php esc_html_e( 'Pegue este shortcode en cualquier página o entrada para mostrar el seguimiento.', 'sysman-suite' ); ?></span>
+                </div>
+
                 <div style="padding:1rem 0;display:flex;gap:12px;flex-wrap:wrap;">
                     <button type="button" id="gn-ejec-save" class="button button-primary button-hero">
                         <span class="dashicons dashicons-saved" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
@@ -186,6 +197,8 @@ jQuery(function($) {
                 savedDep = $('#gn-ejec-dependencia').val();
                 $msg.html('<div class="notice notice-success inline"><p><?php echo esc_js( __( 'Seguimiento guardado exitosamente.', 'sysman-suite' ) ); ?></p></div>').show();
                 history.replaceState(null, '', '<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion&action=edit&id=' ) ); ?>' + postId);
+                $('#gn-ejec-shortcode-text').text('[gn_ejecucion id="' + postId + '"]');
+                $('#gn-ejec-shortcode-box').css('display', 'flex');
             } else {
                 $msg.html('<div class="notice notice-error inline"><p>' + (resp.data || 'Error') + '</p></div>').show();
             }
@@ -223,6 +236,18 @@ jQuery(function($) {
             $btn.prop('disabled', false);
             $res.html('<div class="notice notice-error inline"><p><?php echo esc_js( __( 'Error de comunicación con el servidor.', 'sysman-suite' ) ); ?></p></div>');
         });
+    });
+
+    // Copy shortcode
+    $('#gn-ejec-copy-shortcode').on('click', function() {
+        var text = $('#gn-ejec-shortcode-text').text();
+        if (navigator.clipboard) {
+            var $btn = $(this);
+            navigator.clipboard.writeText(text).then(function() {
+                $btn.find('.dashicons').removeClass('dashicons-clipboard').addClass('dashicons-yes');
+                setTimeout(function(){ $btn.find('.dashicons').removeClass('dashicons-yes').addClass('dashicons-clipboard'); }, 1500);
+            });
+        }
     });
 });
 </script>
