@@ -106,12 +106,29 @@
         html += '<div class="gn-ejec__proyecto-body">';
         html += '<div class="gn-ejec__proyecto-field"><strong>Nombre del Proyecto:</strong> ' + esc(data.nombre_proyecto) + '</div>';
         if (data.metas) {
-            html += '<div class="gn-ejec__proyecto-field"><strong>Metas:</strong> ' + esc(data.metas) + '</div>';
+            html += '<div class="gn-ejec__proyecto-field"><strong>Metas:</strong>';
+            html += renderCommaList(data.metas);
+            html += '</div>';
         }
         if (data.odss) {
-            html += '<div class="gn-ejec__proyecto-field"><strong>ODS:</strong> ' + esc(data.odss) + '</div>';
+            html += '<div class="gn-ejec__proyecto-field"><strong>ODS:</strong>';
+            html += renderCommaList(data.odss);
+            html += '</div>';
         }
         html += '</div></div>';
+        return html;
+    }
+
+    function renderCommaList(str) {
+        var items = str.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        if (items.length <= 1) {
+            return ' ' + esc(str);
+        }
+        var html = '<ul class="gn-ejec__meta-list">';
+        items.forEach(function(item) {
+            html += '<li>' + esc(item) + '</li>';
+        });
+        html += '</ul>';
         return html;
     }
 

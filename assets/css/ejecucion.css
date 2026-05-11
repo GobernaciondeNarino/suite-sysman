@@ -170,6 +170,16 @@
 .gn-ejec__proyecto-field strong {
     color: #1a5632;
 }
+.gn-ejec__meta-list {
+    list-style: disc;
+    margin: 0.25rem 0 0 1.5rem;
+    padding: 0;
+}
+.gn-ejec__meta-list li {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #1f2937;
+}
 
 /* Tables */
 .gn-ejec__table-wrap {
