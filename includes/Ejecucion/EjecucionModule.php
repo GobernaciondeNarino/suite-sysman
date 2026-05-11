@@ -211,7 +211,7 @@ class EjecucionModule {
         }
 
         wp_enqueue_style( 'gn-ejecucion', SYSMAN_SUITE_URL . 'assets/css/ejecucion.css', [], filemtime( SYSMAN_SUITE_PATH . 'assets/css/ejecucion.css' ) );
-        wp_enqueue_script( 'gn-ejecucion', SYSMAN_SUITE_URL . 'assets/js/ejecucion.js', [ 'wp-api' ], filemtime( SYSMAN_SUITE_PATH . 'assets/js/ejecucion.js' ), true );
+        wp_enqueue_script( 'gn-ejecucion', SYSMAN_SUITE_URL . 'assets/js/ejecucion.js', [], filemtime( SYSMAN_SUITE_PATH . 'assets/js/ejecucion.js' ), true );
         wp_localize_script( 'gn-ejecucion', 'gnEjecFront', [
             'restUrl' => esc_url_raw( rest_url( '/' ) ),
         ] );
