@@ -190,12 +190,8 @@ sisman-suite/
 │   ├── class-logger.php          # Sistema de logs
 │   ├── class-updater.php         # Actualizaciones desde GitHub
 │   ├── class-cli.php             # Comandos WP-CLI
-│   └── Ejecucion/                # Modulo Ejecucion (v4.0.0)
-│       ├── Schema.php            # Migracion de tablas (v4.1.0)
-│       ├── SysmanClient.php      # Cliente HTTP para API SYSMAN
-│       ├── PlanPresupuestalSyncer.php
-│       ├── EjecucionConsolidadaSyncer.php
-│       ├── MovimientosSyncer.php
+│   └── Ejecucion/                # Modulo Ejecucion
+│       ├── Schema.php            # Migracion de tablas (v5.0.0)
 │       ├── EjecucionModule.php   # Bootstrap del modulo
 │       ├── PostType.php          # CPT gn_ejecucion
 │       ├── RestController.php    # Endpoints REST del acordeon
@@ -226,6 +222,19 @@ sisman-suite/
 
 ## Changelog
 
+### 5.0.0
+- **Arquitectura unificada**: toda importacion de datos externos pasa exclusivamente por el modulo Importer
+- Eliminacion de sincronizadores duplicados (`SysmanClient`, `PlanPresupuestalSyncer`, `EjecucionConsolidadaSyncer`, `MovimientosSyncer`)
+- El boton "Sincronizar Datos Ahora" del modulo Ejecucion ahora usa el Importer centralizado
+- Correccion de columna `desplazaminento` (typo) renombrada a `desplazamiento` con migracion automatica ALTER TABLE
+- Unificacion de columna timestamp: `synced_at` migrada a `fecha_importacion` en todas las tablas
+- Schema v5.0.0 ya no usa DROP TABLE — preserva datos existentes en actualizaciones
+- Todas las tablas creadas via `Schema::*_sql()` como unica fuente de verdad (DDL unificado)
+- Correccion de scope de borrado: ejecucion e ingresos ahora borran por `compania+anio+mes` (no solo `compania+anio`)
+- Nuevo metodo `Database::insert_plan_records()` con INSERT batch de 500 filas
+- Importacion de Plan Presupuestal usa fetch propio en vez de delegacion al syncer
+- Limpieza de referencias obsoletas en JS (`desplazaminento` en ejecucion.js y admin-import.js)
+
 ### 4.3.0
 - Correccion de graficos con Query personalizada: la vista previa y el renderizado ahora usan la query custom correctamente
 - Deteccion automatica de `has_groups` desde los datos reales del query
@@ -252,7 +261,7 @@ sisman-suite/
 - Nuevo modulo **Ejecucion** con acordeones anidados (Dependencia > Rubros > Consolidada > DIS > RES)
 - Custom Post Type `gn_ejecucion` para seguimientos independientes
 - 5 endpoints REST internos para carga lazy del acordeon
-- Sincronizadores dedicados: `PlanPresupuestalSyncer`, `EjecucionConsolidadaSyncer`, `MovimientosSyncer`
+- Sincronizadores dedicados (reemplazados en v5.0.0 por Importer centralizado)
 - Schema v4.1.0: reconstruccion completa de `plan_presupuestal` y `auxiliar_cuentas`
 - Extraccion correcta del envelope SYSMAN (`cuerpo`)
 - Correccion de valores `tipo_cpte` en dropdown (DIS, RES, OBL, EGR)

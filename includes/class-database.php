@@ -23,44 +23,11 @@ class Database {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
         // Table 1: Ejecución Presupuestal de Gastos (numinforme=1)
         $table_ejecucion = $wpdb->prefix . 'sysman_ejecucion_gastos';
-        $sql_ejecucion = "CREATE TABLE {$table_ejecucion} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            anio INT NOT NULL DEFAULT 0,
-            mes INT NOT NULL DEFAULT 0,
-            compania VARCHAR(10) NOT NULL DEFAULT '001',
-            codigocuenta VARCHAR(50) NOT NULL DEFAULT '',
-            nombrerubro VARCHAR(500) NOT NULL DEFAULT '',
-            movimiento VARCHAR(10) NOT NULL DEFAULT '',
-            destino VARCHAR(100) NOT NULL DEFAULT '',
-            bpid VARCHAR(50) NOT NULL DEFAULT '0',
-            apropiacioninicial DECIMAL(20,2) NOT NULL DEFAULT 0,
-            adicion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            reduccion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            credito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            contracredito DECIMAL(20,2) NOT NULL DEFAULT 0,
-            aplazamiento DECIMAL(20,2) NOT NULL DEFAULT 0,
-            desplazamiento DECIMAL(20,2) NOT NULL DEFAULT 0,
-            apropiacionvigente DECIMAL(20,2) NOT NULL DEFAULT 0,
-            disponibilidades DECIMAL(20,2) NOT NULL DEFAULT 0,
-            saldodisponible DECIMAL(20,2) NOT NULL DEFAULT 0,
-            compromisos DECIMAL(20,2) NOT NULL DEFAULT 0,
-            disponibilidadesabiertas DECIMAL(20,2) NOT NULL DEFAULT 0,
-            obligacion DECIMAL(20,2) NOT NULL DEFAULT 0,
-            pagos DECIMAL(20,2) NOT NULL DEFAULT 0,
-            obligacionesporpagar DECIMAL(20,2) NOT NULL DEFAULT 0,
-            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_anio_mes (anio, mes),
-            KEY idx_codigocuenta (codigocuenta),
-            KEY idx_destino (destino),
-            KEY idx_compania (compania)
-        ) {$charset};";
-
-        dbDelta( $sql_ejecucion );
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_ejecucion ) ) !== $table_ejecucion ) {
+            $wpdb->query( \SysmanSuite\Ejecucion\Schema::ejecucion_gastos_sql( $wpdb->prefix, $charset ) );
+        }
 
         // Table 2: Auxiliar Presupuestal por Cuentas (numinforme=2)
         $table_auxiliar = $wpdb->prefix . 'sysman_auxiliar_cuentas';
@@ -328,7 +295,102 @@ class Database {
     }
 
     /**
-     * Insert records into ejecucion or plan table.
+     * Get the field map for plan presupuestal table (API field name => DB column).
+     */
+    public function get_plan_field_map(): array {
+        return [
+            'codigo'                => 'codigo',
+            'nombre'                => 'nombre',
+            'destino'               => 'destino',
+            'naturaleza'            => 'naturaleza',
+            'movimiento'            => 'movimiento',
+            'tipovigencia'          => 'tipovigencia',
+            'sector'                => 'sector',
+            'programa'              => 'programa',
+            'subPrograma'           => 'subprograma',
+            'codigoProducto'        => 'codigoproducto',
+            'codigoBPIN'            => 'codigobpin',
+            'codigoCCPET'           => 'codigoccpet',
+            'codigoCPCDANE'         => 'codigocpcdane',
+            'codigoUnidadEjecutora' => 'codigounidadejecutora',
+            'codigoFuente'          => 'codigofuente',
+            'codigoCCPETRegalias'   => 'codigoccpetregalias',
+            'politicaPublica'       => 'politicapublica',
+            'detalleSectorial'      => 'detallesectorial',
+            'tipoRecurso'           => 'tiporecurso',
+            'codigoSIA'             => 'codigosia',
+            'dependencia'           => 'dependencia',
+            'nombreDependencia'     => 'nombredependencia',
+            'codigoEquiv'           => 'codigoequiv',
+        ];
+    }
+
+    /**
+     * Insert records into plan presupuestal table (numinforme=4).
+     * Uses batch INSERT for performance.
+     */
+    public function insert_plan_records( array $records, int $anio, int $mes, string $compania ): int {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $field_map  = $this->get_plan_field_map();
+
+        if ( ! $this->ensure_table_exists( $table_name ) ) {
+            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
+            return 0;
+        }
+
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
+            $compania, $anio, $mes
+        ) );
+
+        if ( empty( $records ) ) {
+            return 0;
+        }
+
+        $columns  = array_merge( [ 'compania', 'anio', 'mes' ], array_values( $field_map ) );
+        $col_list = implode( ', ', $columns );
+        $inserted = 0;
+
+        foreach ( array_chunk( $records, 500 ) as $batch ) {
+            $placeholders = [];
+            $values       = [];
+
+            foreach ( $batch as $index => $row ) {
+                if ( 0 === $inserted && 0 === $index ) {
+                    $record_keys = implode( ', ', array_keys( $row ) );
+                    $this->logger->log( "Claves del primer registro API (plan): {$record_keys}" );
+                }
+
+                $ph   = [ '%s', '%d', '%d' ];
+                $vals = [ $compania, $anio, $mes ];
+
+                foreach ( $field_map as $api_key => $db_col ) {
+                    $ph[]   = '%s';
+                    $vals[] = (string) ( $row[ $api_key ] ?? '' );
+                }
+
+                $placeholders[] = '(' . implode( ',', $ph ) . ')';
+                $values         = array_merge( $values, $vals );
+            }
+
+            $sql    = "INSERT INTO `{$table_name}` ({$col_list}) VALUES " . implode( ',', $placeholders );
+            $result = $wpdb->query( $wpdb->prepare( $sql, $values ) );
+            if ( false === $result ) {
+                $this->logger->log( "Error al insertar registros en {$table_name}: {$wpdb->last_error}" );
+                break;
+            }
+            $inserted += count( $batch );
+        }
+
+        delete_transient( "gn_sisman_pp_dependencias_{$compania}_{$anio}_{$mes}" );
+        $this->logger->log( "Insertados {$inserted} registros en {$table_name} (Año: {$anio}, Mes: {$mes})." );
+        return $inserted;
+    }
+
+    /**
+     * Insert records into ejecucion table.
      */
     public function insert_ejecucion_records( array $records, string $table_name, int $anio, int $mes, string $compania ): int {
         global $wpdb;
@@ -346,14 +408,13 @@ class Database {
         $field_map = $this->get_ejecucion_field_map();
         $inserted  = 0;
 
-        // Delete existing records for same year and company to avoid duplicates
-        $wpdb->delete( $table_name, [
-            'anio'     => $anio,
-            'compania' => $compania,
-        ], [ '%d', '%s' ] );
+        // Delete existing records for same year, month and company to avoid duplicates
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
+            $compania, $anio, $mes
+        ) );
 
         foreach ( $records as $index => $record ) {
-            // Log the first record's keys for debugging field mapping
             if ( 0 === $index ) {
                 $record_keys = implode( ', ', array_keys( $record ) );
                 $this->logger->log( "Claves del primer registro API (ejecucion): {$record_keys}" );
@@ -526,11 +587,11 @@ class Database {
             return 0;
         }
 
-        // Delete existing records for same year and company
-        $wpdb->delete( $table_name, [
-            'anio'     => $anio,
-            'compania' => $compania,
-        ], [ '%d', '%s' ] );
+        // Delete existing records for same year, month and company
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
+            $compania, $anio, $mes
+        ) );
 
         foreach ( $records as $index => $record ) {
             if ( 0 === $index ) {

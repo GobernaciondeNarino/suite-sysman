@@ -97,7 +97,7 @@ class Repository {
 
         $result = $wpdb->get_row( $wpdb->prepare(
             "SELECT apropiacioninicial, adicion, reduccion, credito, contracredito,
-                    aplazamiento, desplazaminento, apropiacionvigente, disponibilidades,
+                    aplazamiento, desplazamiento, apropiacionvigente, disponibilidades,
                     saldodisponible, compromisos, disponibilidadesabiertas, obligacion,
                     pagos, obligacionesporpagar
              FROM {$table}

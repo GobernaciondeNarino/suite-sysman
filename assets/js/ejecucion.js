@@ -144,7 +144,7 @@
             credito:                'Crédito',
             contracredito:          'Contracrédito',
             aplazamiento:           'Aplazamiento',
-            desplazaminento:        'Desplazamiento',
+            desplazamiento:         'Desplazamiento',
             apropiacionvigente:     'Aprob. Vigente',
             disponibilidades:       'Disponibilidades',
             saldodisponible:        'Saldo Disponible',

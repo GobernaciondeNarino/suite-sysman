@@ -172,32 +172,28 @@ class EjecucionModule {
         $anio     = absint( $_POST['anio'] ?? date( 'Y' ) );
         $mes      = absint( $_POST['mes'] ?? date( 'n' ) );
 
-        $results = [];
-        $client  = SysmanClient::instance();
+        $importer = \Sysman_Suite::instance()->importer;
+        $results  = [];
 
-        $plan_syncer = new PlanPresupuestalSyncer( $client );
-        $result = $plan_syncer->sync( $compania, $anio, $mes );
-        $results['plan'] = is_wp_error( $result )
-            ? [ 'error' => $result->get_error_message() ]
-            : $result;
+        $r = $importer->import_plan( $compania, $anio, $mes );
+        $results['plan'] = $r['success']
+            ? [ 'inserted' => $r['imported'] ]
+            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
 
-        $ejec_syncer = new EjecucionConsolidadaSyncer( $client );
-        $result = $ejec_syncer->sync( $compania, $anio, $mes );
-        $results['ejecucion'] = is_wp_error( $result )
-            ? [ 'error' => $result->get_error_message() ]
-            : $result;
+        $r = $importer->import_ejecucion( $compania, $anio, $mes );
+        $results['ejecucion'] = $r['success']
+            ? [ 'inserted' => $r['imported'] ]
+            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
 
-        $mov_syncer = new MovimientosSyncer( $client );
+        $r = $importer->import_auxiliar( $compania, $anio, $mes, 'DIS' );
+        $results['dis'] = $r['success']
+            ? [ 'inserted' => $r['imported'] ]
+            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
 
-        $result = $mov_syncer->sync( $compania, $anio, $mes, 'DIS' );
-        $results['dis'] = is_wp_error( $result )
-            ? [ 'error' => $result->get_error_message() ]
-            : $result;
-
-        $result = $mov_syncer->sync( $compania, $anio, $mes, 'RES' );
-        $results['res'] = is_wp_error( $result )
-            ? [ 'error' => $result->get_error_message() ]
-            : $result;
+        $r = $importer->import_auxiliar( $compania, $anio, $mes, 'RES' );
+        $results['res'] = $r['success']
+            ? [ 'inserted' => $r['imported'] ]
+            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
 
         update_option( 'gn_sisman_last_sync_ejecucion_module', current_time( 'mysql' ) );
 

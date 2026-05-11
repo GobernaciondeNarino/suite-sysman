@@ -162,35 +162,26 @@ class Importer {
     }
 
     /**
-     * Import Plan Presupuestal (numinforme=4) — delegates to PlanPresupuestalSyncer
-     * which uses the canonical Ejecución module schema and field mapping.
+     * Import Plan Presupuestal (numinforme=4).
      */
     public function import_plan( string $compania, int $anio, int $mes ): array {
         $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['plan'] . ' ---' );
 
-        $client = \SysmanSuite\Ejecucion\SysmanClient::instance();
-        $syncer = new \SysmanSuite\Ejecucion\PlanPresupuestalSyncer( $client );
-        $result = $syncer->sync( $compania, $anio, $mes );
+        $url    = $this->build_url( $compania, $anio, $mes, 4 );
+        $result = $this->fetch_api( $url );
 
-        if ( is_wp_error( $result ) ) {
-            $error = $result->get_error_message();
-            $this->logger->log( "ERROR al importar plan: {$error}", 'error' );
-            return [
-                'success'  => false,
-                'error'    => $error,
-                'imported' => 0,
-                'total'    => 0,
-                'report'   => 'plan',
-            ];
+        if ( ! $result['success'] ) {
+            return $result;
         }
 
-        $count = (int) ( $result['inserted'] ?? 0 );
-        $this->logger->log( "Resultado: {$count} registros importados en plan." );
+        $inserted = $this->database->insert_plan_records( $result['data'], $anio, $mes, $compania );
+
+        $this->logger->log( "Resultado: {$inserted}/" . count( $result['data'] ) . " registros importados en plan." );
 
         return [
             'success'  => true,
-            'imported' => $count,
-            'total'    => $count,
+            'imported' => $inserted,
+            'total'    => count( $result['data'] ),
             'report'   => 'plan',
         ];
     }

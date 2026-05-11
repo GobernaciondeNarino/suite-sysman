@@ -591,7 +591,7 @@
         isNumericColumn(col) {
             const numericCols = [
                 'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
-                'aplazamiento', 'desplazamiento', 'desplazaminento', 'apropiacionvigente', 'disponibilidades',
+                'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
                 'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
                 'pagos', 'obligacionesporpagar', 'valordebito', 'valorcredito', 'saldoporejecutaresp',
                 'debitoafectado', 'creditoafectado', 'modificaciondebito', 'modificacioncredito',
