@@ -35,8 +35,8 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 ### Base de Datos
 - 5 tablas optimizadas con indices compuestos
 - Migracion automatica con versionamiento (`gn_sisman_schema_version`)
-- `dbDelta` para actualizaciones idempotentes
-- Esquema alineado entre `class-database.php` y `Schema.php`
+- `CREATE TABLE IF NOT EXISTS` con migraciones idempotentes (sin dependencia de `dbDelta`)
+- Esquema centralizado en `Schema.php` como unica fuente de verdad
 
 ### Visualizacion
 - Visor de registros con filtros, busqueda y paginacion
@@ -221,6 +221,14 @@ sisman-suite/
 ```
 
 ## Changelog
+
+### 5.0.2
+- **Fix**: Vista principal del modulo Ejecucion desconfigurada — tabla con 8 columnas desbordaba el contenedor
+- Eliminado `table-layout: fixed` (clase `fixed`) que forzaba anchos rigidos incompatibles con el espacio disponible
+- Reducido de 8 a 7 columnas: Compania integrada como subtexto del titulo
+- Envuelto tabla en contenedor con `overflow-x: auto` para scroll horizontal en pantallas pequenas
+- Titulo del seguimiento ahora es enlace directo a la vista detallada
+- Ajuste de anchos de columnas para distribucion equilibrada
 
 ### 5.0.1
 - **HOTFIX**: Error fatal de `dbDelta()` indefinido en `Database::create_tables()` (faltaba `require_once upgrade.php` removido en v5.0.0)

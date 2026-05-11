@@ -36,7 +36,7 @@ $meses = [
     </div>
 
     <div class="sysman-card">
-        <div class="sysman-card-body">
+        <div class="sysman-card-body" style="padding:0;">
             <?php if ( empty( $posts ) ) : ?>
                 <div style="text-align:center;padding:3rem 1rem;color:#6b7280;">
                     <span class="dashicons dashicons-chart-line" style="font-size:48px;width:48px;height:48px;display:block;margin:0 auto 1rem;opacity:0.3;"></span>
@@ -47,17 +47,17 @@ $meses = [
                     </a>
                 </div>
             <?php else : ?>
-                <table class="wp-list-table widefat fixed striped">
+                <div style="overflow-x:auto;">
+                <table class="wp-list-table widefat striped" style="min-width:800px;">
                     <thead>
                         <tr>
-                            <th style="width:25%;"><?php esc_html_e( 'Título', 'sysman-suite' ); ?></th>
+                            <th><?php esc_html_e( 'Título', 'sysman-suite' ); ?></th>
                             <th><?php esc_html_e( 'Dependencia', 'sysman-suite' ); ?></th>
-                            <th style="width:120px;"><?php esc_html_e( 'Periodo', 'sysman-suite' ); ?></th>
-                            <th style="width:140px;"><?php esc_html_e( 'Vigencia', 'sysman-suite' ); ?></th>
-                            <th style="width:80px;"><?php esc_html_e( 'Compañía', 'sysman-suite' ); ?></th>
-                            <th style="width:220px;"><?php esc_html_e( 'Shortcode', 'sysman-suite' ); ?></th>
-                            <th style="width:160px;"><?php esc_html_e( 'Última Actualización', 'sysman-suite' ); ?></th>
-                            <th style="width:180px;"><?php esc_html_e( 'Acciones', 'sysman-suite' ); ?></th>
+                            <th style="width:130px;"><?php esc_html_e( 'Periodo', 'sysman-suite' ); ?></th>
+                            <th style="width:110px;"><?php esc_html_e( 'Vigencia', 'sysman-suite' ); ?></th>
+                            <th style="width:200px;"><?php esc_html_e( 'Shortcode', 'sysman-suite' ); ?></th>
+                            <th style="width:140px;"><?php esc_html_e( 'Actualización', 'sysman-suite' ); ?></th>
+                            <th style="width:120px;text-align:center;"><?php esc_html_e( 'Acciones', 'sysman-suite' ); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -70,16 +70,18 @@ $meses = [
                             $mes_name = $meses[ $mes ] ?? $mes;
                         ?>
                         <tr>
-                            <td><strong><?php echo esc_html( $p->post_title ); ?></strong></td>
+                            <td>
+                                <strong><a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion&action=view&id=' . $p->ID ) ); ?>" style="color:#1a5632;text-decoration:none;"><?php echo esc_html( $p->post_title ); ?></a></strong>
+                                <br><span style="font-size:12px;color:#6b7280;"><?php esc_html_e( 'Cía', 'sysman-suite' ); ?>: <?php echo esc_html( $comp ); ?></span>
+                            </td>
                             <td><?php echo esc_html( $dep ); ?></td>
                             <td><?php echo esc_html( $mes_name . ' ' . $anio ); ?></td>
                             <td><?php echo $vig ? esc_html( $vig ) : '<em style="color:#9ca3af;">Todas</em>'; ?></td>
-                            <td><?php echo esc_html( $comp ); ?></td>
                             <td>
-                                <code class="gn-shortcode-copy" title="<?php esc_attr_e( 'Clic para copiar', 'sysman-suite' ); ?>" style="cursor:pointer;padding:4px 8px;background:#f0f0f1;border-radius:3px;font-size:12px;user-select:all;">[gn_ejecucion id="<?php echo esc_attr( $p->ID ); ?>"]</code>
+                                <code class="gn-shortcode-copy" title="<?php esc_attr_e( 'Clic para copiar', 'sysman-suite' ); ?>" style="cursor:pointer;padding:3px 6px;background:#f0f0f1;border-radius:3px;font-size:11px;user-select:all;word-break:break-all;">[gn_ejecucion id="<?php echo esc_attr( $p->ID ); ?>"]</code>
                             </td>
-                            <td><?php echo esc_html( get_the_modified_date( 'd/m/Y H:i', $p ) ); ?></td>
-                            <td>
+                            <td style="font-size:12px;white-space:nowrap;"><?php echo esc_html( get_the_modified_date( 'd/m/Y H:i', $p ) ); ?></td>
+                            <td style="text-align:center;white-space:nowrap;">
                                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion&action=view&id=' . $p->ID ) ); ?>" class="button button-small" title="<?php esc_attr_e( 'Ver', 'sysman-suite' ); ?>">
                                     <span class="dashicons dashicons-visibility" style="vertical-align:middle;margin-top:-2px;"></span>
                                 </a>
@@ -94,6 +96,7 @@ $meses = [
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                </div>
             <?php endif; ?>
         </div>
     </div>
