@@ -121,13 +121,13 @@ class Repository {
         return $results;
     }
 
-    public function get_reservas( int $post_id, string $numero_dis ): array {
+    public function get_reservas( int $post_id, string $numero_dis, string $rubro = '' ): array {
         $meta = $this->get_post_meta( $post_id );
         if ( ! $meta ) {
             return [];
         }
 
-        $cache_key = 'gn_sisman_ejec_res_' . md5( $post_id . $numero_dis );
+        $cache_key = 'gn_sisman_ejec_res_' . md5( $post_id . $numero_dis . $rubro );
         $cached = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
@@ -136,13 +136,19 @@ class Repository {
         global $wpdb;
         $table = $wpdb->prefix . 'sysman_auxiliar_cuentas';
 
-        $results = $wpdb->get_results( $wpdb->prepare(
-            "SELECT numero, nombretercero, descripcion, nrodocumento, valordebito, saldoporejecutaresp, fecha
-             FROM {$table}
-             WHERE compania = %s AND anio = %d AND mes = %d AND tipocpte = 'RES' AND cmpteafectado = %s
-             ORDER BY fecha, numero",
-            $meta['compania'], $meta['anio'], $meta['mes'], $numero_dis
-        ), ARRAY_A );
+        $sql = "SELECT numero, nombretercero, descripcion, nrodocumento, valordebito, saldoporejecutaresp, fecha
+                FROM {$table}
+                WHERE compania = %s AND anio = %d AND mes = %d AND tipocpte = 'RES' AND cmpteafectado = %s";
+        $params = [ $meta['compania'], $meta['anio'], $meta['mes'], $numero_dis ];
+
+        if ( '' !== $rubro ) {
+            $sql .= " AND rubro = %s";
+            $params[] = $rubro;
+        }
+
+        $sql .= " ORDER BY fecha, numero";
+
+        $results = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
 
         set_transient( $cache_key, $results, 5 * MINUTE_IN_SECONDS );
         return $results;

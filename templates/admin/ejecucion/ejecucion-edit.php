@@ -225,7 +225,7 @@ jQuery(function($) {
                 html += '<li>Plan Presupuestal: ' + (d.plan.inserted || 0) + ' registros</li>';
                 html += '<li>Ejecución Gastos: ' + (d.ejecucion.inserted || 0) + ' registros</li>';
                 html += '<li>Disponibilidades (DIS): ' + (d.dis.inserted || 0) + ' registros</li>';
-                html += '<li>Reservas (RES): ' + (d.res.inserted || 0) + ' registros</li>';
+                html += '<li>Registros de Compromiso (RES): ' + (d.res.inserted || 0) + ' registros</li>';
                 html += '</ul></div>';
                 $res.html(html);
                 loadDependencias();

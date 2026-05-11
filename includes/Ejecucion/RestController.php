@@ -65,6 +65,7 @@ class RestController {
             'args' => [
                 'post_id'    => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'numero_dis' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+                'rubro'      => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
             ],
         ] );
 
@@ -112,7 +113,8 @@ class RestController {
     public function get_res( \WP_REST_Request $request ): \WP_REST_Response {
         $post_id    = (int) $request->get_param( 'post_id' );
         $numero_dis = $request->get_param( 'numero_dis' );
-        return new \WP_REST_Response( $this->repo->get_reservas( $post_id, $numero_dis ) );
+        $rubro      = $request->get_param( 'rubro' );
+        return new \WP_REST_Response( $this->repo->get_reservas( $post_id, $numero_dis, $rubro ) );
     }
 
     public function get_proyecto( \WP_REST_Request $request ): \WP_REST_Response {

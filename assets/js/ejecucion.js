@@ -68,7 +68,7 @@
                 html += renderProyecto(results[2], codigobpin);
             }
             html += renderConsolidado(results[0]);
-            html += renderDisList(results[1]);
+            html += renderDisList(results[1], codigo);
             body.innerHTML = html;
             li.dataset.loaded = '1';
         }).catch(function() {
@@ -83,15 +83,16 @@
         body.hidden = expanded;
         if (expanded || li.dataset.loaded) return;
 
-        body.innerHTML = '<p class="gn-ejec__loading">Cargando reservas...</p>';
+        body.innerHTML = '<p class="gn-ejec__loading">Cargando registros de compromiso...</p>';
         var numeroDis = li.dataset.numero;
+        var rubro = li.dataset.rubro || '';
 
-        api('/ejecucion/' + postId + '/res', { numero_dis: numeroDis })
+        api('/ejecucion/' + postId + '/res', { numero_dis: numeroDis, rubro: rubro })
             .then(function(data) {
                 body.innerHTML = renderResList(data);
                 li.dataset.loaded = '1';
             }).catch(function() {
-                body.innerHTML = '<p class="gn-ejec__error">Error al cargar reservas.</p>';
+                body.innerHTML = '<p class="gn-ejec__error">Error al cargar registros de compromiso.</p>';
             });
     }
 
@@ -153,7 +154,7 @@
         return html;
     }
 
-    function renderDisList(data) {
+    function renderDisList(data, rubroCodigo) {
         if (!data || data.length === 0) {
             return '<p class="gn-ejec__no-data">Sin disponibilidades para este rubro.</p>';
         }
@@ -164,7 +165,7 @@
         data.forEach(function(dis) {
             var valor = COP.format(parseFloat(dis.valordebito) || 0);
             var saldo = COP.format(parseFloat(dis.saldoporejecutaresp) || 0);
-            html += '<li class="gn-ejec__dis" data-numero="' + esc(dis.numero) + '" aria-expanded="false">';
+            html += '<li class="gn-ejec__dis" data-numero="' + esc(dis.numero) + '" data-rubro="' + esc(rubroCodigo) + '" aria-expanded="false">';
             html += '<button type="button" class="gn-ejec__dis-toggle">';
             html += '<span class="gn-ejec__dis-arrow">&#9654;</span>';
             html += '<span class="gn-ejec__dis-numero">DIS ' + esc(dis.numero) + '</span>';
@@ -183,10 +184,10 @@
 
     function renderResList(data) {
         if (!data || data.length === 0) {
-            return '<p class="gn-ejec__no-data">Sin reservas asociadas a esta disponibilidad.</p>';
+            return '<p class="gn-ejec__no-data">Sin registros de compromiso asociados a esta disponibilidad.</p>';
         }
 
-        var html = '<h5 class="gn-ejec__subtitle gn-ejec__subtitle--res">Reservas (RES) &mdash; ' + data.length + ' registros</h5>';
+        var html = '<h5 class="gn-ejec__subtitle gn-ejec__subtitle--res">Registros de Compromiso (RES) &mdash; ' + data.length + ' registros</h5>';
         html += '<div class="gn-ejec__table-wrap"><table class="gn-ejec__table gn-ejec__table--res">';
         html += '<thead><tr><th>RES #</th><th>Tercero</th><th>Descripción</th><th>Doc.</th><th>Valor</th><th>Saldo Ejecutar</th><th>Fecha</th></tr></thead>';
         html += '<tbody>';
