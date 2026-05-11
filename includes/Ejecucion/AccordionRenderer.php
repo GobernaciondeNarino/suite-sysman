@@ -45,7 +45,7 @@ class AccordionRenderer {
                 </div>
                 <ul class="gn-ejec__rubros">
                     <?php foreach ( $rubros as $rubro ) : ?>
-                    <li class="gn-ejec__rubro" data-codigo="<?php echo esc_attr( $rubro['codigo'] ); ?>" aria-expanded="false">
+                    <li class="gn-ejec__rubro" data-codigo="<?php echo esc_attr( $rubro['codigo'] ); ?>" data-codigobpin="<?php echo esc_attr( $rubro['codigobpin'] ?? '' ); ?>" aria-expanded="false">
                         <button type="button" class="gn-ejec__rubro-toggle">
                             <span class="gn-ejec__rubro-arrow">&#9654;</span>
                             <span class="codigo"><?php echo esc_html( $rubro['codigo'] ); ?></span>

@@ -1,24 +1,31 @@
 (function(){
     'use strict';
 
-    const root = document.querySelector('.gn-ejec');
+    var root = document.querySelector('.gn-ejec');
     if (!root) return;
 
-    const postId = root.dataset.postId;
-    const nonce  = (typeof wpApiSettings !== 'undefined') ? wpApiSettings.nonce : '';
-    const restBase = (typeof wpApiSettings !== 'undefined') ? wpApiSettings.root : '/wp-json/';
+    var postId = root.dataset.postId;
+    var nonce  = (typeof wpApiSettings !== 'undefined') ? wpApiSettings.nonce : '';
+    var restBase = (typeof wpApiSettings !== 'undefined' && wpApiSettings.root)
+        ? wpApiSettings.root
+        : (typeof gnEjecFront !== 'undefined' ? gnEjecFront.restUrl : '/wp-json/');
 
-    const COP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+    var COP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
 
     function api(path, params) {
-        const url = new URL(restBase + 'gn-sisman/v1' + path, window.location.origin);
+        var url = new URL(restBase + 'gn-sisman/v1' + path, window.location.origin);
         if (params) {
             Object.entries(params).forEach(function(entry) {
                 url.searchParams.set(entry[0], entry[1]);
             });
         }
-        return fetch(url, { headers: { 'X-WP-Nonce': nonce }, credentials: 'same-origin' })
-            .then(function(r) { return r.json(); });
+        var headers = {};
+        if (nonce) { headers['X-WP-Nonce'] = nonce; }
+        return fetch(url, { headers: headers, credentials: 'same-origin' })
+            .then(function(r) {
+                if (!r.ok) throw new Error(r.status);
+                return r.json();
+            });
     }
 
     root.addEventListener('click', function(e) {
@@ -44,12 +51,25 @@
 
         body.innerHTML = '<p class="gn-ejec__loading">Cargando ejecución...</p>';
         var codigo = li.dataset.codigo;
+        var codigobpin = li.dataset.codigobpin || '';
 
-        Promise.all([
+        var calls = [
             api('/ejecucion/' + postId + '/consolidado', { codigo: codigo }),
             api('/ejecucion/' + postId + '/dis', { codigocuenta: codigo })
-        ]).then(function(results) {
-            body.innerHTML = renderConsolidado(results[0]) + renderDisList(results[1]);
+        ];
+
+        if (codigobpin) {
+            calls.push(api('/ejecucion/' + postId + '/proyecto', { codigobpin: codigobpin }));
+        }
+
+        Promise.all(calls).then(function(results) {
+            var html = '';
+            if (results[2]) {
+                html += renderProyecto(results[2], codigobpin);
+            }
+            html += renderConsolidado(results[0]);
+            html += renderDisList(results[1]);
+            body.innerHTML = html;
             li.dataset.loaded = '1';
         }).catch(function() {
             body.innerHTML = '<p class="gn-ejec__error">Error al cargar datos.</p>';
@@ -73,6 +93,25 @@
             }).catch(function() {
                 body.innerHTML = '<p class="gn-ejec__error">Error al cargar reservas.</p>';
             });
+    }
+
+    function renderProyecto(data, bpin) {
+        if (!data || !data.nombre_proyecto) {
+            return '';
+        }
+
+        var html = '<div class="gn-ejec__proyecto">';
+        html += '<h4 class="gn-ejec__subtitle gn-ejec__subtitle--proyecto">Proyecto BPIN ' + esc(bpin) + '</h4>';
+        html += '<div class="gn-ejec__proyecto-body">';
+        html += '<div class="gn-ejec__proyecto-field"><strong>Nombre del Proyecto:</strong> ' + esc(data.nombre_proyecto) + '</div>';
+        if (data.metas) {
+            html += '<div class="gn-ejec__proyecto-field"><strong>Metas:</strong> ' + esc(data.metas) + '</div>';
+        }
+        if (data.odss) {
+            html += '<div class="gn-ejec__proyecto-field"><strong>ODS:</strong> ' + esc(data.odss) + '</div>';
+        }
+        html += '</div></div>';
+        return html;
     }
 
     function renderConsolidado(data) {

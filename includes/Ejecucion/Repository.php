@@ -148,6 +148,29 @@ class Repository {
         return $results;
     }
 
+    public function get_proyecto_bpin( string $codigobpin ): ?array {
+        if ( empty( $codigobpin ) ) {
+            return null;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'bpid_suite_contratos';
+
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) !== $table ) {
+            return null;
+        }
+
+        $result = $wpdb->get_row( $wpdb->prepare(
+            "SELECT nombre_proyecto, metas, odss
+             FROM {$table}
+             WHERE numero_proyecto = %s
+             LIMIT 1",
+            $codigobpin
+        ), ARRAY_A );
+
+        return $result ?: null;
+    }
+
     private function get_post_meta( int $post_id ): ?array {
         $post = get_post( $post_id );
         if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {

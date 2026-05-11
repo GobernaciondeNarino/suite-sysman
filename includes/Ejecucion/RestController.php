@@ -21,7 +21,7 @@ class RestController {
         register_rest_route( $ns, '/dependencias', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_dependencias' ],
-            'permission_callback' => [ $this, 'check_permission' ],
+            'permission_callback' => [ $this, 'check_admin' ],
             'args' => [
                 'anio' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'mes'  => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
@@ -32,7 +32,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/rubros', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_rubros' ],
-            'permission_callback' => [ $this, 'check_permission' ],
+            'permission_callback' => '__return_true',
             'args' => [
                 'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
             ],
@@ -41,7 +41,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/consolidado', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_consolidado' ],
-            'permission_callback' => [ $this, 'check_permission' ],
+            'permission_callback' => '__return_true',
             'args' => [
                 'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'codigo'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -51,7 +51,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/dis', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_dis' ],
-            'permission_callback' => [ $this, 'check_permission' ],
+            'permission_callback' => '__return_true',
             'args' => [
                 'post_id'      => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'codigocuenta' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -61,15 +61,25 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/res', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_res' ],
-            'permission_callback' => [ $this, 'check_permission' ],
+            'permission_callback' => '__return_true',
             'args' => [
                 'post_id'    => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'numero_dis' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
             ],
         ] );
+
+        register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/proyecto', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_proyecto' ],
+            'permission_callback' => '__return_true',
+            'args' => [
+                'post_id'    => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
+                'codigobpin' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+            ],
+        ] );
     }
 
-    public function check_permission(): bool {
+    public function check_admin(): bool {
         return current_user_can( 'edit_posts' );
     }
 
@@ -103,5 +113,10 @@ class RestController {
         $post_id    = (int) $request->get_param( 'post_id' );
         $numero_dis = $request->get_param( 'numero_dis' );
         return new \WP_REST_Response( $this->repo->get_reservas( $post_id, $numero_dis ) );
+    }
+
+    public function get_proyecto( \WP_REST_Request $request ): \WP_REST_Response {
+        $codigobpin = $request->get_param( 'codigobpin' );
+        return new \WP_REST_Response( $this->repo->get_proyecto_bpin( $codigobpin ) );
     }
 }
