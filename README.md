@@ -222,6 +222,14 @@ sisman-suite/
 
 ## Changelog
 
+### 5.0.3
+- **Fix critico**: Modulo de graficos no renderizaba — `ReferenceError: d3plus is not defined`
+- Causa raiz: el CDN `https://d3plus.org/js/d3plus.v2.0.full.min.js` ahora devuelve **HTTP 404** (d3plus.org removio la ruta)
+- Nuevo CDN por defecto: `https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js` (jsDelivr, verificado funcional)
+- Actualizados los 3 puntos donde se carga d3plus: `Sysman_Suite::enqueue_admin_assets()`, `Visualizer::enqueue_frontend_assets()`, y `register_setting()` default
+- Nueva migracion automatica `Sysman_Suite::migrate_options()`: si la opcion almacenada `sysman_d3plus_cdn_url` apunta a la URL rota de d3plus.org, se reemplaza automaticamente al jsDelivr CDN al cargar el admin
+- Tambien actualizado el placeholder del campo D3Plus CDN en la pagina de Configuracion
+
 ### 5.0.2
 - **Fix**: Vista principal del modulo Ejecucion desconfigurada — tabla con 8 columnas desbordaba el contenedor
 - Eliminado `table-layout: fixed` (clase `fixed`) que forzaba anchos rigidos incompatibles con el espacio disponible

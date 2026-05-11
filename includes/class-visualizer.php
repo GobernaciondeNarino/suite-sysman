@@ -630,7 +630,7 @@ class Visualizer {
 
         // D3.js and D3plus (URLs from settings)
         $d3_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
-        $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://d3plus.org/js/d3plus.v2.0.full.min.js' );
+        $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
         wp_enqueue_script( 'd3-v5', $d3_url, [], '5.16.0', true );
         wp_enqueue_script( 'd3plus', $d3plus_url, [ 'd3-v5' ], '2.0.0', true );
 

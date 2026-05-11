@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $api_base_url   = get_option( 'sysman_api_base_url', 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar' );
 $github_repo    = get_option( 'sysman_github_repo', 'GobernaciondeNarino/sysman-suite' );
 $d3_cdn_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
-$d3plus_cdn_url = get_option( 'sysman_d3plus_cdn_url', 'https://d3plus.org/js/d3plus.v2.0.full.min.js' );
+$d3plus_cdn_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
 $compania       = get_option( 'sysman_api_compania', '001' );
 $anio           = get_option( 'sysman_api_anio', (int) date( 'Y' ) );
 $mes            = get_option( 'sysman_api_mes', (int) date( 'n' ) );
@@ -176,7 +176,7 @@ $frequency      = get_option( 'sysman_import_frequency', 'daily' );
                         <td>
                             <input type="url" id="sysman_d3plus_cdn_url" name="sysman_d3plus_cdn_url"
                                    value="<?php echo esc_attr( $d3plus_cdn_url ); ?>"
-                                   class="large-text" placeholder="https://d3plus.org/js/d3plus.v2.0.full.min.js">
+                                   class="large-text" placeholder="https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js">
                             <p class="description">
                                 <?php esc_html_e( 'URL de la librería D3Plus v2. Extiende D3 con gráficos avanzados (barras, tortas, treemaps, etc).', 'sysman-suite' ); ?>
                             </p>
