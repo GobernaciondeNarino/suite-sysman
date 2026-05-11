@@ -18,102 +18,35 @@ class Database {
 
     /**
      * Create the plugin database tables.
+     * Uses Schema class as single source of truth for all DDL.
      */
     public function create_tables(): void {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
+        $prefix  = $wpdb->prefix;
 
-        // Table 1: Ejecución Presupuestal de Gastos (numinforme=1)
-        $table_ejecucion = $wpdb->prefix . 'sysman_ejecucion_gastos';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_ejecucion ) ) !== $table_ejecucion ) {
-            $wpdb->query( \SysmanSuite\Ejecucion\Schema::ejecucion_gastos_sql( $wpdb->prefix, $charset ) );
+        $tables = [
+            'sysman_ejecucion_gastos'  => \SysmanSuite\Ejecucion\Schema::ejecucion_gastos_sql( $prefix, $charset ),
+            'sysman_auxiliar_cuentas'  => \SysmanSuite\Ejecucion\Schema::auxiliar_cuentas_sql( $prefix, $charset ),
+            'sysman_plan_presupuestal' => \SysmanSuite\Ejecucion\Schema::plan_presupuestal_sql( $prefix, $charset ),
+            'sysman_personal_nomina'   => \SysmanSuite\Ejecucion\Schema::personal_nomina_sql( $prefix, $charset ),
+            'sysman_ejecucion_ingresos' => \SysmanSuite\Ejecucion\Schema::ejecucion_ingresos_sql( $prefix, $charset ),
+        ];
+
+        foreach ( $tables as $name => $sql ) {
+            $full_name = $prefix . $name;
+            if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $full_name ) ) !== $full_name ) {
+                $wpdb->query( $sql );
+                if ( $wpdb->last_error ) {
+                    $this->logger->log( "Error al crear tabla {$full_name}: {$wpdb->last_error}", 'error' );
+                }
+            }
         }
 
-        // Table 2: Auxiliar Presupuestal por Cuentas (numinforme=2)
-        $table_auxiliar = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_auxiliar ) ) !== $table_auxiliar ) {
-            $wpdb->query( \SysmanSuite\Ejecucion\Schema::auxiliar_cuentas_sql( $wpdb->prefix, $charset ) );
-        }
+        // Run column-rename migrations for tables that may have stale column names from older versions.
+        \SysmanSuite\Ejecucion\Schema::run();
 
-        // Table 3: Plan Presupuestal (numinforme=4)
-        $table_plan = $wpdb->prefix . 'sysman_plan_presupuestal';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_plan ) ) !== $table_plan ) {
-            $wpdb->query( \SysmanSuite\Ejecucion\Schema::plan_presupuestal_sql( $wpdb->prefix, $charset ) );
-        }
-
-        // Table 4: Personal Activo de Nómina (numinforme=5)
-        $table_personal = $wpdb->prefix . 'sysman_personal_nomina';
-        $sql_personal = "CREATE TABLE {$table_personal} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            anio INT NOT NULL DEFAULT 0,
-            compania VARCHAR(10) NOT NULL DEFAULT '001',
-            iddeempleado VARCHAR(20) NOT NULL DEFAULT '',
-            apellido1 VARCHAR(200) NOT NULL DEFAULT '',
-            apellido2 VARCHAR(200) NOT NULL DEFAULT '',
-            nombres VARCHAR(200) NOT NULL DEFAULT '',
-            numerodcto VARCHAR(30) NOT NULL DEFAULT '',
-            expedida VARCHAR(50) NOT NULL DEFAULT '',
-            fechancto VARCHAR(20) NOT NULL DEFAULT '',
-            fechadeingreso VARCHAR(20) NOT NULL DEFAULT '',
-            fechaderetiro VARCHAR(20) NOT NULL DEFAULT '',
-            iddecargo VARCHAR(20) NOT NULL DEFAULT '',
-            nombredelcargo VARCHAR(300) NOT NULL DEFAULT '',
-            iddecategoria VARCHAR(20) NOT NULL DEFAULT '',
-            nombrecategoria VARCHAR(200) NOT NULL DEFAULT '',
-            escalafon VARCHAR(10) NOT NULL DEFAULT '',
-            nombreescalafon VARCHAR(100) NOT NULL DEFAULT '',
-            grado VARCHAR(10) NOT NULL DEFAULT '',
-            decarrera VARCHAR(10) NOT NULL DEFAULT '',
-            salariobaseibc DECIMAL(20,2) NOT NULL DEFAULT 0,
-            dependencianombre VARCHAR(500) NOT NULL DEFAULT '',
-            emailcorporativo VARCHAR(200) NOT NULL DEFAULT '',
-            emailpersonal VARCHAR(200) NOT NULL DEFAULT '',
-            direccion VARCHAR(500) NOT NULL DEFAULT '',
-            telefonos VARCHAR(200) NOT NULL DEFAULT '',
-            fechacumplimientobonificacion VARCHAR(20) NOT NULL DEFAULT '',
-            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_anio (anio),
-            KEY idx_compania (compania),
-            KEY idx_numerodcto (numerodcto),
-            KEY idx_nombredelcargo (nombredelcargo(100)),
-            KEY idx_dependencia (dependencianombre(100))
-        ) {$charset};";
-
-        dbDelta( $sql_personal );
-
-        // Table 5: Ejecución de Ingresos (numinforme=6)
-        $table_ingresos = $wpdb->prefix . 'sysman_ejecucion_ingresos';
-        $sql_ingresos = "CREATE TABLE {$table_ingresos} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            anio INT NOT NULL DEFAULT 0,
-            mes INT NOT NULL DEFAULT 0,
-            compania VARCHAR(10) NOT NULL DEFAULT '001',
-            cuenta VARCHAR(50) NOT NULL DEFAULT '',
-            codigo VARCHAR(50) NOT NULL DEFAULT '',
-            nombre VARCHAR(500) NOT NULL DEFAULT '',
-            movimiento VARCHAR(10) NOT NULL DEFAULT '',
-            tiporecurso VARCHAR(100) NOT NULL DEFAULT '',
-            fuenterecurso VARCHAR(100) NOT NULL DEFAULT '',
-            apropiado DECIMAL(20,2) NOT NULL DEFAULT 0,
-            modificaciones DECIMAL(20,2) NOT NULL DEFAULT 0,
-            totalpresupuesto DECIMAL(20,2) NOT NULL DEFAULT 0,
-            recaudosanteriores DECIMAL(20,2) NOT NULL DEFAULT 0,
-            recaudosmes DECIMAL(20,2) NOT NULL DEFAULT 0,
-            recaudosacumulados DECIMAL(20,2) NOT NULL DEFAULT 0,
-            porrecaudar DECIMAL(20,2) NOT NULL DEFAULT 0,
-            porcrecaudado DECIMAL(10,2) NOT NULL DEFAULT 0,
-            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_anio_mes (anio, mes),
-            KEY idx_compania (compania),
-            KEY idx_cuenta (cuenta),
-            KEY idx_codigo (codigo)
-        ) {$charset};";
-
-        dbDelta( $sql_ingresos );
-
-        $this->logger->log( 'Tablas de base de datos creadas/actualizadas correctamente.' );
+        $this->logger->log( 'Tablas de base de datos verificadas correctamente.' );
     }
 
     /**
@@ -390,6 +323,18 @@ class Database {
     }
 
     /**
+     * Filter a data array to only include keys that match actual columns in the table.
+     * Defensive measure against schema mismatches.
+     */
+    private function filter_to_existing_columns( string $table_name, array $data ): array {
+        $existing = $this->get_table_columns( $table_name );
+        if ( empty( $existing ) ) {
+            return $data;
+        }
+        return array_intersect_key( $data, array_flip( $existing ) );
+    }
+
+    /**
      * Insert records into ejecucion table.
      */
     public function insert_ejecucion_records( array $records, string $table_name, int $anio, int $mes, string $compania ): int {
@@ -407,6 +352,7 @@ class Database {
 
         $field_map = $this->get_ejecucion_field_map();
         $inserted  = 0;
+        $errors    = 0;
 
         // Delete existing records for same year, month and company to avoid duplicates
         $wpdb->query( $wpdb->prepare(
@@ -429,7 +375,6 @@ class Database {
             foreach ( $field_map as $api_field => $db_column ) {
                 if ( isset( $record[ $api_field ] ) ) {
                     $value = $record[ $api_field ];
-                    // Convert numeric strings
                     if ( in_array( $db_column, [
                         'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
                         'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
@@ -443,15 +388,19 @@ class Database {
                 }
             }
 
+            $data   = $this->filter_to_existing_columns( $table_name, $data );
             $result = $wpdb->insert( $table_name, $data );
             if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
-                break;
+                $errors++;
+                if ( $errors <= 3 ) {
+                    $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
+                }
+                continue;
             }
             $inserted++;
         }
 
-        $this->logger->log( "Insertados {$inserted} registros en {$table_name} (Año: {$anio}, Mes: {$mes})." );
+        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros en {$table_name} (Año: {$anio}, Mes: {$mes}, Errores: {$errors})." );
         return $inserted;
     }
 
@@ -503,15 +452,16 @@ class Database {
                 }
             }
 
+            $data   = $this->filter_to_existing_columns( $table_name, $data );
             $result = $wpdb->insert( $table_name, $data );
             if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
-                break;
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
+                continue;
             }
             $inserted++;
         }
 
-        $this->logger->log( "Insertados {$inserted} registros auxiliares (Año: {$anio}, Mes: {$mes}, Tipo: {$tipo_cpte})." );
+        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros auxiliares (Año: {$anio}, Mes: {$mes}, Tipo: {$tipo_cpte})." );
         return $inserted;
     }
 
@@ -559,15 +509,16 @@ class Database {
                 }
             }
 
+            $data   = $this->filter_to_existing_columns( $table_name, $data );
             $result = $wpdb->insert( $table_name, $data );
             if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
-                break;
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
+                continue;
             }
             $inserted++;
         }
 
-        $this->logger->log( "Insertados {$inserted} registros de personal (Año: {$anio}, Compañía: {$compania})." );
+        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros de personal (Año: {$anio}, Compañía: {$compania})." );
         return $inserted;
     }
 
@@ -616,15 +567,16 @@ class Database {
                 }
             }
 
+            $data   = $this->filter_to_existing_columns( $table_name, $data );
             $result = $wpdb->insert( $table_name, $data );
             if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}" );
-                break;
+                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
+                continue;
             }
             $inserted++;
         }
 
-        $this->logger->log( "Insertados {$inserted} registros de ingresos (Año: {$anio}, Mes: {$mes})." );
+        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros de ingresos (Año: {$anio}, Mes: {$mes})." );
         return $inserted;
     }
 

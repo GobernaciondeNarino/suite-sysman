@@ -222,6 +222,16 @@ sisman-suite/
 
 ## Changelog
 
+### 5.0.1
+- **HOTFIX**: Error fatal de `dbDelta()` indefinido en `Database::create_tables()` (faltaba `require_once upgrade.php` removido en v5.0.0)
+- Refactor: Toda la DDL ahora vive en `Schema.php` como unica fuente de verdad — eliminada dependencia de `dbDelta()`
+- Nuevos metodos `Schema::personal_nomina_sql()` y `Schema::ejecucion_ingresos_sql()`
+- INSERTs defensivos: `filter_to_existing_columns()` filtra automaticamente claves de datos que no existen como columnas en la tabla (resiliencia ante migraciones incompletas)
+- Manejo de errores: los INSERTs ya no abortan con `break` al primer error — usan `continue` para procesar todos los registros y reportar errores
+- Refactor de `migrate_column_names()`: ahora idempotente y robusto contra null/empty
+- Compatibilidad: `codigocuenta` ampliado a VARCHAR(255), `nombrerubro` a TEXT, `bpid` a VARCHAR(64) — coincide con esquema anterior, evita truncamiento
+- Schema bump a 5.0.1 para forzar re-migracion en instalaciones donde v5.0.0 fallo a medias
+
 ### 5.0.0
 - **Arquitectura unificada**: toda importacion de datos externos pasa exclusivamente por el modulo Importer
 - Eliminacion de sincronizadores duplicados (`SysmanClient`, `PlanPresupuestalSyncer`, `EjecucionConsolidadaSyncer`, `MovimientosSyncer`)

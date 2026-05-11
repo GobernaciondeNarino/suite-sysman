@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Schema {
 
-    const VERSION = '5.0.0';
+    const VERSION = '5.0.1';
 
     public static function run(): void {
         $current = get_option( 'gn_sisman_schema_version', '0' );
@@ -44,51 +44,56 @@ class Schema {
         );
     }
 
-    private static function migrate_column_names( $wpdb ): void {
-        $table_eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_eg ) ) === $table_eg ) {
-            $columns = $wpdb->get_col( "DESCRIBE `{$table_eg}`", 0 );
+    private static function get_columns( $wpdb, string $table ): array {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) !== $table ) {
+            return [];
+        }
+        $cols = $wpdb->get_col( "DESCRIBE `{$table}`", 0 );
+        return is_array( $cols ) ? $cols : [];
+    }
 
+    private static function migrate_column_names( $wpdb ): void {
+        // --- ejecucion_gastos: fix desplazaminento typo + synced_at → fecha_importacion
+        $table_eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
+        $columns  = self::get_columns( $wpdb, $table_eg );
+
+        if ( ! empty( $columns ) ) {
             // Fix: desplazaminento (typo) → desplazamiento
-            if ( in_array( 'desplazaminento', $columns, true ) && ! in_array( 'desplazamiento', $columns, true ) ) {
+            $has_typo    = in_array( 'desplazaminento', $columns, true );
+            $has_correct = in_array( 'desplazamiento', $columns, true );
+
+            if ( $has_typo && ! $has_correct ) {
                 $wpdb->query( "ALTER TABLE `{$table_eg}` CHANGE `desplazaminento` `desplazamiento` DECIMAL(20,2) NOT NULL DEFAULT 0" );
-            } elseif ( in_array( 'desplazaminento', $columns, true ) && in_array( 'desplazamiento', $columns, true ) ) {
-                // Both columns exist (dbDelta may have added the corrected one) — merge data
+            } elseif ( $has_typo && $has_correct ) {
                 $wpdb->query( "UPDATE `{$table_eg}` SET `desplazamiento` = `desplazaminento` WHERE `desplazamiento` = 0 AND `desplazaminento` != 0" );
                 $wpdb->query( "ALTER TABLE `{$table_eg}` DROP COLUMN `desplazaminento`" );
             }
 
-            // Refresh column list after potential changes
-            $columns = $wpdb->get_col( "DESCRIBE `{$table_eg}`", 0 );
-
-            // Fix: synced_at → fecha_importacion
-            if ( in_array( 'synced_at', $columns, true ) && ! in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_eg}` CHANGE `synced_at` `fecha_importacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP" );
-            } elseif ( in_array( 'synced_at', $columns, true ) && in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_eg}` DROP COLUMN `synced_at`" );
-            }
+            // Refresh columns and handle timestamp column
+            $columns = self::get_columns( $wpdb, $table_eg );
+            self::migrate_timestamp_column( $wpdb, $table_eg, $columns );
         }
 
-        // Fix synced_at → fecha_importacion in auxiliar_cuentas
+        // --- auxiliar_cuentas: synced_at → fecha_importacion
         $table_ac = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_ac ) ) === $table_ac ) {
-            $columns = $wpdb->get_col( "DESCRIBE `{$table_ac}`", 0 );
-            if ( in_array( 'synced_at', $columns, true ) && ! in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_ac}` CHANGE `synced_at` `fecha_importacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP" );
-            } elseif ( in_array( 'synced_at', $columns, true ) && in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_ac}` DROP COLUMN `synced_at`" );
-            }
-        }
+        self::migrate_timestamp_column( $wpdb, $table_ac, self::get_columns( $wpdb, $table_ac ) );
 
-        // Fix synced_at → fecha_importacion in plan_presupuestal
+        // --- plan_presupuestal: synced_at → fecha_importacion
         $table_pp = $wpdb->prefix . 'sysman_plan_presupuestal';
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_pp ) ) === $table_pp ) {
-            $columns = $wpdb->get_col( "DESCRIBE `{$table_pp}`", 0 );
-            if ( in_array( 'synced_at', $columns, true ) && ! in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_pp}` CHANGE `synced_at` `fecha_importacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP" );
-            } elseif ( in_array( 'synced_at', $columns, true ) && in_array( 'fecha_importacion', $columns, true ) ) {
-                $wpdb->query( "ALTER TABLE `{$table_pp}` DROP COLUMN `synced_at`" );
-            }
+        self::migrate_timestamp_column( $wpdb, $table_pp, self::get_columns( $wpdb, $table_pp ) );
+    }
+
+    private static function migrate_timestamp_column( $wpdb, string $table, array $columns ): void {
+        if ( empty( $columns ) ) {
+            return;
+        }
+        $has_old = in_array( 'synced_at', $columns, true );
+        $has_new = in_array( 'fecha_importacion', $columns, true );
+
+        if ( $has_old && ! $has_new ) {
+            $wpdb->query( "ALTER TABLE `{$table}` CHANGE `synced_at` `fecha_importacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP" );
+        } elseif ( $has_old && $has_new ) {
+            $wpdb->query( "ALTER TABLE `{$table}` DROP COLUMN `synced_at`" );
         }
     }
 
@@ -184,11 +189,11 @@ class Schema {
             compania VARCHAR(10) NOT NULL DEFAULT '001',
             anio INT NOT NULL DEFAULT 0,
             mes INT NOT NULL DEFAULT 0,
-            codigocuenta VARCHAR(50) NOT NULL DEFAULT '',
-            nombrerubro VARCHAR(500) NOT NULL DEFAULT '',
+            codigocuenta VARCHAR(255) NOT NULL DEFAULT '',
+            nombrerubro TEXT,
             movimiento VARCHAR(10) NOT NULL DEFAULT '',
             destino VARCHAR(100) NOT NULL DEFAULT '',
-            bpid VARCHAR(50) NOT NULL DEFAULT '0',
+            bpid VARCHAR(64) NOT NULL DEFAULT '0',
             apropiacioninicial DECIMAL(20,2) NOT NULL DEFAULT 0,
             adicion DECIMAL(20,2) NOT NULL DEFAULT 0,
             reduccion DECIMAL(20,2) NOT NULL DEFAULT 0,
@@ -207,10 +212,80 @@ class Schema {
             fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY idx_anio_mes (anio, mes),
-            KEY idx_codigocuenta (codigocuenta),
+            KEY idx_codigocuenta (codigocuenta(191)),
             KEY idx_destino (destino),
             KEY idx_compania (compania),
-            KEY idx_lookup (compania, anio, mes, codigocuenta)
+            KEY idx_lookup (compania, anio, mes, codigocuenta(100))
+        ) {$charset};";
+    }
+
+    public static function personal_nomina_sql( string $prefix, string $charset ): string {
+        $table = $prefix . 'sysman_personal_nomina';
+        return "CREATE TABLE IF NOT EXISTS {$table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            anio INT NOT NULL DEFAULT 0,
+            compania VARCHAR(10) NOT NULL DEFAULT '001',
+            iddeempleado VARCHAR(20) NOT NULL DEFAULT '',
+            apellido1 VARCHAR(200) NOT NULL DEFAULT '',
+            apellido2 VARCHAR(200) NOT NULL DEFAULT '',
+            nombres VARCHAR(200) NOT NULL DEFAULT '',
+            numerodcto VARCHAR(30) NOT NULL DEFAULT '',
+            expedida VARCHAR(50) NOT NULL DEFAULT '',
+            fechancto VARCHAR(20) NOT NULL DEFAULT '',
+            fechadeingreso VARCHAR(20) NOT NULL DEFAULT '',
+            fechaderetiro VARCHAR(20) NOT NULL DEFAULT '',
+            iddecargo VARCHAR(20) NOT NULL DEFAULT '',
+            nombredelcargo VARCHAR(300) NOT NULL DEFAULT '',
+            iddecategoria VARCHAR(20) NOT NULL DEFAULT '',
+            nombrecategoria VARCHAR(200) NOT NULL DEFAULT '',
+            escalafon VARCHAR(10) NOT NULL DEFAULT '',
+            nombreescalafon VARCHAR(100) NOT NULL DEFAULT '',
+            grado VARCHAR(10) NOT NULL DEFAULT '',
+            decarrera VARCHAR(10) NOT NULL DEFAULT '',
+            salariobaseibc DECIMAL(20,2) NOT NULL DEFAULT 0,
+            dependencianombre VARCHAR(500) NOT NULL DEFAULT '',
+            emailcorporativo VARCHAR(200) NOT NULL DEFAULT '',
+            emailpersonal VARCHAR(200) NOT NULL DEFAULT '',
+            direccion VARCHAR(500) NOT NULL DEFAULT '',
+            telefonos VARCHAR(200) NOT NULL DEFAULT '',
+            fechacumplimientobonificacion VARCHAR(20) NOT NULL DEFAULT '',
+            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_anio (anio),
+            KEY idx_compania (compania),
+            KEY idx_numerodcto (numerodcto),
+            KEY idx_nombredelcargo (nombredelcargo(100)),
+            KEY idx_dependencia (dependencianombre(100))
+        ) {$charset};";
+    }
+
+    public static function ejecucion_ingresos_sql( string $prefix, string $charset ): string {
+        $table = $prefix . 'sysman_ejecucion_ingresos';
+        return "CREATE TABLE IF NOT EXISTS {$table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            anio INT NOT NULL DEFAULT 0,
+            mes INT NOT NULL DEFAULT 0,
+            compania VARCHAR(10) NOT NULL DEFAULT '001',
+            cuenta VARCHAR(50) NOT NULL DEFAULT '',
+            codigo VARCHAR(50) NOT NULL DEFAULT '',
+            nombre VARCHAR(500) NOT NULL DEFAULT '',
+            movimiento VARCHAR(10) NOT NULL DEFAULT '',
+            tiporecurso VARCHAR(100) NOT NULL DEFAULT '',
+            fuenterecurso VARCHAR(100) NOT NULL DEFAULT '',
+            apropiado DECIMAL(20,2) NOT NULL DEFAULT 0,
+            modificaciones DECIMAL(20,2) NOT NULL DEFAULT 0,
+            totalpresupuesto DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosanteriores DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosmes DECIMAL(20,2) NOT NULL DEFAULT 0,
+            recaudosacumulados DECIMAL(20,2) NOT NULL DEFAULT 0,
+            porrecaudar DECIMAL(20,2) NOT NULL DEFAULT 0,
+            porcrecaudado DECIMAL(10,2) NOT NULL DEFAULT 0,
+            fecha_importacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_anio_mes (anio, mes),
+            KEY idx_compania (compania),
+            KEY idx_cuenta (cuenta),
+            KEY idx_codigo (codigo)
         ) {$charset};";
     }
 }
