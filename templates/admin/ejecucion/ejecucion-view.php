@@ -10,6 +10,7 @@ if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {
 }
 
 $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
+$vigencia    = get_post_meta( $post_id, '_gn_vigencia', true );
 $anio        = get_post_meta( $post_id, '_gn_anio', true );
 $mes         = (int) get_post_meta( $post_id, '_gn_mes', true );
 $compania    = get_post_meta( $post_id, '_gn_compania', true ) ?: '001';
@@ -31,7 +32,9 @@ $mes_nombre = $meses[ $mes ] ?? $mes;
             <div>
                 <h1 class="sysman-page-title"><?php echo esc_html( $post->post_title ); ?></h1>
                 <p class="sysman-page-subtitle">
-                    <?php echo esc_html( $dependencia ); ?> &mdash; <?php echo esc_html( $mes_nombre . ' ' . $anio ); ?> &mdash; <?php esc_html_e( 'Compañía', 'sysman-suite' ); ?> <?php echo esc_html( $compania ); ?>
+                    <?php echo esc_html( $dependencia ); ?> &mdash; <?php echo esc_html( $mes_nombre . ' ' . $anio ); ?>
+                    <?php if ( $vigencia ) : ?> &mdash; <?php echo esc_html( $vigencia ); ?><?php endif; ?>
+                    &mdash; <?php esc_html_e( 'Compañía', 'sysman-suite' ); ?> <?php echo esc_html( $compania ); ?>
                 </p>
             </div>
         </div>

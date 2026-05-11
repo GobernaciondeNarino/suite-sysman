@@ -35,6 +35,18 @@ class Repository {
         return $results;
     }
 
+    public function get_vigencias( int $anio, int $mes, string $compania = '001' ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'sysman_plan_presupuestal';
+
+        return $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT tipovigencia FROM {$table}
+             WHERE compania = %s AND anio = %d AND mes = %d AND tipovigencia != ''
+             ORDER BY tipovigencia",
+            $compania, $anio, $mes
+        ) ) ?: [];
+    }
+
     public function get_rubros( int $post_id ): array {
         $meta = $this->get_post_meta( $post_id );
         if ( ! $meta ) {
@@ -50,13 +62,19 @@ class Repository {
         global $wpdb;
         $table = $wpdb->prefix . 'sysman_plan_presupuestal';
 
-        $results = $wpdb->get_results( $wpdb->prepare(
-            "SELECT codigo, nombre, destino, naturaleza, codigobpin, sector, programa, subprograma, codigoproducto, movimiento
-             FROM {$table}
-             WHERE compania = %s AND anio = %d AND mes = %d AND nombredependencia = %s AND movimiento = 'SI'
-             ORDER BY codigo",
-            $meta['compania'], $meta['anio'], $meta['mes'], $meta['dependencia']
-        ), ARRAY_A );
+        $sql = "SELECT codigo, nombre, destino, naturaleza, codigobpin, sector, programa, subprograma, codigoproducto, movimiento
+                FROM {$table}
+                WHERE compania = %s AND anio = %d AND mes = %d AND nombredependencia = %s AND movimiento = 'SI'";
+        $params = [ $meta['compania'], $meta['anio'], $meta['mes'], $meta['dependencia'] ];
+
+        if ( ! empty( $meta['vigencia'] ) ) {
+            $sql .= " AND tipovigencia = %s";
+            $params[] = $meta['vigencia'];
+        }
+
+        $sql .= " ORDER BY codigo";
+
+        $results = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
 
         set_transient( $cache_key, $results, 5 * MINUTE_IN_SECONDS );
         return $results;
@@ -188,6 +206,7 @@ class Repository {
             'anio'        => (int) get_post_meta( $post_id, '_gn_anio', true ),
             'mes'         => (int) get_post_meta( $post_id, '_gn_mes', true ),
             'compania'    => get_post_meta( $post_id, '_gn_compania', true ) ?: '001',
+            'vigencia'    => get_post_meta( $post_id, '_gn_vigencia', true ),
         ];
     }
 }

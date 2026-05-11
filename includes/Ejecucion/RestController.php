@@ -29,6 +29,17 @@ class RestController {
             ],
         ] );
 
+        register_rest_route( $ns, '/vigencias', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_vigencias' ],
+            'permission_callback' => [ $this, 'check_admin' ],
+            'args' => [
+                'anio' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
+                'mes'  => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
+                'compania' => [ 'required' => false, 'type' => 'string', 'default' => '001', 'sanitize_callback' => 'sanitize_text_field' ],
+            ],
+        ] );
+
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/rubros', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_rubros' ],
@@ -82,6 +93,14 @@ class RestController {
 
     public function check_admin(): bool {
         return current_user_can( 'edit_posts' );
+    }
+
+    public function get_vigencias( \WP_REST_Request $request ): \WP_REST_Response {
+        $anio     = $request->get_param( 'anio' );
+        $mes      = $request->get_param( 'mes' );
+        $compania = $request->get_param( 'compania' );
+
+        return new \WP_REST_Response( $this->repo->get_vigencias( $anio, $mes, $compania ) );
     }
 
     public function get_dependencias( \WP_REST_Request $request ): \WP_REST_Response {

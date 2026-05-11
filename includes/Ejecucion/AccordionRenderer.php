@@ -12,6 +12,7 @@ class AccordionRenderer {
         }
 
         $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
+        $vigencia    = get_post_meta( $post_id, '_gn_vigencia', true );
         $anio        = (int) get_post_meta( $post_id, '_gn_anio', true );
         $mes         = (int) get_post_meta( $post_id, '_gn_mes', true );
         $compania    = get_post_meta( $post_id, '_gn_compania', true ) ?: '001';
@@ -31,7 +32,7 @@ class AccordionRenderer {
         <div class="gn-ejec" data-post-id="<?php echo esc_attr( $post_id ); ?>" data-anio="<?php echo esc_attr( $anio ); ?>" data-mes="<?php echo esc_attr( $mes ); ?>">
             <header class="gn-ejec__header">
                 <h2><?php echo esc_html( $post->post_title ); ?></h2>
-                <span class="gn-ejec__periodo"><?php echo esc_html( $dependencia ); ?> &mdash; <?php echo esc_html( $mes_nombre ); ?> <?php echo esc_html( $anio ); ?></span>
+                <span class="gn-ejec__periodo"><?php echo esc_html( $dependencia ); ?> &mdash; <?php echo esc_html( $mes_nombre ); ?> <?php echo esc_html( $anio ); ?><?php if ( $vigencia ) : ?> &mdash; <?php echo esc_html( $vigencia ); ?><?php endif; ?></span>
             </header>
 
             <?php if ( empty( $rubros ) ) : ?>

@@ -6,6 +6,7 @@ $is_new  = ( 0 === $post_id );
 
 $title       = '';
 $dependencia = '';
+$vigencia    = '';
 $anio        = (int) date( 'Y' );
 $mes         = (int) date( 'n' );
 $compania    = get_option( 'sysman_api_compania', '001' );
@@ -15,6 +16,7 @@ if ( ! $is_new && $post_id ) {
     if ( $post && 'gn_ejecucion' === $post->post_type ) {
         $title       = $post->post_title;
         $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
+        $vigencia    = get_post_meta( $post_id, '_gn_vigencia', true );
         $anio        = (int) get_post_meta( $post_id, '_gn_anio', true );
         $mes         = (int) get_post_meta( $post_id, '_gn_mes', true );
         $compania    = get_post_meta( $post_id, '_gn_compania', true ) ?: '001';
@@ -99,6 +101,15 @@ $current_year = (int) date( 'Y' );
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="gn-ejec-vigencia"><?php esc_html_e( 'Vigencia', 'sysman-suite' ); ?></label></th>
+                        <td>
+                            <select id="gn-ejec-vigencia" style="width:100%;max-width:400px;">
+                                <option value=""><?php esc_html_e( 'Cargando vigencias...', 'sysman-suite' ); ?></option>
+                            </select>
+                            <p class="description"><?php esc_html_e( 'Filtra los rubros por tipo de vigencia. Déjelo vacío para ver todos.', 'sysman-suite' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="gn-ejec-dependencia"><?php esc_html_e( 'Dependencia', 'sysman-suite' ); ?></label></th>
                         <td>
                             <select id="gn-ejec-dependencia" style="width:100%;max-width:600px;">
@@ -142,6 +153,35 @@ $current_year = (int) date( 'Y' );
 jQuery(function($) {
     var postId = <?php echo (int) $post_id; ?>;
     var savedDep = <?php echo wp_json_encode( $dependencia ); ?>;
+    var savedVig = <?php echo wp_json_encode( $vigencia ); ?>;
+
+    function loadVigencias() {
+        var anio = $('#gn-ejec-anio').val();
+        var mes  = $('#gn-ejec-mes').val();
+        var comp = $('#gn-ejec-compania').val();
+
+        var $sel = $('#gn-ejec-vigencia');
+        $sel.html('<option value=""><?php echo esc_js( __( 'Cargando...', 'sysman-suite' ) ); ?></option>');
+
+        $.ajax({
+            url: gnEjecucion.restUrl + 'vigencias',
+            data: { anio: anio, mes: mes, compania: comp },
+            beforeSend: function(xhr) { xhr.setRequestHeader('X-WP-Nonce', gnEjecucion.restNonce); },
+            success: function(data) {
+                $sel.empty();
+                $sel.append('<option value=""><?php echo esc_js( __( 'Todas las vigencias', 'sysman-suite' ) ); ?></option>');
+                if (data && data.length > 0) {
+                    data.forEach(function(vig) {
+                        var selected = (vig === savedVig) ? ' selected' : '';
+                        $sel.append('<option value="' + $('<span>').text(vig).html() + '"' + selected + '>' + $('<span>').text(vig).html() + '</option>');
+                    });
+                }
+            },
+            error: function() {
+                $sel.html('<option value=""><?php echo esc_js( __( 'Error al cargar vigencias', 'sysman-suite' ) ); ?></option>');
+            }
+        });
+    }
 
     function loadDependencias() {
         var anio = $('#gn-ejec-anio').val();
@@ -173,8 +213,13 @@ jQuery(function($) {
         });
     }
 
-    loadDependencias();
-    $('#gn-ejec-anio, #gn-ejec-mes, #gn-ejec-compania').on('change', loadDependencias);
+    function loadFilters() {
+        loadVigencias();
+        loadDependencias();
+    }
+
+    loadFilters();
+    $('#gn-ejec-anio, #gn-ejec-mes, #gn-ejec-compania').on('change', loadFilters);
 
     // Save
     $('#gn-ejec-save').on('click', function() {
@@ -187,6 +232,7 @@ jQuery(function($) {
             post_id: postId,
             title: $('#gn-ejec-title').val(),
             dependencia: $('#gn-ejec-dependencia').val(),
+            vigencia: $('#gn-ejec-vigencia').val(),
             anio: $('#gn-ejec-anio').val(),
             mes: $('#gn-ejec-mes').val(),
             compania: $('#gn-ejec-compania').val()
@@ -195,6 +241,7 @@ jQuery(function($) {
             if (resp.success) {
                 postId = resp.data.post_id;
                 savedDep = $('#gn-ejec-dependencia').val();
+                savedVig = $('#gn-ejec-vigencia').val();
                 $msg.html('<div class="notice notice-success inline"><p><?php echo esc_js( __( 'Seguimiento guardado exitosamente.', 'sysman-suite' ) ); ?></p></div>').show();
                 history.replaceState(null, '', '<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion&action=edit&id=' ) ); ?>' + postId);
                 $('#gn-ejec-shortcode-text').text('[gn_ejecucion id="' + postId + '"]');
