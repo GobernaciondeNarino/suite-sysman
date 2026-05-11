@@ -412,12 +412,13 @@
             const area = $('#sysman-chart-preview-area');
             const status = $('#sysman-preview-status');
 
+            const customQuery = ($('#sysman_custom_query').val() || '').trim();
             const dataTable   = $('#sysman_data_table').val();
             const groupColumn = $('#sysman_group_column').val();
             const valueColumns = this.getValueColumns();
 
-            if (!dataTable || !groupColumn || valueColumns.length === 0) {
-                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y al menos un valor Y.</p>');
+            if (!customQuery && (!dataTable || !groupColumn || valueColumns.length === 0)) {
+                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y al menos un valor Y, o escriba una Query personalizada.</p>');
                 return;
             }
 
@@ -430,6 +431,7 @@
                 data: {
                     action:         'sysman_preview_chart',
                     preview_nonce:  sysmanCharts.previewNonce,
+                    custom_query:   customQuery,
                     data_table:     dataTable,
                     group_column:   groupColumn,
                     value_columns:  valueColumns,

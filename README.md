@@ -226,6 +226,16 @@ sisman-suite/
 
 ## Changelog
 
+### 4.3.0
+- Correccion de graficos con Query personalizada: la vista previa y el renderizado ahora usan la query custom correctamente
+- Deteccion automatica de `has_groups` desde los datos reales del query
+- Nuevo filtro **Vigencia** en seguimientos de ejecucion (filtra rubros por `tipovigencia`)
+- Shortcode `[gn_ejecucion id="X"]` visible en listado, edicion y vista de seguimientos
+- Acordeon publico funciona sin sesion (endpoints REST publicos, sin dependencia de `wp-api`)
+- RES renombrado a "Registros de Compromiso" con filtro por rubro
+- Cruce de proyecto BPIN con tabla `bpid_suite_contratos` (nombre_proyecto, metas, ODS)
+- Metas y ODS renderizados como lista con vinetas
+
 ### 4.2.0
 - Correccion de URL del menu Ejecucion: redireccionaba a pagina 404 (`wp-admin/sysman-ejecucion` en vez de `admin.php?page=sysman-ejecucion`)
 - Ajuste de prioridad en `admin_menu` para garantizar orden de registro correcto

@@ -159,6 +159,10 @@ class Rest_Api {
         $data   = $plugin->visualizer->get_chart_data( $id );
         $meta   = $plugin->visualizer->get_chart_meta( $id );
 
+        if ( ! empty( $data ) && isset( $data[0]['group'] ) ) {
+            $meta['has_groups'] = true;
+        }
+
         return new \WP_REST_Response( [
             'data' => $data,
             'meta' => $meta,

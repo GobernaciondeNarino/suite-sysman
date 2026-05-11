@@ -523,77 +523,79 @@ class Visualizer {
 
         global $wpdb;
 
-        $table     = sanitize_text_field( $_POST['data_table'] ?? '' );
-        $group_col = sanitize_text_field( $_POST['group_column'] ?? '' );
-        $aggregate = strtoupper( sanitize_text_field( $_POST['aggregate'] ?? 'SUM' ) );
+        $custom_query = sanitize_textarea_field( $_POST['custom_query'] ?? '' );
 
-        if ( ! $this->database->validate_table( $table ) ) {
-            wp_send_json_error( [ 'message' => 'Tabla no válida' ] );
-        }
-        if ( ! $this->database->validate_column( $table, $group_col ) ) {
-            wp_send_json_error( [ 'message' => 'Columna de agrupación no válida' ] );
-        }
-        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
-            $aggregate = 'SUM';
-        }
-
-        // Collect value columns (array from JS)
-        $raw_value_cols = $_POST['value_columns'] ?? [];
-        if ( ! is_array( $raw_value_cols ) ) {
-            $raw_value_cols = [ $raw_value_cols ];
-        }
-        $value_cols = [];
-        foreach ( $raw_value_cols as $vc ) {
-            $vc = sanitize_text_field( $vc );
-            if ( $vc && $this->database->validate_column( $table, $vc ) ) {
-                $value_cols[] = $vc;
-            }
-        }
-        if ( empty( $value_cols ) ) {
-            wp_send_json_error( [ 'message' => 'Seleccione al menos una columna de valor' ] );
-        }
-
-        // Build WHERE
-        $where   = [];
-        $prepare = [];
-
-        $filter_anio = absint( $_POST['filter_anio'] ?? 0 );
-        $filter_mes  = absint( $_POST['filter_mes'] ?? 0 );
-        if ( $filter_anio > 0 ) {
-            $where[]   = 'anio = %d';
-            $prepare[] = $filter_anio;
-        }
-        if ( $filter_mes > 0 ) {
-            $where[]   = 'mes = %d';
-            $prepare[] = $filter_mes;
-        }
-
-        $filter_destino = sanitize_text_field( $_POST['filter_destino'] ?? '' );
-        if ( ! empty( $filter_destino ) ) {
-            $where[]   = 'destino = %s';
-            $prepare[] = $filter_destino;
-        }
-
-        $where_clause = $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
-
-        // Multiple Y columns: UNION ALL
-        if ( count( $value_cols ) > 1 ) {
-            $query = $this->build_multi_y_query( $table, $group_col, $value_cols, $aggregate, $where_clause, $prepare );
+        if ( ! empty( $custom_query ) ) {
+            $query = $custom_query;
         } else {
-            // Single Y column
-            $value_col = $value_cols[0];
-            $color_col = sanitize_text_field( $_POST['color_column'] ?? '' );
-            $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+            $table     = sanitize_text_field( $_POST['data_table'] ?? '' );
+            $group_col = sanitize_text_field( $_POST['group_column'] ?? '' );
+            $aggregate = strtoupper( sanitize_text_field( $_POST['aggregate'] ?? 'SUM' ) );
 
-            if ( $has_color ) {
-                $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
-            } else {
-                $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`{$where_clause} GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+            if ( ! $this->database->validate_table( $table ) ) {
+                wp_send_json_error( [ 'message' => 'Tabla no válida' ] );
+            }
+            if ( ! $this->database->validate_column( $table, $group_col ) ) {
+                wp_send_json_error( [ 'message' => 'Columna de agrupación no válida' ] );
+            }
+            if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
+                $aggregate = 'SUM';
             }
 
-            if ( $prepare ) {
-                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-                $query = $wpdb->prepare( $query, ...$prepare );
+            $raw_value_cols = $_POST['value_columns'] ?? [];
+            if ( ! is_array( $raw_value_cols ) ) {
+                $raw_value_cols = [ $raw_value_cols ];
+            }
+            $value_cols = [];
+            foreach ( $raw_value_cols as $vc ) {
+                $vc = sanitize_text_field( $vc );
+                if ( $vc && $this->database->validate_column( $table, $vc ) ) {
+                    $value_cols[] = $vc;
+                }
+            }
+            if ( empty( $value_cols ) ) {
+                wp_send_json_error( [ 'message' => 'Seleccione al menos una columna de valor' ] );
+            }
+
+            $where   = [];
+            $prepare = [];
+
+            $filter_anio = absint( $_POST['filter_anio'] ?? 0 );
+            $filter_mes  = absint( $_POST['filter_mes'] ?? 0 );
+            if ( $filter_anio > 0 ) {
+                $where[]   = 'anio = %d';
+                $prepare[] = $filter_anio;
+            }
+            if ( $filter_mes > 0 ) {
+                $where[]   = 'mes = %d';
+                $prepare[] = $filter_mes;
+            }
+
+            $filter_destino = sanitize_text_field( $_POST['filter_destino'] ?? '' );
+            if ( ! empty( $filter_destino ) ) {
+                $where[]   = 'destino = %s';
+                $prepare[] = $filter_destino;
+            }
+
+            $where_clause = $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
+
+            if ( count( $value_cols ) > 1 ) {
+                $query = $this->build_multi_y_query( $table, $group_col, $value_cols, $aggregate, $where_clause, $prepare );
+            } else {
+                $value_col = $value_cols[0];
+                $color_col = sanitize_text_field( $_POST['color_column'] ?? '' );
+                $has_color = ! empty( $color_col ) && $this->database->validate_column( $table, $color_col );
+
+                if ( $has_color ) {
+                    $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value, `{$color_col}` AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`, `{$color_col}` ORDER BY `{$group_col}`, value DESC LIMIT 500";
+                } else {
+                    $query = "SELECT `{$group_col}` AS label, {$aggregate}(`{$value_col}`) AS value FROM `{$table}`{$where_clause} GROUP BY `{$group_col}` ORDER BY value DESC LIMIT 100";
+                }
+
+                if ( $prepare ) {
+                    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                    $query = $wpdb->prepare( $query, ...$prepare );
+                }
             }
         }
 
