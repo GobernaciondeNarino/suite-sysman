@@ -126,14 +126,32 @@ class RestController {
     public function get_dis( \WP_REST_Request $request ): \WP_REST_Response {
         $post_id      = (int) $request->get_param( 'post_id' );
         $codigocuenta = $request->get_param( 'codigocuenta' );
-        return new \WP_REST_Response( $this->repo->get_disponibilidades( $post_id, $codigocuenta ) );
+        $rows = $this->repo->get_disponibilidades( $post_id, $codigocuenta );
+        return new \WP_REST_Response( $this->enrich_with_contracts( $rows ) );
     }
 
     public function get_res( \WP_REST_Request $request ): \WP_REST_Response {
         $post_id    = (int) $request->get_param( 'post_id' );
         $numero_dis = $request->get_param( 'numero_dis' );
         $rubro      = $request->get_param( 'rubro' );
-        return new \WP_REST_Response( $this->repo->get_reservas( $post_id, $numero_dis, $rubro ) );
+        $rows = $this->repo->get_reservas( $post_id, $numero_dis, $rubro );
+        return new \WP_REST_Response( $this->enrich_with_contracts( $rows ) );
+    }
+
+    private function enrich_with_contracts( array $rows ): array {
+        $docs = array_filter( array_unique( array_column( $rows, 'nrodocumento' ) ) );
+        if ( empty( $docs ) ) {
+            return $rows;
+        }
+        $urls = $this->repo->get_contract_urls( array_values( $docs ) );
+        if ( empty( $urls ) ) {
+            return $rows;
+        }
+        foreach ( $rows as &$row ) {
+            $doc = $row['nrodocumento'] ?? '';
+            $row['contract_url'] = $urls[ $doc ] ?? '';
+        }
+        return $rows;
     }
 
     public function get_proyecto( \WP_REST_Request $request ): \WP_REST_Response {

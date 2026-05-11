@@ -302,6 +302,118 @@
     padding: 0.5rem 0;
 }
 
+/* ========================================
+   BPID Two-Column Layout
+   ======================================== */
+.gn-ejec__bpid-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.gn-ejec__bpid-sidebar {
+    background: #f8fafc;
+    border-right: 1px solid #e5e7eb;
+    overflow-y: auto;
+    max-height: 80vh;
+}
+.gn-ejec__bpid-sidebar-title {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1a5276;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #E8A020;
+    background: #fff;
+}
+.gn-ejec__bpid-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.gn-ejec__bpid-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    border-left: 3px solid transparent;
+    position: relative;
+}
+.gn-ejec__bpid-item:hover {
+    background: #f0f7ff;
+}
+.gn-ejec__bpid-item.active {
+    background: #fff;
+    border-left-color: #E8A020;
+}
+.gn-ejec__bpid-code {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 0.78rem;
+    color: #003087;
+    font-weight: 600;
+}
+.gn-ejec__bpid-name {
+    font-size: 0.82rem;
+    color: #1f2937;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.gn-ejec__bpid-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    line-height: 1.4;
+}
+.gn-ejec__bpid-item.active .gn-ejec__bpid-badge {
+    background: #E8A020;
+    color: #fff;
+}
+
+/* Content area */
+.gn-ejec__bpid-content {
+    overflow-y: auto;
+    max-height: 80vh;
+}
+.gn-ejec__bpid-group {
+    display: none;
+}
+.gn-ejec__bpid-group.active {
+    display: block;
+}
+
+/* Contract link */
+.gn-ejec__contract-link {
+    color: #003087;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.gn-ejec__contract-link:hover {
+    color: #E8A020;
+}
+.gn-ejec__dis-doc {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .gn-ejec__rubro-toggle {
@@ -311,5 +423,16 @@
     .gn-ejec__rubro .nombre,
     .gn-ejec__rubro .meta {
         grid-column: 2;
+    }
+    .gn-ejec__bpid-layout {
+        grid-template-columns: 1fr;
+    }
+    .gn-ejec__bpid-sidebar {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+        max-height: 200px;
+    }
+    .gn-ejec__bpid-content {
+        max-height: none;
     }
 }

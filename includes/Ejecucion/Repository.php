@@ -195,6 +195,30 @@ class Repository {
         return $result ?: null;
     }
 
+    public function get_contract_urls( array $nrodocumentos ): array {
+        if ( empty( $nrodocumentos ) ) {
+            return [];
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'secop_contracts';
+
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) !== $table ) {
+            return [];
+        }
+
+        $placeholders = implode( ',', array_fill( 0, count( $nrodocumentos ), '%s' ) );
+        $sql = "SELECT numero_de_proceso, url_contrato FROM {$table} WHERE numero_de_proceso IN ({$placeholders})";
+
+        $results = $wpdb->get_results( $wpdb->prepare( $sql, $nrodocumentos ), ARRAY_A );
+
+        $map = [];
+        foreach ( $results as $row ) {
+            $map[ $row['numero_de_proceso'] ] = $row['url_contrato'];
+        }
+        return $map;
+    }
+
     private function get_post_meta( int $post_id ): ?array {
         $post = get_post( $post_id );
         if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {

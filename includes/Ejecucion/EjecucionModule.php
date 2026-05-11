@@ -115,7 +115,8 @@ class EjecucionModule {
         $anio        = absint( $_POST['anio'] ?? date( 'Y' ) );
         $mes         = absint( $_POST['mes'] ?? date( 'n' ) );
         $compania    = sanitize_text_field( $_POST['compania'] ?? '001' );
-        $vigencia    = sanitize_text_field( $_POST['vigencia'] ?? '' );
+        $vigencia      = sanitize_text_field( $_POST['vigencia'] ?? '' );
+        $agrupar_bpid  = sanitize_text_field( $_POST['agrupar_bpid'] ?? '0' );
 
         if ( empty( $title ) || empty( $dependencia ) ) {
             wp_send_json_error( __( 'Título y dependencia son requeridos.', 'sysman-suite' ) );
@@ -143,6 +144,7 @@ class EjecucionModule {
         update_post_meta( $post_id, '_gn_mes', $mes );
         update_post_meta( $post_id, '_gn_compania', $compania );
         update_post_meta( $post_id, '_gn_vigencia', $vigencia );
+        update_post_meta( $post_id, '_gn_agrupar_bpid', $agrupar_bpid );
 
         wp_send_json_success( [ 'post_id' => $post_id ] );
     }

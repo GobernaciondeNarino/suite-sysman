@@ -11,15 +11,18 @@ $anio        = (int) date( 'Y' );
 $mes         = (int) date( 'n' );
 $compania    = get_option( 'sysman_api_compania', '001' );
 
+$agrupar_bpid = '0';
+
 if ( ! $is_new && $post_id ) {
     $post = get_post( $post_id );
     if ( $post && 'gn_ejecucion' === $post->post_type ) {
-        $title       = $post->post_title;
-        $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
-        $vigencia    = get_post_meta( $post_id, '_gn_vigencia', true );
-        $anio        = (int) get_post_meta( $post_id, '_gn_anio', true );
-        $mes         = (int) get_post_meta( $post_id, '_gn_mes', true );
-        $compania    = get_post_meta( $post_id, '_gn_compania', true ) ?: '001';
+        $title         = $post->post_title;
+        $dependencia   = get_post_meta( $post_id, '_gn_dependencia', true );
+        $vigencia      = get_post_meta( $post_id, '_gn_vigencia', true );
+        $anio          = (int) get_post_meta( $post_id, '_gn_anio', true );
+        $mes           = (int) get_post_meta( $post_id, '_gn_mes', true );
+        $compania      = get_post_meta( $post_id, '_gn_compania', true ) ?: '001';
+        $agrupar_bpid  = get_post_meta( $post_id, '_gn_agrupar_bpid', true ) ?: '0';
     }
 }
 
@@ -107,6 +110,16 @@ $current_year = (int) date( 'Y' );
                                 <option value=""><?php esc_html_e( 'Cargando vigencias...', 'sysman-suite' ); ?></option>
                             </select>
                             <p class="description"><?php esc_html_e( 'Filtra los rubros por tipo de vigencia. Déjelo vacío para ver todos.', 'sysman-suite' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Agrupar por BPIN', 'sysman-suite' ); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" id="gn-ejec-agrupar-bpid" value="1" <?php checked( $agrupar_bpid, '1' ); ?>>
+                                <?php esc_html_e( 'Mostrar rubros agrupados por proyecto BPIN en dos columnas', 'sysman-suite' ); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'Si se activa, la vista se divide en un panel lateral con los proyectos BPIN y el acordeón de rubros correspondiente.', 'sysman-suite' ); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -235,7 +248,8 @@ jQuery(function($) {
             vigencia: $('#gn-ejec-vigencia').val(),
             anio: $('#gn-ejec-anio').val(),
             mes: $('#gn-ejec-mes').val(),
-            compania: $('#gn-ejec-compania').val()
+            compania: $('#gn-ejec-compania').val(),
+            agrupar_bpid: $('#gn-ejec-agrupar-bpid').is(':checked') ? '1' : '0'
         }, function(resp) {
             $btn.prop('disabled', false);
             if (resp.success) {

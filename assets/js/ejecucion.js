@@ -29,6 +29,12 @@
     }
 
     root.addEventListener('click', function(e) {
+        var bpidItem = e.target.closest('.gn-ejec__bpid-item');
+        if (bpidItem) {
+            selectBpid(bpidItem);
+            return;
+        }
+
         var rubroBtn = e.target.closest('.gn-ejec__rubro-toggle');
         if (rubroBtn) {
             toggleRubro(rubroBtn.parentElement);
@@ -41,6 +47,22 @@
             return;
         }
     });
+
+    function selectBpid(item) {
+        var list = root.querySelector('.gn-ejec__bpid-list');
+        if (!list) return;
+
+        list.querySelectorAll('.gn-ejec__bpid-item').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        item.classList.add('active');
+
+        var bpid = item.dataset.bpid;
+        var groups = root.querySelectorAll('.gn-ejec__bpid-group');
+        groups.forEach(function(g) {
+            g.classList.toggle('active', g.dataset.bpidGroup === bpid);
+        });
+    }
 
     function toggleRubro(li) {
         var expanded = li.getAttribute('aria-expanded') === 'true';
@@ -182,6 +204,7 @@
         data.forEach(function(dis) {
             var valor = COP.format(parseFloat(dis.valordebito) || 0);
             var saldo = COP.format(parseFloat(dis.saldoporejecutaresp) || 0);
+            var docHtml = renderDocLink(dis.nrodocumento, dis.contract_url);
             html += '<li class="gn-ejec__dis" data-numero="' + esc(dis.numero) + '" data-rubro="' + esc(rubroCodigo) + '" aria-expanded="false">';
             html += '<button type="button" class="gn-ejec__dis-toggle">';
             html += '<span class="gn-ejec__dis-arrow">&#9654;</span>';
@@ -189,6 +212,9 @@
             html += '<span class="gn-ejec__dis-tercero">' + esc(dis.nombretercero) + '</span>';
             html += '<span class="gn-ejec__dis-valor">' + valor + '</span>';
             html += '<span class="gn-ejec__dis-saldo">Saldo: ' + saldo + '</span>';
+            if (docHtml) {
+                html += '<span class="gn-ejec__dis-doc">' + docHtml + '</span>';
+            }
             html += '<span class="gn-ejec__dis-fecha">' + esc(dis.fecha) + '</span>';
             html += '</button>';
             html += '<div class="gn-ejec__dis-body" hidden></div>';
@@ -210,11 +236,12 @@
         html += '<tbody>';
 
         data.forEach(function(res) {
+            var docHtml = renderDocLink(res.nrodocumento, res.contract_url);
             html += '<tr>';
             html += '<td>' + esc(res.numero) + '</td>';
             html += '<td>' + esc(res.nombretercero) + '</td>';
             html += '<td>' + esc(res.descripcion) + '</td>';
-            html += '<td>' + esc(res.nrodocumento) + '</td>';
+            html += '<td>' + (docHtml || esc(res.nrodocumento)) + '</td>';
             html += '<td class="num">' + COP.format(parseFloat(res.valordebito) || 0) + '</td>';
             html += '<td class="num">' + COP.format(parseFloat(res.saldoporejecutaresp) || 0) + '</td>';
             html += '<td>' + esc(res.fecha) + '</td>';
@@ -223,6 +250,14 @@
 
         html += '</tbody></table></div>';
         return html;
+    }
+
+    function renderDocLink(nrodocumento, contractUrl) {
+        if (!nrodocumento) return '';
+        if (contractUrl) {
+            return '<a href="' + esc(contractUrl) + '" target="_blank" rel="noopener" class="gn-ejec__contract-link" title="Ver contrato SECOP">' + esc(nrodocumento) + '</a>';
+        }
+        return esc(nrodocumento);
     }
 
     function esc(str) {

@@ -222,6 +222,20 @@ sisman-suite/
 
 ## Changelog
 
+### 5.5.1 (M — para pruebas)
+- **Nueva funcionalidad**: Agrupacion por BPIN en modulo Ejecucion (configurable por seguimiento)
+- Nuevo toggle "Agrupar por BPIN" en formulario de edicion del seguimiento
+- Layout de dos columnas: panel lateral con lista de proyectos BPIN + acordeon de rubros filtrado
+- Click en un proyecto BPIN muestra solo los rubros correspondientes
+- Lookup de nombres de proyecto desde tabla `bpid_suite_contratos`
+- Rubros sin BPIN asignado se agrupan como "Sin BPIN asignado"
+- **Nueva funcionalidad**: Links a contratos SECOP en DIS y RES
+- Cruce automatico de `auxiliar_cuentas.nrodocumento` con `secop_contracts.numero_de_proceso`
+- Si hay coincidencia, el documento se muestra como enlace `<a>` a `secop_contracts.url_contrato`
+- Batch lookup eficiente (una sola consulta IN por peticion REST)
+- Deteccion segura de tabla `secop_contracts` (no falla si el plugin de contratacion no esta instalado)
+- Responsive: en pantallas < 900px el layout cambia a una columna con sidebar horizontal
+
 ### 5.0.3
 - **Fix critico**: Modulo de graficos no renderizaba — `ReferenceError: d3plus is not defined`
 - Causa raiz: el CDN `https://d3plus.org/js/d3plus.v2.0.full.min.js` ahora devuelve **HTTP 404** (d3plus.org removio la ruta)
