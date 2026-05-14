@@ -222,6 +222,13 @@ sisman-suite/
 
 ## Changelog
 
+### 5.5.2
+- **Fix**: Multiples shortcodes `[gn_ejecucion]` en la misma pagina — solo el primero funcionaba
+- Causa raiz: `document.querySelector('.gn-ejec')` solo seleccionaba la primera instancia; click handlers, postId y BPID sidebar quedaban ligados unicamente a ella
+- Refactor: `document.querySelectorAll('.gn-ejec').forEach(initInstance)` — cada acordeon recibe su propio listener con su propio `postId`
+- Funciones de renderizado (consolidado, DIS, RES, proyecto, contratos) son compartidas y stateless
+- `selectBpid()` y `toggleRubro/Dis()` ahora reciben `root`/`postId` como parametro en vez de depender del closure global
+
 ### 5.5.1 (M — para pruebas)
 - **Nueva funcionalidad**: Agrupacion por BPIN en modulo Ejecucion (configurable por seguimiento)
 - Nuevo toggle "Agrupar por BPIN" en formulario de edicion del seguimiento

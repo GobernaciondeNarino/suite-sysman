@@ -1,11 +1,7 @@
 (function(){
     'use strict';
 
-    var root = document.querySelector('.gn-ejec');
-    if (!root) return;
-
-    var postId = root.dataset.postId;
-    var nonce  = (typeof wpApiSettings !== 'undefined') ? wpApiSettings.nonce : '';
+    var nonce = (typeof wpApiSettings !== 'undefined') ? wpApiSettings.nonce : '';
     var restBase = (typeof wpApiSettings !== 'undefined' && wpApiSettings.root)
         ? wpApiSettings.root
         : (typeof gnEjecFront !== 'undefined' ? gnEjecFront.restUrl : '/wp-json/');
@@ -28,27 +24,31 @@
             });
     }
 
-    root.addEventListener('click', function(e) {
-        var bpidItem = e.target.closest('.gn-ejec__bpid-item');
-        if (bpidItem) {
-            selectBpid(bpidItem);
-            return;
-        }
+    function initInstance(root) {
+        var postId = root.dataset.postId;
 
-        var rubroBtn = e.target.closest('.gn-ejec__rubro-toggle');
-        if (rubroBtn) {
-            toggleRubro(rubroBtn.parentElement);
-            return;
-        }
+        root.addEventListener('click', function(e) {
+            var bpidItem = e.target.closest('.gn-ejec__bpid-item');
+            if (bpidItem && root.contains(bpidItem)) {
+                selectBpid(root, bpidItem);
+                return;
+            }
 
-        var disBtn = e.target.closest('.gn-ejec__dis-toggle');
-        if (disBtn) {
-            toggleDis(disBtn.parentElement);
-            return;
-        }
-    });
+            var rubroBtn = e.target.closest('.gn-ejec__rubro-toggle');
+            if (rubroBtn && root.contains(rubroBtn)) {
+                toggleRubro(rubroBtn.parentElement, postId);
+                return;
+            }
 
-    function selectBpid(item) {
+            var disBtn = e.target.closest('.gn-ejec__dis-toggle');
+            if (disBtn && root.contains(disBtn)) {
+                toggleDis(disBtn.parentElement, postId);
+                return;
+            }
+        });
+    }
+
+    function selectBpid(root, item) {
         var list = root.querySelector('.gn-ejec__bpid-list');
         if (!list) return;
 
@@ -58,13 +58,12 @@
         item.classList.add('active');
 
         var bpid = item.dataset.bpid;
-        var groups = root.querySelectorAll('.gn-ejec__bpid-group');
-        groups.forEach(function(g) {
+        root.querySelectorAll('.gn-ejec__bpid-group').forEach(function(g) {
             g.classList.toggle('active', g.dataset.bpidGroup === bpid);
         });
     }
 
-    function toggleRubro(li) {
+    function toggleRubro(li, postId) {
         var expanded = li.getAttribute('aria-expanded') === 'true';
         li.setAttribute('aria-expanded', String(!expanded));
         var body = li.querySelector('.gn-ejec__rubro-body');
@@ -98,7 +97,7 @@
         });
     }
 
-    function toggleDis(li) {
+    function toggleDis(li, postId) {
         var expanded = li.getAttribute('aria-expanded') === 'true';
         li.setAttribute('aria-expanded', String(!expanded));
         var body = li.querySelector('.gn-ejec__dis-body');
@@ -266,5 +265,9 @@
         d.textContent = str;
         return d.innerHTML;
     }
+
+    document.querySelectorAll('.gn-ejec').forEach(function(root) {
+        initInstance(root);
+    });
 
 })();
