@@ -135,6 +135,13 @@
         },
     };
 
+    const VISTA_COLUMNS = [
+        'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+        'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+        'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
+        'obligacion', 'pagos', 'obligacionesporpagar',
+    ];
+
     const ChartConfigManager = {
         currentColumns: [],
 
@@ -146,9 +153,55 @@
             this.updateColorPreview();
             this.updateFieldVisibility();
             this.updateFieldGuidance();
+            this.initVistaTab();
         },
 
         bindEvents() {
+            // Data source tab switching
+            $(document).on('click', '.sysman-source-tab', function () {
+                const tab = $(this).data('tab');
+                $('.sysman-source-tab').removeClass('active').attr('aria-selected', 'false');
+                $(this).addClass('active').attr('aria-selected', 'true');
+                $('.sysman-source-panel').hide();
+                $(`#sysman-panel-${tab}`).show();
+                $('#sysman_data_source_mode').val(tab);
+
+                // Toggle name attributes so only the active tab's selects submit
+                if (tab === 'vista') {
+                    $('#sysman-value-columns-list select').removeAttr('name');
+                    $('#sysman-vista-value-columns-list select').attr('name', 'sysman_value_columns[]');
+                    $('#sysman_aggregate_vista').val($('#sysman_aggregate').val());
+                    ChartConfigManager.loadDependencias();
+                } else {
+                    $('#sysman-vista-value-columns-list select').removeAttr('name');
+                    $('#sysman-value-columns-list select').attr('name', 'sysman_value_columns[]');
+                    $('#sysman_aggregate').val($('#sysman_aggregate_vista').val());
+                }
+            });
+
+            // Sync aggregate between tabs
+            $('#sysman_aggregate').on('change', function () {
+                $('#sysman_aggregate_vista').val($(this).val());
+            });
+            $('#sysman_aggregate_vista').on('change', function () {
+                $('#sysman_aggregate').val($(this).val());
+            });
+
+            // Vista dependencia reload triggers
+            $('#sysman_vista_compania').on('change', () => this.loadDependencias());
+            $('#sysman_filter_anio, #sysman_filter_mes').on('change', () => {
+                if ($('#sysman_data_source_mode').val() === 'vista') {
+                    this.loadDependencias();
+                }
+            });
+
+            // Vista Y-value columns
+            $(document).on('click', '#sysman-vista-add-value-column', () => this.addVistaValueColumn(''));
+            $(document).on('click', '.sysman-vista-remove-value-col', function () {
+                $(this).closest('.sysman-value-col-row').remove();
+                ChartConfigManager.renumberVistaBadges();
+            });
+
             $('#sysman_data_table').on('change', () => this.loadColumns());
 
             $('.sysman-chart-type-option').on('click', function () {
@@ -234,9 +287,105 @@
         },
 
         renumberValueBadges() {
-            $('.sysman-value-col-badge').each(function (i) {
+            $('#sysman-value-columns-list .sysman-value-col-badge').each(function (i) {
                 $(this).text('Y' + (i + 1));
             });
+        },
+
+        /**
+         * Initialize Vista tab (load saved values, dependencias).
+         */
+        initVistaTab() {
+            const mode = $('#sysman_data_source_mode').val();
+
+            // Set correct name attributes based on active mode
+            if (mode === 'vista') {
+                $('#sysman-value-columns-list select').removeAttr('name');
+                this.loadDependencias();
+                this.loadVistaValues();
+            } else {
+                // Ensure table mode selects have names (they do by default from addValueColumn)
+            }
+        },
+
+        loadVistaValues() {
+            let savedValues = [];
+            try {
+                savedValues = JSON.parse($('#sysman-saved-value-columns').val() || '[]');
+            } catch (e) { /* ignore */ }
+
+            $('#sysman-vista-value-columns-list').empty();
+            if (savedValues.length > 0) {
+                savedValues.forEach(v => this.addVistaValueColumn(v));
+            } else {
+                this.addVistaValueColumn('apropiacionvigente');
+                this.addVistaValueColumn('compromisos');
+                this.addVistaValueColumn('pagos');
+            }
+        },
+
+        addVistaValueColumn(selectedValue) {
+            const index = $('#sysman-vista-value-columns-list .sysman-value-col-row').length;
+            const isVistaActive = $('#sysman_data_source_mode').val() === 'vista';
+            const nameAttr = isVistaActive ? ' name="sysman_value_columns[]"' : '';
+            let options = '<option value="">-- Seleccionar columna --</option>';
+            VISTA_COLUMNS.forEach(col => {
+                const label = this.formatColumnName(col);
+                const sel = col === selectedValue ? ' selected' : '';
+                options += `<option value="${col}" style="background-color:#d4edda"${sel}>${label}</option>`;
+            });
+
+            const html = `
+                <div class="sysman-value-col-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+                    <span class="sysman-vista-value-badge" style="background:var(--sysman-primary,#1a5632);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">Y${index + 1}</span>
+                    <select${nameAttr} class="sysman-vista-value-col-select" style="flex:1;max-width:500px;">
+                        ${options}
+                    </select>
+                    <button type="button" class="button sysman-vista-remove-value-col" aria-label="Eliminar" style="padding:0 8px;color:#dc3232;">&times;</button>
+                </div>`;
+            $('#sysman-vista-value-columns-list').append(html);
+            this.renumberVistaBadges();
+        },
+
+        renumberVistaBadges() {
+            $('#sysman-vista-value-columns-list .sysman-vista-value-badge').each(function (i) {
+                $(this).text('Y' + (i + 1));
+            });
+        },
+
+        loadDependencias() {
+            const compania = $('#sysman_vista_compania').val() || '001';
+            const anio = $('#sysman_filter_anio').val() || 0;
+            const mes = $('#sysman_filter_mes').val() || 0;
+            const savedDep = $('#sysman-saved-vista-dependencia').val() || '';
+
+            $.ajax({
+                url: `${sysmanCharts.restUrl}dependencias`,
+                headers: { 'X-WP-Nonce': sysmanCharts.restNonce },
+                data: { compania, anio, mes },
+                success: (deps) => {
+                    const sel = $('#sysman_vista_dependencia');
+                    const current = sel.val() || savedDep;
+                    sel.empty().append('<option value="">-- Todas las dependencias --</option>');
+                    deps.forEach(dep => {
+                        const opt = $('<option>').val(dep).text(dep);
+                        if (dep === current) opt.prop('selected', true);
+                        sel.append(opt);
+                    });
+                    // Clear saved so we don't re-read on next load
+                    $('#sysman-saved-vista-dependencia').val('');
+                },
+                error: () => console.error('Error loading dependencias'),
+            });
+        },
+
+        getVistaValueColumns() {
+            const cols = [];
+            $('.sysman-vista-value-col-select').each(function () {
+                const v = $(this).val();
+                if (v) cols.push(v);
+            });
+            return cols;
         },
 
         updateFieldVisibility() {
@@ -411,42 +560,56 @@
         refreshPreview() {
             const area = $('#sysman-chart-preview-area');
             const status = $('#sysman-preview-status');
+            const mode = $('#sysman_data_source_mode').val() || 'table';
 
             const customQuery = ($('#sysman_custom_query').val() || '').trim();
-            const dataTable   = $('#sysman_data_table').val();
-            const groupColumn = $('#sysman_group_column').val();
-            const valueColumns = this.getValueColumns();
 
-            if (!customQuery && (!dataTable || !groupColumn || valueColumns.length === 0)) {
-                area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y al menos un valor Y, o escriba una Query personalizada.</p>');
-                return;
+            if (mode === 'table') {
+                const dataTable   = $('#sysman_data_table').val();
+                const groupColumn = $('#sysman_group_column').val();
+                const valueColumns = this.getValueColumns();
+                if (!customQuery && (!dataTable || !groupColumn || valueColumns.length === 0)) {
+                    area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione tabla, columna de agrupacion y al menos un valor Y, o escriba una Query personalizada.</p>');
+                    return;
+                }
+            } else {
+                const vistaValues = this.getVistaValueColumns();
+                if (vistaValues.length === 0) {
+                    area.html('<p style="text-align:center;padding:60px 20px;color:#999;">Seleccione al menos una columna de valor para la Vista.</p>');
+                    return;
+                }
             }
 
             area.html('<div style="text-align:center;padding:80px 20px;"><span class="spinner is-active" style="float:none;"></span><p>Cargando datos...</p></div>');
             status.text('Cargando...');
 
+            const postData = {
+                action:            'sysman_preview_chart',
+                preview_nonce:     sysmanCharts.previewNonce,
+                data_source_mode:  mode,
+                custom_query:      customQuery,
+                data_table:        $('#sysman_data_table').val() || '',
+                group_column:      $('#sysman_group_column').val() || '',
+                value_columns:     mode === 'vista' ? this.getVistaValueColumns() : this.getValueColumns(),
+                color_column:      $('#sysman_color_column').val() || '',
+                aggregate:         (mode === 'vista' ? $('#sysman_aggregate_vista').val() : $('#sysman_aggregate').val()) || 'SUM',
+                chart_type:        this.getSelectedChartType(),
+                chart_height:      $('#sysman_chart_height').val() || 400,
+                chart_colors:      $('#sysman_chart_colors').val() || '',
+                show_legend:       $('input[name="sysman_show_legend"]').is(':checked') ? 'yes' : '',
+                y_axis_title:      $('#sysman_y_axis_title').val() || '',
+                x_axis_title:      $('#sysman_x_axis_title').val() || '',
+                filter_anio:       $('#sysman_filter_anio').val() || 0,
+                filter_mes:        $('#sysman_filter_mes').val() || 0,
+                filter_destino:    $('#sysman_filter_destino').val() || '',
+                vista_dependencia: $('#sysman_vista_dependencia').val() || '',
+                vista_compania:    $('#sysman_vista_compania').val() || '001',
+            };
+
             $.ajax({
                 url: sysmanCharts.ajaxUrl,
                 type: 'POST',
-                data: {
-                    action:         'sysman_preview_chart',
-                    preview_nonce:  sysmanCharts.previewNonce,
-                    custom_query:   customQuery,
-                    data_table:     dataTable,
-                    group_column:   groupColumn,
-                    value_columns:  valueColumns,
-                    color_column:   $('#sysman_color_column').val() || '',
-                    aggregate:      $('#sysman_aggregate').val() || 'SUM',
-                    chart_type:     this.getSelectedChartType(),
-                    chart_height:   $('#sysman_chart_height').val() || 400,
-                    chart_colors:   $('#sysman_chart_colors').val() || '',
-                    show_legend:    $('input[name="sysman_show_legend"]').is(':checked') ? 'yes' : '',
-                    y_axis_title:   $('#sysman_y_axis_title').val() || '',
-                    x_axis_title:   $('#sysman_x_axis_title').val() || '',
-                    filter_anio:    $('#sysman_filter_anio').val() || 0,
-                    filter_mes:     $('#sysman_filter_mes').val() || 0,
-                    filter_destino: $('#sysman_filter_destino').val() || '',
-                },
+                data: postData,
                 success: (response) => {
                     if (!response.success || !response.data.data || response.data.data.length === 0) {
                         area.html('<p style="text-align:center;padding:60px 20px;color:#999;">No hay datos disponibles. Verifique que la tabla tenga registros.</p>');
@@ -488,13 +651,17 @@
             const yConfig = { title: meta.y_axis_title || '', tickFormat: d => NumberFormatter.format(d) };
             const xConfig = { title: meta.x_axis_title || '' };
 
+            const tooltipCatLabel = ($('#sysman_tooltip_label_category').val() || '').trim() || meta.x_axis_title || 'Categoria';
+            const tooltipValLabel = ($('#sysman_tooltip_label_value').val() || '').trim() || meta.y_axis_title || 'Valor';
+            const tooltipSerLabel = ($('#sysman_tooltip_label_series').val() || '').trim() || 'Serie';
+
             const tooltipConfig = {
                 tbody: [
-                    [meta.x_axis_title || 'Categoria', d => d.label],
-                    [meta.y_axis_title || 'Valor', d => (d.value || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })],
+                    [tooltipCatLabel, d => d.label],
+                    [tooltipValLabel, d => (d.value || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })],
                 ],
             };
-            if (hasGroups) tooltipConfig.tbody.unshift(['Serie', d => d.group]);
+            if (hasGroups) tooltipConfig.tbody.unshift([tooltipSerLabel, d => d.group]);
 
             const selector = `#${canvasId}`;
 

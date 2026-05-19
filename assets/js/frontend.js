@@ -112,17 +112,20 @@
             uniqueGroups.forEach((g, i) => { colorMap[g] = colors[i % colors.length]; });
             const colorFn = (d) => colorMap[d.group || d.label] || colors[0];
 
-            // Tooltip config
+            // Tooltip config with custom labels
+            const tooltipCategoryLabel = config.tooltipLabelCategory || config.xAxisTitle || 'Categoria';
+            const tooltipValueLabel    = config.tooltipLabelValue || config.yAxisTitle || 'Valor';
+            const tooltipSeriesLabel   = config.tooltipLabelSeries || 'Serie';
+
             const tooltipConfig = {
                 tbody: [
-                    [config.xAxisTitle || 'Categoria', (d) => d.label],
-                    [config.yAxisTitle || 'Valor', (d) => NumberFormatter.fullFormat(d.value, numberFormat)],
+                    [tooltipCategoryLabel, (d) => d.label],
+                    [tooltipValueLabel, (d) => NumberFormatter.fullFormat(d.value, numberFormat)],
                 ],
             };
 
-            // Add series info to tooltip if multi-series
             if (this.meta.has_groups || chartData.some(d => d.group !== d.label)) {
-                tooltipConfig.tbody.unshift(['Serie', (d) => d.group]);
+                tooltipConfig.tbody.unshift([tooltipSeriesLabel, (d) => d.group]);
             }
 
             // Axis configs

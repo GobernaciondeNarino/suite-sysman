@@ -1506,3 +1506,46 @@
     outline: 2px solid var(--sysman-accent);
     outline-offset: 2px;
 }
+
+/* ========================================
+   Data Source Tabs (Tablas / Vistas)
+   ======================================== */
+.sysman-source-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    border-bottom: 2px solid #e5e7eb;
+}
+.sysman-source-tab {
+    padding: 10px 20px;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, color 0.15s;
+    margin-bottom: -2px;
+}
+.sysman-source-tab:hover {
+    background: #fff;
+    color: #1a5276;
+}
+.sysman-source-tab.active {
+    background: #fff;
+    color: var(--sysman-primary, #1a5632);
+    border-bottom-color: #fff;
+}
+.sysman-source-tab .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+.sysman-source-panel {
+    padding: 16px 0 0;
+}

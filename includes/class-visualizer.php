@@ -143,29 +143,36 @@ class Visualizer {
         }
 
         $fields = [
-            'chart_type'       => 'sanitize_text_field',
-            'data_table'       => 'sanitize_text_field',
-            'group_column'     => 'sanitize_text_field',
-            'color_column'     => 'sanitize_text_field',
-            'aggregate'        => 'sanitize_text_field',
-            'orientation'      => 'sanitize_text_field',
-            'filter_anio'      => 'absint',
-            'filter_mes'       => 'absint',
-            'filter_destino'   => 'sanitize_text_field',
-            'chart_height'     => 'absint',
-            'chart_colors'     => 'sanitize_text_field',
-            'show_legend'      => 'sanitize_text_field',
-            'show_labels'      => 'sanitize_text_field',
-            'number_format'    => 'sanitize_text_field',
-            'y_axis_title'     => 'sanitize_text_field',
-            'x_axis_title'     => 'sanitize_text_field',
-            'show_timeline'    => 'sanitize_text_field',
-            'show_toolbar'     => 'sanitize_text_field',
-            'toolbar_detail'   => 'sanitize_text_field',
-            'toolbar_share'    => 'sanitize_text_field',
-            'toolbar_data'     => 'sanitize_text_field',
-            'toolbar_image'    => 'sanitize_text_field',
-            'toolbar_csv'      => 'sanitize_text_field',
+            'chart_type'              => 'sanitize_text_field',
+            'data_source_mode'        => 'sanitize_text_field',
+            'data_table'              => 'sanitize_text_field',
+            'group_column'            => 'sanitize_text_field',
+            'color_column'            => 'sanitize_text_field',
+            'aggregate'               => 'sanitize_text_field',
+            'orientation'             => 'sanitize_text_field',
+            'vista_type'              => 'sanitize_text_field',
+            'vista_dependencia'       => 'sanitize_text_field',
+            'vista_compania'          => 'sanitize_text_field',
+            'filter_anio'             => 'absint',
+            'filter_mes'              => 'absint',
+            'filter_destino'          => 'sanitize_text_field',
+            'chart_height'            => 'absint',
+            'chart_colors'            => 'sanitize_text_field',
+            'show_legend'             => 'sanitize_text_field',
+            'show_labels'             => 'sanitize_text_field',
+            'number_format'           => 'sanitize_text_field',
+            'y_axis_title'            => 'sanitize_text_field',
+            'x_axis_title'            => 'sanitize_text_field',
+            'tooltip_label_category'  => 'sanitize_text_field',
+            'tooltip_label_value'     => 'sanitize_text_field',
+            'tooltip_label_series'    => 'sanitize_text_field',
+            'show_timeline'           => 'sanitize_text_field',
+            'show_toolbar'            => 'sanitize_text_field',
+            'toolbar_detail'          => 'sanitize_text_field',
+            'toolbar_share'           => 'sanitize_text_field',
+            'toolbar_data'            => 'sanitize_text_field',
+            'toolbar_image'           => 'sanitize_text_field',
+            'toolbar_csv'             => 'sanitize_text_field',
         ];
 
         foreach ( $fields as $field => $sanitize ) {
@@ -283,6 +290,12 @@ class Visualizer {
             return $custom_query;
         }
 
+        // Check data source mode
+        $mode = get_post_meta( $chart_id, '_sysman_data_source_mode', true ) ?: 'table';
+        if ( 'vista' === $mode ) {
+            return $this->build_vista_query( $chart_id );
+        }
+
         $table      = get_post_meta( $chart_id, '_sysman_data_table', true );
         $group_col  = get_post_meta( $chart_id, '_sysman_group_column', true );
         $value_cols = get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [];
@@ -397,6 +410,140 @@ class Visualizer {
     }
 
     /**
+     * Build a Vista query (pre-built JOINs between plan_presupuestal and ejecucion_gastos).
+     */
+    private function build_vista_query( int $chart_id ): ?string {
+        global $wpdb;
+
+        $vista_type    = get_post_meta( $chart_id, '_sysman_vista_type', true ) ?: 'ejecucion_dependencia';
+        $dependencia   = get_post_meta( $chart_id, '_sysman_vista_dependencia', true ) ?: '';
+        $compania      = get_post_meta( $chart_id, '_sysman_vista_compania', true ) ?: '001';
+        $filter_anio   = (int) get_post_meta( $chart_id, '_sysman_filter_anio', true );
+        $filter_mes    = (int) get_post_meta( $chart_id, '_sysman_filter_mes', true );
+        $aggregate     = strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' );
+        $value_cols    = get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [];
+
+        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
+            $aggregate = 'SUM';
+        }
+
+        $pp_table = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $eg_table = $wpdb->prefix . 'sysman_ejecucion_gastos';
+
+        $allowed_vista_cols = [
+            'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+            'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+            'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
+            'obligacion', 'pagos', 'obligacionesporpagar',
+        ];
+
+        $valid_cols = [];
+        foreach ( $value_cols as $vc ) {
+            if ( in_array( $vc, $allowed_vista_cols, true ) ) {
+                $valid_cols[] = $vc;
+            }
+        }
+
+        if ( empty( $valid_cols ) ) {
+            $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
+        }
+
+        $where   = [ "pp.movimiento = 'SI'", 'pp.compania = %s' ];
+        $prepare = [ $compania ];
+
+        if ( ! empty( $dependencia ) ) {
+            $where[]   = 'pp.nombredependencia = %s';
+            $prepare[] = $dependencia;
+        }
+
+        if ( $filter_anio > 0 ) {
+            $where[]   = 'pp.anio = %d';
+            $prepare[] = $filter_anio;
+        }
+
+        if ( $filter_mes > 0 ) {
+            $where[]   = 'pp.mes = %d';
+            $prepare[] = $filter_mes;
+        }
+
+        $where_clause = ' WHERE ' . implode( ' AND ', $where );
+
+        $join = "FROM `{$pp_table}` pp INNER JOIN `{$eg_table}` eg "
+              . 'ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania AND pp.anio = eg.anio AND pp.mes = eg.mes';
+
+        $column_labels = [
+            'apropiacioninicial'      => 'Apropiacion Inicial',
+            'adicion'                 => 'Adicion',
+            'reduccion'              => 'Reduccion',
+            'credito'                => 'Credito',
+            'contracredito'          => 'Contracredito',
+            'aplazamiento'           => 'Aplazamiento',
+            'desplazamiento'         => 'Desplazamiento',
+            'apropiacionvigente'     => 'Apropiacion Vigente',
+            'disponibilidades'       => 'Disponibilidades',
+            'saldodisponible'        => 'Saldo Disponible',
+            'compromisos'            => 'Compromisos',
+            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
+            'obligacion'             => 'Obligacion',
+            'pagos'                  => 'Pagos',
+            'obligacionesporpagar'   => 'Obligaciones por Pagar',
+        ];
+
+        if ( count( $valid_cols ) > 1 ) {
+            $unions      = [];
+            $all_prepare = [];
+
+            foreach ( $valid_cols as $col ) {
+                $label     = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
+                $sub       = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value, '{$label}' AS `group` {$join}{$where_clause} GROUP BY pp.nombre";
+                $unions[]  = "({$sub})";
+                $all_prepare = array_merge( $all_prepare, $prepare );
+            }
+
+            $query = implode( ' UNION ALL ', $unions ) . " ORDER BY label, `group` LIMIT 1000";
+
+            if ( $all_prepare ) {
+                return $wpdb->prepare( $query, ...$all_prepare );
+            }
+            return $query;
+        }
+
+        $col   = $valid_cols[0];
+        $query = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value {$join}{$where_clause} GROUP BY pp.nombre ORDER BY value DESC LIMIT 100";
+
+        if ( $prepare ) {
+            return $wpdb->prepare( $query, ...$prepare );
+        }
+        return $query;
+    }
+
+    /**
+     * Get distinct dependencias from plan_presupuestal for a given compania/anio/mes.
+     */
+    public function get_dependencias( string $compania = '001', int $anio = 0, int $mes = 0 ): array {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'sysman_plan_presupuestal';
+
+        $where   = [ 'compania = %s', "nombredependencia != ''" ];
+        $prepare = [ $compania ];
+
+        if ( $anio > 0 ) {
+            $where[]   = 'anio = %d';
+            $prepare[] = $anio;
+        }
+        if ( $mes > 0 ) {
+            $where[]   = 'mes = %d';
+            $prepare[] = $mes;
+        }
+
+        $where_clause = ' WHERE ' . implode( ' AND ', $where );
+        $query = "SELECT DISTINCT nombredependencia FROM `{$table}`{$where_clause} ORDER BY nombredependencia";
+
+        return $wpdb->get_col( $wpdb->prepare( $query, ...$prepare ) ) ?: [];
+    }
+
+    /**
      * Get chart data.
      */
     public function get_chart_data( int $chart_id ): array {
@@ -427,7 +574,10 @@ class Visualizer {
             'number_format'  => get_post_meta( $chart_id, '_sysman_number_format', true ) ?: 'colombian',
             'y_axis_title'   => get_post_meta( $chart_id, '_sysman_y_axis_title', true ) ?: '',
             'x_axis_title'   => get_post_meta( $chart_id, '_sysman_x_axis_title', true ) ?: '',
-            'has_groups'     => count( get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [] ) > 1 || ! empty( get_post_meta( $chart_id, '_sysman_color_column', true ) ),
+            'has_groups'              => count( get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [] ) > 1 || ! empty( get_post_meta( $chart_id, '_sysman_color_column', true ) ),
+            'tooltip_label_category' => get_post_meta( $chart_id, '_sysman_tooltip_label_category', true ) ?: '',
+            'tooltip_label_value'    => get_post_meta( $chart_id, '_sysman_tooltip_label_value', true ) ?: '',
+            'tooltip_label_series'   => get_post_meta( $chart_id, '_sysman_tooltip_label_series', true ) ?: '',
             'show_timeline'  => get_post_meta( $chart_id, '_sysman_show_timeline', true ) === 'yes',
             'show_toolbar'   => get_post_meta( $chart_id, '_sysman_show_toolbar', true ) !== '',
             'toolbar_detail' => get_post_meta( $chart_id, '_sysman_toolbar_detail', true ) === 'yes',
@@ -523,10 +673,13 @@ class Visualizer {
 
         global $wpdb;
 
-        $custom_query = sanitize_textarea_field( $_POST['custom_query'] ?? '' );
+        $custom_query    = sanitize_textarea_field( $_POST['custom_query'] ?? '' );
+        $data_source_mode = sanitize_text_field( $_POST['data_source_mode'] ?? 'table' );
 
         if ( ! empty( $custom_query ) ) {
             $query = $custom_query;
+        } elseif ( 'vista' === $data_source_mode ) {
+            $query = $this->build_vista_preview_query( $_POST );
         } else {
             $table     = sanitize_text_field( $_POST['data_table'] ?? '' );
             $group_col = sanitize_text_field( $_POST['group_column'] ?? '' );
@@ -616,6 +769,106 @@ class Visualizer {
         ];
 
         wp_send_json_success( [ 'data' => $results, 'meta' => $meta ] );
+    }
+
+    /**
+     * Build a Vista query from AJAX POST data (preview mode).
+     */
+    private function build_vista_preview_query( array $post ): ?string {
+        global $wpdb;
+
+        $dependencia = sanitize_text_field( $post['vista_dependencia'] ?? '' );
+        $compania    = sanitize_text_field( $post['vista_compania'] ?? '001' );
+        $filter_anio = absint( $post['filter_anio'] ?? 0 );
+        $filter_mes  = absint( $post['filter_mes'] ?? 0 );
+        $aggregate   = strtoupper( sanitize_text_field( $post['aggregate'] ?? 'SUM' ) );
+
+        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
+            $aggregate = 'SUM';
+        }
+
+        $raw_value_cols = $post['value_columns'] ?? [];
+        if ( ! is_array( $raw_value_cols ) ) {
+            $raw_value_cols = [ $raw_value_cols ];
+        }
+
+        $allowed = [
+            'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+            'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+            'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
+            'obligacion', 'pagos', 'obligacionesporpagar',
+        ];
+
+        $valid_cols = [];
+        foreach ( $raw_value_cols as $vc ) {
+            $vc = sanitize_text_field( $vc );
+            if ( in_array( $vc, $allowed, true ) ) {
+                $valid_cols[] = $vc;
+            }
+        }
+        if ( empty( $valid_cols ) ) {
+            $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
+        }
+
+        $pp_table = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $eg_table = $wpdb->prefix . 'sysman_ejecucion_gastos';
+
+        $where   = [ "pp.movimiento = 'SI'", 'pp.compania = %s' ];
+        $prepare = [ $compania ];
+
+        if ( ! empty( $dependencia ) ) {
+            $where[]   = 'pp.nombredependencia = %s';
+            $prepare[] = $dependencia;
+        }
+        if ( $filter_anio > 0 ) {
+            $where[]   = 'pp.anio = %d';
+            $prepare[] = $filter_anio;
+        }
+        if ( $filter_mes > 0 ) {
+            $where[]   = 'pp.mes = %d';
+            $prepare[] = $filter_mes;
+        }
+
+        $where_clause = ' WHERE ' . implode( ' AND ', $where );
+        $join = "FROM `{$pp_table}` pp INNER JOIN `{$eg_table}` eg "
+              . 'ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania AND pp.anio = eg.anio AND pp.mes = eg.mes';
+
+        $column_labels = [
+            'apropiacioninicial'      => 'Apropiacion Inicial',
+            'adicion'                 => 'Adicion',
+            'reduccion'              => 'Reduccion',
+            'credito'                => 'Credito',
+            'contracredito'          => 'Contracredito',
+            'aplazamiento'           => 'Aplazamiento',
+            'desplazamiento'         => 'Desplazamiento',
+            'apropiacionvigente'     => 'Apropiacion Vigente',
+            'disponibilidades'       => 'Disponibilidades',
+            'saldodisponible'        => 'Saldo Disponible',
+            'compromisos'            => 'Compromisos',
+            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
+            'obligacion'             => 'Obligacion',
+            'pagos'                  => 'Pagos',
+            'obligacionesporpagar'   => 'Obligaciones por Pagar',
+        ];
+
+        if ( count( $valid_cols ) > 1 ) {
+            $unions      = [];
+            $all_prepare = [];
+
+            foreach ( $valid_cols as $col ) {
+                $label     = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
+                $sub       = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value, '{$label}' AS `group` {$join}{$where_clause} GROUP BY pp.nombre";
+                $unions[]  = "({$sub})";
+                $all_prepare = array_merge( $all_prepare, $prepare );
+            }
+
+            $query = implode( ' UNION ALL ', $unions ) . " ORDER BY label, `group` LIMIT 1000";
+            return $all_prepare ? $wpdb->prepare( $query, ...$all_prepare ) : $query;
+        }
+
+        $col   = $valid_cols[0];
+        $query = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value {$join}{$where_clause} GROUP BY pp.nombre ORDER BY value DESC LIMIT 100";
+        return $prepare ? $wpdb->prepare( $query, ...$prepare ) : $query;
     }
 
     /**

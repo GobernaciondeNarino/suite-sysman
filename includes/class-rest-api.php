@@ -87,6 +87,18 @@ class Rest_Api {
                 'table' => [ 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
             ],
         ] );
+
+        // Dependencias for Vista mode
+        register_rest_route( $namespace, '/dependencias', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_dependencias' ],
+            'permission_callback' => [ $this, 'admin_permission' ],
+            'args'                => [
+                'compania' => [ 'default' => '001', 'sanitize_callback' => 'sanitize_text_field' ],
+                'anio'     => [ 'default' => 0, 'sanitize_callback' => 'absint' ],
+                'mes'      => [ 'default' => 0, 'sanitize_callback' => 'absint' ],
+            ],
+        ] );
     }
 
     public function admin_permission(): bool {
@@ -216,5 +228,16 @@ class Rest_Api {
 
         $years = $this->database->get_available_years( $table );
         return new \WP_REST_Response( $years );
+    }
+
+    public function get_dependencias( \WP_REST_Request $request ): \WP_REST_Response {
+        $compania = $request->get_param( 'compania' ) ?: '001';
+        $anio     = (int) $request->get_param( 'anio' );
+        $mes      = (int) $request->get_param( 'mes' );
+
+        $plugin = \Sysman_Suite::instance();
+        $deps   = $plugin->visualizer->get_dependencias( $compania, $anio, $mes );
+
+        return new \WP_REST_Response( $deps );
     }
 }

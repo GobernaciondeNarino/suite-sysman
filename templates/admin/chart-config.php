@@ -33,6 +33,14 @@ $toolbar_csv    = get_post_meta( $post->ID, '_sysman_toolbar_csv', true ) ?: 'ye
 $custom_query   = get_post_meta( $post->ID, '_sysman_custom_query', true ) ?: '';
 $filters        = get_post_meta( $post->ID, '_sysman_filters', true ) ?: [];
 
+$data_source_mode        = get_post_meta( $post->ID, '_sysman_data_source_mode', true ) ?: 'table';
+$vista_type              = get_post_meta( $post->ID, '_sysman_vista_type', true ) ?: 'ejecucion_dependencia';
+$vista_dependencia       = get_post_meta( $post->ID, '_sysman_vista_dependencia', true ) ?: '';
+$vista_compania          = get_post_meta( $post->ID, '_sysman_vista_compania', true ) ?: '001';
+$tooltip_label_category  = get_post_meta( $post->ID, '_sysman_tooltip_label_category', true ) ?: '';
+$tooltip_label_value     = get_post_meta( $post->ID, '_sysman_tooltip_label_value', true ) ?: '';
+$tooltip_label_series    = get_post_meta( $post->ID, '_sysman_tooltip_label_series', true ) ?: '';
+
 wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
 ?>
 
@@ -77,84 +85,163 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
             <?php esc_html_e( 'Fuente de Datos', 'sysman-suite' ); ?>
         </h3>
 
-        <!-- Field guidance hint -->
-        <div id="sysman-field-guidance" class="sysman-field-guidance" style="display:none;">
-            <span class="dashicons dashicons-lightbulb" aria-hidden="true" style="color:var(--sysman-warning,#f39c12);"></span>
-            <span id="sysman-field-guidance-text"></span>
+        <!-- Data Source Tabs -->
+        <div class="sysman-source-tabs" role="tablist">
+            <button type="button" class="sysman-source-tab <?php echo 'table' === $data_source_mode ? 'active' : ''; ?>" data-tab="table" role="tab" aria-selected="<?php echo 'table' === $data_source_mode ? 'true' : 'false'; ?>">
+                <span class="dashicons dashicons-editor-table" aria-hidden="true"></span>
+                <?php esc_html_e( 'Tablas', 'sysman-suite' ); ?>
+            </button>
+            <button type="button" class="sysman-source-tab <?php echo 'vista' === $data_source_mode ? 'active' : ''; ?>" data-tab="vista" role="tab" aria-selected="<?php echo 'vista' === $data_source_mode ? 'true' : 'false'; ?>">
+                <span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+                <?php esc_html_e( 'Vistas', 'sysman-suite' ); ?>
+            </button>
+        </div>
+        <input type="hidden" id="sysman_data_source_mode" name="sysman_data_source_mode" value="<?php echo esc_attr( $data_source_mode ); ?>">
+
+        <!-- Tab: Tablas -->
+        <div class="sysman-source-panel" id="sysman-panel-table" style="<?php echo 'table' !== $data_source_mode ? 'display:none;' : ''; ?>">
+
+            <!-- Field guidance hint -->
+            <div id="sysman-field-guidance" class="sysman-field-guidance" style="display:none;">
+                <span class="dashicons dashicons-lightbulb" aria-hidden="true" style="color:var(--sysman-warning,#f39c12);"></span>
+                <span id="sysman-field-guidance-text"></span>
+            </div>
+
+            <div class="sysman-form-stack">
+                <div class="sysman-form-group">
+                    <label for="sysman_data_table"><?php esc_html_e( 'Tabla de Datos', 'sysman-suite' ); ?></label>
+                    <select id="sysman_data_table" name="sysman_data_table">
+                        <option value=""><?php esc_html_e( '-- Seleccionar tabla --', 'sysman-suite' ); ?></option>
+                        <?php foreach ( $tables as $table_name => $label ) : ?>
+                        <option value="<?php echo esc_attr( $table_name ); ?>" <?php selected( $data_table, $table_name ); ?>>
+                            <?php echo esc_html( $label ); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="sysman-form-group">
+                    <label for="sysman_group_column">
+                        <?php esc_html_e( 'Columna de Agrupación (Eje X / Etiquetas)', 'sysman-suite' ); ?>
+                    </label>
+                    <select id="sysman_group_column" name="sysman_group_column">
+                        <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
+                    </select>
+                    <p class="description sysman-column-hint" id="sysman-group-hint"></p>
+                </div>
+
+                <!-- Dynamic Y-value columns -->
+                <div class="sysman-form-group">
+                    <label>
+                        <?php esc_html_e( 'Columnas de Valor (Eje Y)', 'sysman-suite' ); ?>
+                    </label>
+                    <p class="description sysman-column-hint" id="sysman-value-hint"></p>
+                    <div id="sysman-value-columns-list">
+                        <!-- JS will populate saved values here -->
+                    </div>
+                    <button type="button" id="sysman-add-value-column" class="button" style="margin-top:8px;">
+                        <span class="dashicons dashicons-plus-alt2" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
+                        <?php esc_html_e( 'Agregar Valor Y', 'sysman-suite' ); ?>
+                    </button>
+                    <p class="description" style="margin-top:6px;">
+                        <?php esc_html_e( 'Cada columna de valor genera una serie independiente en el gráfico. Ej: agregar "Apropiación Vigente" y "Apropiación Inicial" para comparar ambas métricas por año.', 'sysman-suite' ); ?>
+                    </p>
+                </div>
+
+                <!-- Color/Series column -->
+                <div class="sysman-form-group sysman-field-color-column" id="sysman-color-column-wrap" style="display:none;">
+                    <label for="sysman_color_column">
+                        <?php esc_html_e( 'Columna de Serie / Color (agrupación secundaria)', 'sysman-suite' ); ?>
+                    </label>
+                    <select id="sysman_color_column" name="sysman_color_column">
+                        <option value=""><?php esc_html_e( '-- Sin serie adicional --', 'sysman-suite' ); ?></option>
+                    </select>
+                    <p class="description" id="sysman-color-hint">
+                        <?php esc_html_e( 'Solo visible si usa 1 valor Y. Define series por una columna categórica (ej: destino). Si usa múltiples valores Y, las series se crean automáticamente.', 'sysman-suite' ); ?>
+                    </p>
+                </div>
+
+                <div class="sysman-form-row-inline">
+                    <div class="sysman-form-group">
+                        <label for="sysman_aggregate"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
+                        <select id="sysman_aggregate" name="sysman_aggregate">
+                            <option value="SUM" <?php selected( $aggregate, 'SUM' ); ?>>SUM - <?php esc_html_e( 'Suma', 'sysman-suite' ); ?></option>
+                            <option value="COUNT" <?php selected( $aggregate, 'COUNT' ); ?>>COUNT - <?php esc_html_e( 'Contar', 'sysman-suite' ); ?></option>
+                            <option value="AVG" <?php selected( $aggregate, 'AVG' ); ?>>AVG - <?php esc_html_e( 'Promedio', 'sysman-suite' ); ?></option>
+                            <option value="MAX" <?php selected( $aggregate, 'MAX' ); ?>>MAX - <?php esc_html_e( 'Máximo', 'sysman-suite' ); ?></option>
+                            <option value="MIN" <?php selected( $aggregate, 'MIN' ); ?>>MIN - <?php esc_html_e( 'Mínimo', 'sysman-suite' ); ?></option>
+                        </select>
+                    </div>
+
+                    <!-- Orientation -->
+                    <div class="sysman-form-group sysman-field-orientation" id="sysman-orientation-wrap" style="display:none;">
+                        <label for="sysman_orientation"><?php esc_html_e( 'Orientación', 'sysman-suite' ); ?></label>
+                        <select id="sysman_orientation" name="sysman_orientation">
+                            <option value="vertical" <?php selected( $orientation, 'vertical' ); ?>><?php esc_html_e( 'Vertical', 'sysman-suite' ); ?></option>
+                            <option value="horizontal" <?php selected( $orientation, 'horizontal' ); ?>><?php esc_html_e( 'Horizontal', 'sysman-suite' ); ?></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="sysman-form-stack">
-            <div class="sysman-form-group">
-                <label for="sysman_data_table"><?php esc_html_e( 'Tabla de Datos', 'sysman-suite' ); ?></label>
-                <select id="sysman_data_table" name="sysman_data_table">
-                    <option value=""><?php esc_html_e( '-- Seleccionar tabla --', 'sysman-suite' ); ?></option>
-                    <?php foreach ( $tables as $table_name => $label ) : ?>
-                    <option value="<?php echo esc_attr( $table_name ); ?>" <?php selected( $data_table, $table_name ); ?>>
-                        <?php echo esc_html( $label ); ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
+        <!-- Tab: Vistas -->
+        <div class="sysman-source-panel" id="sysman-panel-vista" style="<?php echo 'vista' !== $data_source_mode ? 'display:none;' : ''; ?>">
+            <div class="sysman-field-guidance" style="margin-bottom:12px;">
+                <span class="dashicons dashicons-info-outline" aria-hidden="true" style="color:var(--sysman-primary,#1a5276);"></span>
+                <span><?php esc_html_e( 'Las Vistas combinan automáticamente las tablas Plan Presupuestal y Ejecución de Gastos mediante JOINs, mostrando la ejecución por dependencia.', 'sysman-suite' ); ?></span>
             </div>
 
-            <div class="sysman-form-group">
-                <label for="sysman_group_column">
-                    <?php esc_html_e( 'Columna de Agrupación (Eje X / Etiquetas)', 'sysman-suite' ); ?>
-                </label>
-                <select id="sysman_group_column" name="sysman_group_column">
-                    <option value=""><?php esc_html_e( '-- Seleccionar columna --', 'sysman-suite' ); ?></option>
-                </select>
-                <p class="description sysman-column-hint" id="sysman-group-hint"></p>
-            </div>
-
-            <!-- Dynamic Y-value columns -->
-            <div class="sysman-form-group">
-                <label>
-                    <?php esc_html_e( 'Columnas de Valor (Eje Y)', 'sysman-suite' ); ?>
-                </label>
-                <p class="description sysman-column-hint" id="sysman-value-hint"></p>
-                <div id="sysman-value-columns-list">
-                    <!-- JS will populate saved values here -->
-                </div>
-                <button type="button" id="sysman-add-value-column" class="button" style="margin-top:8px;">
-                    <span class="dashicons dashicons-plus-alt2" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
-                    <?php esc_html_e( 'Agregar Valor Y', 'sysman-suite' ); ?>
-                </button>
-                <p class="description" style="margin-top:6px;">
-                    <?php esc_html_e( 'Cada columna de valor genera una serie independiente en el gráfico. Ej: agregar "Apropiación Vigente" y "Apropiación Inicial" para comparar ambas métricas por año.', 'sysman-suite' ); ?>
-                </p>
-            </div>
-
-            <!-- Color/Series column: optional, for grouping by a categorical column instead -->
-            <div class="sysman-form-group sysman-field-color-column" id="sysman-color-column-wrap" style="display:none;">
-                <label for="sysman_color_column">
-                    <?php esc_html_e( 'Columna de Serie / Color (agrupación secundaria)', 'sysman-suite' ); ?>
-                </label>
-                <select id="sysman_color_column" name="sysman_color_column">
-                    <option value=""><?php esc_html_e( '-- Sin serie adicional --', 'sysman-suite' ); ?></option>
-                </select>
-                <p class="description" id="sysman-color-hint">
-                    <?php esc_html_e( 'Solo visible si usa 1 valor Y. Define series por una columna categórica (ej: destino). Si usa múltiples valores Y, las series se crean automáticamente.', 'sysman-suite' ); ?>
-                </p>
-            </div>
-
-            <div class="sysman-form-row-inline">
+            <div class="sysman-form-stack">
                 <div class="sysman-form-group">
-                    <label for="sysman_aggregate"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
-                    <select id="sysman_aggregate" name="sysman_aggregate">
+                    <label for="sysman_vista_type"><?php esc_html_e( 'Tipo de Vista', 'sysman-suite' ); ?></label>
+                    <select id="sysman_vista_type" name="sysman_vista_type">
+                        <option value="ejecucion_dependencia" <?php selected( $vista_type, 'ejecucion_dependencia' ); ?>>
+                            <?php esc_html_e( 'Ejecución por Dependencia', 'sysman-suite' ); ?>
+                        </option>
+                    </select>
+                    <p class="description"><?php esc_html_e( 'JOIN entre Plan Presupuestal (pp.codigo = eg.codigocuenta) y Ejecución de Gastos, agrupado por rubro (pp.nombre).', 'sysman-suite' ); ?></p>
+                </div>
+
+                <div class="sysman-form-row">
+                    <div class="sysman-form-group">
+                        <label for="sysman_vista_compania"><?php esc_html_e( 'Compañía', 'sysman-suite' ); ?></label>
+                        <input type="text" id="sysman_vista_compania" name="sysman_vista_compania" value="<?php echo esc_attr( $vista_compania ); ?>" class="small-text" placeholder="001">
+                    </div>
+
+                    <div class="sysman-form-group" style="flex:2;">
+                        <label for="sysman_vista_dependencia"><?php esc_html_e( 'Dependencia', 'sysman-suite' ); ?></label>
+                        <select id="sysman_vista_dependencia" name="sysman_vista_dependencia">
+                            <option value=""><?php esc_html_e( '-- Todas las dependencias --', 'sysman-suite' ); ?></option>
+                            <?php if ( $vista_dependencia ) : ?>
+                            <option value="<?php echo esc_attr( $vista_dependencia ); ?>" selected><?php echo esc_html( $vista_dependencia ); ?></option>
+                            <?php endif; ?>
+                        </select>
+                        <p class="description"><?php esc_html_e( 'Filtrar por dependencia específica. Las opciones se cargan según la compañía, año y mes seleccionados.', 'sysman-suite' ); ?></p>
+                    </div>
+                </div>
+
+                <!-- Vista Y-value columns (reuses the ejecucion_gastos numeric columns) -->
+                <div class="sysman-form-group">
+                    <label><?php esc_html_e( 'Columnas de Valor (Eje Y)', 'sysman-suite' ); ?></label>
+                    <p class="description"><?php esc_html_e( 'Seleccione las métricas de ejecución a visualizar. Cada una genera una serie en el gráfico.', 'sysman-suite' ); ?></p>
+                    <div id="sysman-vista-value-columns-list">
+                        <!-- JS will populate saved values here for vista mode -->
+                    </div>
+                    <button type="button" id="sysman-vista-add-value-column" class="button" style="margin-top:8px;">
+                        <span class="dashicons dashicons-plus-alt2" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
+                        <?php esc_html_e( 'Agregar Valor Y', 'sysman-suite' ); ?>
+                    </button>
+                </div>
+
+                <div class="sysman-form-group">
+                    <label for="sysman_aggregate_vista"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
+                    <select id="sysman_aggregate_vista">
                         <option value="SUM" <?php selected( $aggregate, 'SUM' ); ?>>SUM - <?php esc_html_e( 'Suma', 'sysman-suite' ); ?></option>
                         <option value="COUNT" <?php selected( $aggregate, 'COUNT' ); ?>>COUNT - <?php esc_html_e( 'Contar', 'sysman-suite' ); ?></option>
                         <option value="AVG" <?php selected( $aggregate, 'AVG' ); ?>>AVG - <?php esc_html_e( 'Promedio', 'sysman-suite' ); ?></option>
                         <option value="MAX" <?php selected( $aggregate, 'MAX' ); ?>>MAX - <?php esc_html_e( 'Máximo', 'sysman-suite' ); ?></option>
                         <option value="MIN" <?php selected( $aggregate, 'MIN' ); ?>>MIN - <?php esc_html_e( 'Mínimo', 'sysman-suite' ); ?></option>
-                    </select>
-                </div>
-
-                <!-- Orientation: shown for bar types -->
-                <div class="sysman-form-group sysman-field-orientation" id="sysman-orientation-wrap" style="display:none;">
-                    <label for="sysman_orientation"><?php esc_html_e( 'Orientación', 'sysman-suite' ); ?></label>
-                    <select id="sysman_orientation" name="sysman_orientation">
-                        <option value="vertical" <?php selected( $orientation, 'vertical' ); ?>><?php esc_html_e( 'Vertical', 'sysman-suite' ); ?></option>
-                        <option value="horizontal" <?php selected( $orientation, 'horizontal' ); ?>><?php esc_html_e( 'Horizontal', 'sysman-suite' ); ?></option>
                     </select>
                 </div>
             </div>
@@ -296,6 +383,48 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
         </table>
     </div>
 
+    <!-- Tooltip Configuration -->
+    <div class="sysman-config-section">
+        <h3>
+            <span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+            <?php esc_html_e( 'Tooltip (Información al pasar el mouse)', 'sysman-suite' ); ?>
+        </h3>
+
+        <p class="description" style="margin-bottom:12px;">
+            <?php esc_html_e( 'Personalice las etiquetas que aparecen en el tooltip al pasar el mouse sobre los datos de la gráfica. Déjelo vacío para usar los valores por defecto.', 'sysman-suite' ); ?>
+        </p>
+
+        <table class="form-table sysman-appearance-table">
+            <tr>
+                <th scope="row">
+                    <label for="sysman_tooltip_label_category"><?php esc_html_e( 'Etiqueta de Categoría', 'sysman-suite' ); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="sysman_tooltip_label_category" name="sysman_tooltip_label_category" value="<?php echo esc_attr( $tooltip_label_category ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Categoría (o Título Eje X)', 'sysman-suite' ); ?>">
+                    <p class="description"><?php esc_html_e( 'Nombre para el campo de categoría/etiqueta en el tooltip. Ej: "Rubro", "Dependencia", "Año".', 'sysman-suite' ); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="sysman_tooltip_label_value"><?php esc_html_e( 'Etiqueta de Valor', 'sysman-suite' ); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="sysman_tooltip_label_value" name="sysman_tooltip_label_value" value="<?php echo esc_attr( $tooltip_label_value ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Valor (o Título Eje Y)', 'sysman-suite' ); ?>">
+                    <p class="description"><?php esc_html_e( 'Nombre para el campo de valor numérico. Ej: "Monto", "Presupuesto", "Total".', 'sysman-suite' ); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="sysman_tooltip_label_series"><?php esc_html_e( 'Etiqueta de Serie', 'sysman-suite' ); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="sysman_tooltip_label_series" name="sysman_tooltip_label_series" value="<?php echo esc_attr( $tooltip_label_series ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Serie', 'sysman-suite' ); ?>">
+                    <p class="description"><?php esc_html_e( 'Nombre para la serie/grupo en el tooltip. Ej: "Concepto", "Tipo", "Métrica".', 'sysman-suite' ); ?></p>
+                </td>
+            </tr>
+        </table>
+    </div>
+
     <!-- Toolbar Configuration -->
     <div class="sysman-config-section">
         <h3>
@@ -365,4 +494,5 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
     <input type="hidden" id="sysman-saved-value-columns" value="<?php echo esc_attr( wp_json_encode( $value_columns ) ); ?>">
     <input type="hidden" id="sysman-saved-color-column" value="<?php echo esc_attr( $color_column ); ?>">
     <input type="hidden" id="sysman-saved-filters" value="<?php echo esc_attr( wp_json_encode( $filters ) ); ?>">
+    <input type="hidden" id="sysman-saved-vista-dependencia" value="<?php echo esc_attr( $vista_dependencia ); ?>">
 </div>

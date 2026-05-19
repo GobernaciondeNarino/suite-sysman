@@ -193,20 +193,23 @@ $unique_id     = 'sysman-chart-' . $id;
     <!-- Chart Config (JSON for JS) -->
     <script type="application/json" id="<?php echo esc_attr( $unique_id ); ?>-config"><?php
         echo wp_json_encode( [
-            'chartId'       => $id,
-            'type'          => $chart_type,
-            'colors'        => $chart_colors,
-            'height'        => $chart_height,
-            'showLegend'    => $show_legend,
-            'showLabels'    => $show_labels,
-            'showTimeline'  => $show_timeline,
-            'numberFormat'  => $number_format,
-            'yAxisTitle'    => $y_axis_title,
-            'xAxisTitle'    => $x_axis_title,
-            'hasGroups'     => $meta['has_groups'] ?? false,
-            'title'         => $title,
-            'restUrl'       => rest_url( 'sysman-suite/v1/' ),
-            'nonce'         => wp_create_nonce( 'wp_rest' ),
+            'chartId'              => $id,
+            'type'                 => $chart_type,
+            'colors'               => $chart_colors,
+            'height'               => $chart_height,
+            'showLegend'           => $show_legend,
+            'showLabels'           => $show_labels,
+            'showTimeline'         => $show_timeline,
+            'numberFormat'         => $number_format,
+            'yAxisTitle'           => $y_axis_title,
+            'xAxisTitle'           => $x_axis_title,
+            'tooltipLabelCategory' => $meta['tooltip_label_category'] ?? '',
+            'tooltipLabelValue'    => $meta['tooltip_label_value'] ?? '',
+            'tooltipLabelSeries'   => $meta['tooltip_label_series'] ?? '',
+            'hasGroups'            => $meta['has_groups'] ?? false,
+            'title'                => $title,
+            'restUrl'              => rest_url( 'sysman-suite/v1/' ),
+            'nonce'                => wp_create_nonce( 'wp_rest' ),
         ] );
     ?></script>
 
