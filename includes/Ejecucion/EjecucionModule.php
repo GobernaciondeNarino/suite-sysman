@@ -170,6 +170,8 @@ class EjecucionModule {
             wp_send_json_error( 'Unauthorized', 403 );
         }
 
+        @set_time_limit( 600 );
+
         $compania = sanitize_text_field( $_POST['compania'] ?? '001' );
         $anio     = absint( $_POST['anio'] ?? date( 'Y' ) );
         $mes      = absint( $_POST['mes'] ?? date( 'n' ) );
@@ -177,25 +179,41 @@ class EjecucionModule {
         $importer = \Sysman_Suite::instance()->importer;
         $results  = [];
 
-        $r = $importer->import_plan( $compania, $anio, $mes );
-        $results['plan'] = $r['success']
-            ? [ 'inserted' => $r['imported'] ]
-            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        try {
+            $r = $importer->import_plan( $compania, $anio, $mes );
+            $results['plan'] = $r['success']
+                ? [ 'inserted' => $r['imported'] ]
+                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        } catch ( \Throwable $e ) {
+            $results['plan'] = [ 'error' => $e->getMessage() ];
+        }
 
-        $r = $importer->import_ejecucion( $compania, $anio, $mes );
-        $results['ejecucion'] = $r['success']
-            ? [ 'inserted' => $r['imported'] ]
-            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        try {
+            $r = $importer->import_ejecucion( $compania, $anio, $mes );
+            $results['ejecucion'] = $r['success']
+                ? [ 'inserted' => $r['imported'] ]
+                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        } catch ( \Throwable $e ) {
+            $results['ejecucion'] = [ 'error' => $e->getMessage() ];
+        }
 
-        $r = $importer->import_auxiliar( $compania, $anio, $mes, 'DIS' );
-        $results['dis'] = $r['success']
-            ? [ 'inserted' => $r['imported'] ]
-            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        try {
+            $r = $importer->import_auxiliar( $compania, $anio, $mes, 'DIS' );
+            $results['dis'] = $r['success']
+                ? [ 'inserted' => $r['imported'] ]
+                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        } catch ( \Throwable $e ) {
+            $results['dis'] = [ 'error' => $e->getMessage() ];
+        }
 
-        $r = $importer->import_auxiliar( $compania, $anio, $mes, 'RES' );
-        $results['res'] = $r['success']
-            ? [ 'inserted' => $r['imported'] ]
-            : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        try {
+            $r = $importer->import_auxiliar( $compania, $anio, $mes, 'RES' );
+            $results['res'] = $r['success']
+                ? [ 'inserted' => $r['imported'] ]
+                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+        } catch ( \Throwable $e ) {
+            $results['res'] = [ 'error' => $e->getMessage() ];
+        }
 
         update_option( 'gn_sisman_last_sync_ejecucion_module', current_time( 'mysql' ) );
 

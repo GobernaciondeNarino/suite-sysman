@@ -272,30 +272,60 @@ jQuery(function($) {
         var $res = $('#gn-ejec-sync-results');
         $res.html('<p><span class="spinner is-active" style="float:none;margin:0 8px 0 0;"></span><?php echo esc_js( __( 'Sincronizando datos desde SYSMAN (esto puede tomar varios minutos)...', 'sysman-suite' ) ); ?></p>').show();
 
-        $.post(gnEjecucion.ajaxUrl, {
-            action: 'gn_ejecucion_sync',
-            nonce: gnEjecucion.nonce,
-            compania: $('#gn-ejec-compania').val(),
-            anio: $('#gn-ejec-anio').val(),
-            mes: $('#gn-ejec-mes').val()
-        }, function(resp) {
-            $btn.prop('disabled', false);
-            if (resp.success) {
-                var d = resp.data;
-                var html = '<div class="notice notice-success inline"><p><strong><?php echo esc_js( __( 'Sincronización completada', 'sysman-suite' ) ); ?></strong></p><ul style="margin:0.5rem 0 0 1.5rem;list-style:disc;">';
-                html += '<li>Plan Presupuestal: ' + (d.plan.inserted || 0) + ' registros</li>';
-                html += '<li>Ejecución Gastos: ' + (d.ejecucion.inserted || 0) + ' registros</li>';
-                html += '<li>Disponibilidades (DIS): ' + (d.dis.inserted || 0) + ' registros</li>';
-                html += '<li>Registros de Compromiso (RES): ' + (d.res.inserted || 0) + ' registros</li>';
-                html += '</ul></div>';
-                $res.html(html);
-                loadDependencias();
-            } else {
-                $res.html('<div class="notice notice-error inline"><p><?php echo esc_js( __( 'Error durante la sincronización.', 'sysman-suite' ) ); ?></p></div>');
+        $.ajax({
+            url: gnEjecucion.ajaxUrl,
+            type: 'POST',
+            timeout: 600000,
+            data: {
+                action: 'gn_ejecucion_sync',
+                nonce: gnEjecucion.nonce,
+                compania: $('#gn-ejec-compania').val(),
+                anio: $('#gn-ejec-anio').val(),
+                mes: $('#gn-ejec-mes').val()
+            },
+            success: function(resp) {
+                $btn.prop('disabled', false);
+                if (resp.success) {
+                    var d = resp.data;
+                    var hasErrors = false;
+                    var html = '<div class="notice notice-success inline"><p><strong><?php echo esc_js( __( 'Sincronización completada', 'sysman-suite' ) ); ?></strong></p><ul style="margin:0.5rem 0 0 1.5rem;list-style:disc;">';
+
+                    var items = [
+                        { key: 'plan', label: 'Plan Presupuestal' },
+                        { key: 'ejecucion', label: 'Ejecución Gastos' },
+                        { key: 'dis', label: 'Disponibilidades (DIS)' },
+                        { key: 'res', label: 'Registros de Compromiso (RES)' }
+                    ];
+                    items.forEach(function(item) {
+                        var r = d[item.key] || {};
+                        if (r.error) {
+                            html += '<li style="color:#dc3232;">' + item.label + ': <strong>Error</strong> — ' + r.error + '</li>';
+                            hasErrors = true;
+                        } else {
+                            html += '<li>' + item.label + ': ' + (r.inserted || 0) + ' registros</li>';
+                        }
+                    });
+
+                    html += '</ul></div>';
+                    if (hasErrors) {
+                        html = html.replace('notice-success', 'notice-warning');
+                    }
+                    $res.html(html);
+                    loadDependencias();
+                } else {
+                    $res.html('<div class="notice notice-error inline"><p><?php echo esc_js( __( 'Error durante la sincronización.', 'sysman-suite' ) ); ?> ' + (resp.data || '') + '</p></div>');
+                }
+            },
+            error: function(xhr, status) {
+                $btn.prop('disabled', false);
+                var detail = '';
+                if (status === 'timeout') {
+                    detail = ' <?php echo esc_js( __( 'La solicitud excedió el tiempo de espera. Intente sincronizar desde el módulo principal de SYSMAN Suite.', 'sysman-suite' ) ); ?>';
+                } else if (xhr.status) {
+                    detail = ' (HTTP ' + xhr.status + ')';
+                }
+                $res.html('<div class="notice notice-error inline"><p><?php echo esc_js( __( 'Error de comunicación con el servidor.', 'sysman-suite' ) ); ?>' + detail + '</p></div>');
             }
-        }).fail(function() {
-            $btn.prop('disabled', false);
-            $res.html('<div class="notice notice-error inline"><p><?php echo esc_js( __( 'Error de comunicación con el servidor.', 'sysman-suite' ) ); ?></p></div>');
         });
     });
 

@@ -164,8 +164,6 @@
             reduccion:              'Reducción',
             credito:                'Crédito',
             contracredito:          'Contracrédito',
-            aplazamiento:           'Aplazamiento',
-            desplazamiento:         'Desplazamiento',
             apropiacionvigente:     'Aprob. Vigente',
             disponibilidades:       'Disponibilidades',
             saldodisponible:        'Saldo Disponible',
