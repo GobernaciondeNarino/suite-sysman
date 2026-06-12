@@ -75,25 +75,51 @@
         var codigobpin = li.dataset.codigobpin || '';
 
         var calls = [
-            api('/ejecucion/' + postId + '/consolidado', { codigo: codigo }),
+            api('/ejecucion/' + postId + '/consolidado', { codigo: codigo })
+                .catch(function(e) { return { _error: 'consolidado', msg: e.message }; }),
             api('/ejecucion/' + postId + '/dis', { codigocuenta: codigo })
+                .catch(function(e) { return { _error: 'dis', msg: e.message }; })
         ];
 
         if (codigobpin) {
-            calls.push(api('/ejecucion/' + postId + '/proyecto', { codigobpin: codigobpin }));
+            calls.push(
+                api('/ejecucion/' + postId + '/proyecto', { codigobpin: codigobpin })
+                    .catch(function() { return null; })
+            );
         }
 
         Promise.all(calls).then(function(results) {
             var html = '';
-            if (results[2]) {
-                html += renderProyecto(results[2], codigobpin);
+            var errors = [];
+
+            // Proyecto BPIN — only show if data exists and has content
+            var proyectoData = results[2] || null;
+            if (proyectoData && !proyectoData._error && proyectoData.nombre_proyecto) {
+                html += renderProyecto(proyectoData, codigobpin);
             }
-            html += renderConsolidado(results[0]);
-            html += renderDisList(results[1], codigo);
+
+            // Consolidado
+            var consolData = results[0];
+            if (consolData && consolData._error) {
+                errors.push('Ejecución consolidada (HTTP ' + consolData.msg + ')');
+            } else {
+                html += renderConsolidado(consolData);
+            }
+
+            // DIS
+            var disData = results[1];
+            if (disData && disData._error) {
+                errors.push('Disponibilidades (HTTP ' + disData.msg + ')');
+            } else {
+                html += renderDisList(disData, codigo);
+            }
+
+            if (errors.length > 0) {
+                html += '<p class="gn-ejec__error">Error al cargar: ' + esc(errors.join('; ')) + '</p>';
+            }
+
             body.innerHTML = html;
             li.dataset.loaded = '1';
-        }).catch(function() {
-            body.innerHTML = '<p class="gn-ejec__error">Error al cargar datos.</p>';
         });
     }
 
@@ -112,8 +138,8 @@
             .then(function(data) {
                 body.innerHTML = renderResList(data);
                 li.dataset.loaded = '1';
-            }).catch(function() {
-                body.innerHTML = '<p class="gn-ejec__error">Error al cargar registros de compromiso.</p>';
+            }).catch(function(e) {
+                body.innerHTML = '<p class="gn-ejec__error">Error al cargar registros de compromiso (HTTP ' + esc(e.message) + ').</p>';
             });
     }
 
