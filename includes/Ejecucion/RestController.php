@@ -80,6 +80,15 @@ class RestController {
             ],
         ] );
 
+        register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/export', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_export' ],
+            'permission_callback' => '__return_true',
+            'args' => [
+                'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
+            ],
+        ] );
+
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/proyecto', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_proyecto' ],
@@ -152,6 +161,30 @@ class RestController {
             $row['contract_url'] = $urls[ $doc ] ?? '';
         }
         return $rows;
+    }
+
+    public function get_export( \WP_REST_Request $request ): \WP_REST_Response {
+        $post_id = (int) $request->get_param( 'post_id' );
+        $post    = get_post( $post_id );
+
+        if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {
+            return new \WP_REST_Response( [ 'error' => 'Not found' ], 404 );
+        }
+
+        $data = $this->repo->get_export_data( $post_id );
+
+        return new \WP_REST_Response( [
+            'meta'  => [
+                'titulo'      => $post->post_title,
+                'dependencia' => get_post_meta( $post_id, '_gn_dependencia', true ),
+                'anio'        => (int) get_post_meta( $post_id, '_gn_anio', true ),
+                'mes'         => (int) get_post_meta( $post_id, '_gn_mes', true ),
+                'compania'    => get_post_meta( $post_id, '_gn_compania', true ) ?: '001',
+                'vigencia'    => get_post_meta( $post_id, '_gn_vigencia', true ),
+            ],
+            'total' => count( $data ),
+            'data'  => $data,
+        ] );
     }
 
     public function get_proyecto( \WP_REST_Request $request ): \WP_REST_Response {

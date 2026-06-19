@@ -195,6 +195,48 @@ class Repository {
         return $result ?: null;
     }
 
+    public function get_export_data( int $post_id ): array {
+        $meta = $this->get_post_meta( $post_id );
+        if ( ! $meta ) {
+            return [];
+        }
+
+        global $wpdb;
+        $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
+
+        $sql = "SELECT pp.codigo, pp.nombre, pp.destino, pp.naturaleza, pp.sector, pp.programa,
+                       pp.subprograma, pp.codigoproducto, pp.codigobpin,
+                       COALESCE(eg.apropiacioninicial, 0) AS apropiacioninicial,
+                       COALESCE(eg.adicion, 0) AS adicion,
+                       COALESCE(eg.reduccion, 0) AS reduccion,
+                       COALESCE(eg.credito, 0) AS credito,
+                       COALESCE(eg.contracredito, 0) AS contracredito,
+                       COALESCE(eg.apropiacionvigente, 0) AS apropiacionvigente,
+                       COALESCE(eg.disponibilidades, 0) AS disponibilidades,
+                       COALESCE(eg.saldodisponible, 0) AS saldodisponible,
+                       COALESCE(eg.compromisos, 0) AS compromisos,
+                       COALESCE(eg.disponibilidadesabiertas, 0) AS disponibilidadesabiertas,
+                       COALESCE(eg.obligacion, 0) AS obligacion,
+                       COALESCE(eg.pagos, 0) AS pagos,
+                       COALESCE(eg.obligacionesporpagar, 0) AS obligacionesporpagar
+                FROM {$pp} pp
+                LEFT JOIN {$eg} eg ON pp.codigo = eg.codigocuenta
+                    AND eg.compania = pp.compania AND eg.anio = pp.anio AND eg.mes = pp.mes
+                WHERE pp.compania = %s AND pp.anio = %d AND pp.mes = %d
+                    AND pp.nombredependencia = %s AND pp.movimiento = 'SI'";
+        $params = [ $meta['compania'], $meta['anio'], $meta['mes'], $meta['dependencia'] ];
+
+        if ( ! empty( $meta['vigencia'] ) ) {
+            $sql .= " AND pp.tipovigencia = %s";
+            $params[] = $meta['vigencia'];
+        }
+
+        $sql .= " ORDER BY pp.codigo";
+
+        return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+    }
+
     public function get_contract_urls( array $nrodocumentos ): array {
         if ( empty( $nrodocumentos ) ) {
             return [];

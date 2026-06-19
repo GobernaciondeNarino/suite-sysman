@@ -34,8 +34,11 @@ class EjecucionModule {
         add_action( 'wp_ajax_gn_ejecucion_save', [ $this, 'ajax_save' ] );
         add_action( 'wp_ajax_gn_ejecucion_delete', [ $this, 'ajax_delete' ] );
         add_action( 'wp_ajax_gn_ejecucion_sync', [ $this, 'ajax_sync' ] );
+        add_action( 'wp_ajax_gn_ejecucion_export', [ $this, 'ajax_export' ] );
+        add_action( 'wp_ajax_nopriv_gn_ejecucion_export', [ $this, 'ajax_export' ] );
 
         add_shortcode( 'gn_ejecucion', [ $this, 'shortcode' ] );
+        add_shortcode( 'gn_ejecucion_export', [ $this, 'shortcode_export' ] );
     }
 
     public function admin_menu(): void {
@@ -218,6 +221,111 @@ class EjecucionModule {
         update_option( 'gn_sisman_last_sync_ejecucion_module', current_time( 'mysql' ) );
 
         wp_send_json_success( $results );
+    }
+
+    public function ajax_export(): void {
+        $post_id = absint( $_GET['id'] ?? 0 );
+        $format  = sanitize_text_field( $_GET['format'] ?? 'csv' );
+
+        $post = $post_id ? get_post( $post_id ) : null;
+        if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {
+            wp_die( 'Seguimiento no encontrado.', 'Error', [ 'response' => 404 ] );
+        }
+
+        $repo = Repository::instance();
+        $data = $repo->get_export_data( $post_id );
+
+        $slug     = sanitize_file_name( $post->post_title );
+        $filename = $slug . '_' . gmdate( 'Y-m-d' );
+
+        $headers = [
+            'Codigo', 'Nombre', 'Destino', 'Naturaleza', 'Sector', 'Programa',
+            'Subprograma', 'Codigo Producto', 'Codigo BPIN',
+            'Aprob. Inicial', 'Adicion', 'Reduccion', 'Credito', 'Contracredito',
+            'Aprob. Vigente', 'Disponibilidades', 'Saldo Disponible', 'Compromisos',
+            'Disp. Abiertas', 'Obligacion', 'Pagos', 'Oblig. por Pagar',
+        ];
+
+        $keys = [
+            'codigo', 'nombre', 'destino', 'naturaleza', 'sector', 'programa',
+            'subprograma', 'codigoproducto', 'codigobpin',
+            'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+            'apropiacionvigente', 'disponibilidades', 'saldodisponible', 'compromisos',
+            'disponibilidadesabiertas', 'obligacion', 'pagos', 'obligacionesporpagar',
+        ];
+
+        if ( 'txt' === $format ) {
+            header( 'Content-Type: text/plain; charset=utf-8' );
+            header( 'Content-Disposition: attachment; filename="' . $filename . '.txt"' );
+
+            echo implode( "\t", $headers ) . "\n";
+            foreach ( $data as $row ) {
+                $values = [];
+                foreach ( $keys as $k ) {
+                    $values[] = $row[ $k ] ?? '';
+                }
+                echo implode( "\t", $values ) . "\n";
+            }
+        } else {
+            header( 'Content-Type: text/csv; charset=utf-8' );
+            header( 'Content-Disposition: attachment; filename="' . $filename . '.csv"' );
+
+            $output = fopen( 'php://output', 'w' );
+            fprintf( $output, "\xEF\xBB\xBF" );
+            fputcsv( $output, $headers, ';' );
+            foreach ( $data as $row ) {
+                $values = [];
+                foreach ( $keys as $k ) {
+                    $values[] = $row[ $k ] ?? '';
+                }
+                fputcsv( $output, $values, ';' );
+            }
+            fclose( $output );
+        }
+
+        exit;
+    }
+
+    public function shortcode_export( $atts ): string {
+        $atts    = shortcode_atts( [ 'id' => 0 ], $atts, 'gn_ejecucion_export' );
+        $post_id = absint( $atts['id'] );
+
+        if ( ! $post_id ) {
+            return '';
+        }
+
+        $post = get_post( $post_id );
+        if ( ! $post || 'gn_ejecucion' !== $post->post_type ) {
+            return '';
+        }
+
+        wp_enqueue_style( 'gn-ejecucion', SYSMAN_SUITE_URL . 'assets/css/ejecucion.css', [], filemtime( SYSMAN_SUITE_PATH . 'assets/css/ejecucion.css' ) );
+
+        $csv_url  = admin_url( 'admin-ajax.php?action=gn_ejecucion_export&id=' . $post_id . '&format=csv' );
+        $txt_url  = admin_url( 'admin-ajax.php?action=gn_ejecucion_export&id=' . $post_id . '&format=txt' );
+        $json_url = rest_url( 'gn-sisman/v1/ejecucion/' . $post_id . '/export' );
+
+        $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
+        $anio = get_post_meta( $post_id, '_gn_anio', true );
+        $mes  = (int) get_post_meta( $post_id, '_gn_mes', true );
+        $meses = [ 1=>'Ene',2=>'Feb',3=>'Mar',4=>'Abr',5=>'May',6=>'Jun',7=>'Jul',8=>'Ago',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dic' ];
+
+        $html  = '<div class="gn-ejec-export">';
+        $html .= '<div class="gn-ejec-export__header">';
+        $html .= '<strong class="gn-ejec-export__title">' . esc_html__( 'Exportar Datos de Ejecucion', 'sysman-suite' ) . '</strong>';
+        $html .= '<span class="gn-ejec-export__meta">' . esc_html( $dependencia . ' — ' . ( $meses[ $mes ] ?? $mes ) . ' ' . $anio ) . '</span>';
+        $html .= '</div>';
+        $html .= '<div class="gn-ejec-export__body">';
+        $html .= '<a href="' . esc_url( $csv_url ) . '" class="gn-ejec-export__btn gn-ejec-export__btn--csv">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128196;</span> CSV</a>';
+        $html .= '<a href="' . esc_url( $txt_url ) . '" class="gn-ejec-export__btn gn-ejec-export__btn--txt">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128203;</span> TXT</a>';
+        $html .= '<a href="' . esc_url( $json_url ) . '" target="_blank" rel="noopener" class="gn-ejec-export__btn gn-ejec-export__btn--json">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128279;</span> JSON API</a>';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     public function shortcode( $atts ): string {
