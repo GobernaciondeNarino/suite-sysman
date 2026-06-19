@@ -237,6 +237,34 @@ class Repository {
         return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
     }
 
+    public function get_disponibilidades_report( int $anio, int $mes, string $compania = '001', string $dependencia = '' ): array {
+        global $wpdb;
+        $ac = $wpdb->prefix . 'sysman_auxiliar_cuentas';
+        $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
+
+        $sql = "SELECT ac.numero, ac.tercero, ac.nombretercero, ac.rubro, ac.descripcion,
+                       ac.nrodocumento, ac.valordebito, ac.valorcredito, ac.saldoporejecutaresp,
+                       ac.cmpteafectado, ac.fecha, ac.anio, ac.mes,
+                       pp.nombre AS nombrerubro, pp.dependencia, pp.nombredependencia,
+                       pp.destino, pp.naturaleza, pp.sector, pp.programa, pp.subprograma,
+                       pp.codigoproducto, pp.codigobpin
+                FROM {$ac} ac
+                INNER JOIN {$pp} pp ON ac.rubro = pp.codigo
+                    AND pp.compania = ac.compania AND pp.anio = ac.anio AND pp.mes = ac.mes
+                WHERE ac.tipocpte = 'DIS' AND ac.compania = %s AND ac.anio = %d AND ac.mes = %d
+                    AND pp.movimiento = 'SI'";
+        $params = [ $compania, $anio, $mes ];
+
+        if ( '' !== $dependencia ) {
+            $sql .= " AND pp.nombredependencia = %s";
+            $params[] = $dependencia;
+        }
+
+        $sql .= " ORDER BY ac.fecha, ac.numero";
+
+        return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+    }
+
     public function get_contract_urls( array $nrodocumentos ): array {
         if ( empty( $nrodocumentos ) ) {
             return [];

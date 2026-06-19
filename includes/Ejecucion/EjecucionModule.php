@@ -37,8 +37,12 @@ class EjecucionModule {
         add_action( 'wp_ajax_gn_ejecucion_export', [ $this, 'ajax_export' ] );
         add_action( 'wp_ajax_nopriv_gn_ejecucion_export', [ $this, 'ajax_export' ] );
 
+        add_action( 'wp_ajax_gn_reporte_dis_export', [ $this, 'ajax_reporte_dis_export' ] );
+        add_action( 'wp_ajax_nopriv_gn_reporte_dis_export', [ $this, 'ajax_reporte_dis_export' ] );
+
         add_shortcode( 'gn_ejecucion', [ $this, 'shortcode' ] );
         add_shortcode( 'gn_ejecucion_export', [ $this, 'shortcode_export' ] );
+        add_shortcode( 'gn_reporte_dis', [ $this, 'shortcode_reporte_dis' ] );
     }
 
     public function admin_menu(): void {
@@ -314,6 +318,122 @@ class EjecucionModule {
         $html .= '<div class="gn-ejec-export__header">';
         $html .= '<strong class="gn-ejec-export__title">' . esc_html__( 'Exportar Datos de Ejecucion', 'sysman-suite' ) . '</strong>';
         $html .= '<span class="gn-ejec-export__meta">' . esc_html( $dependencia . ' — ' . ( $meses[ $mes ] ?? $mes ) . ' ' . $anio ) . '</span>';
+        $html .= '</div>';
+        $html .= '<div class="gn-ejec-export__body">';
+        $html .= '<a href="' . esc_url( $csv_url ) . '" class="gn-ejec-export__btn gn-ejec-export__btn--csv">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128196;</span> CSV</a>';
+        $html .= '<a href="' . esc_url( $txt_url ) . '" class="gn-ejec-export__btn gn-ejec-export__btn--txt">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128203;</span> TXT</a>';
+        $html .= '<a href="' . esc_url( $json_url ) . '" target="_blank" rel="noopener" class="gn-ejec-export__btn gn-ejec-export__btn--json">';
+        $html .= '<span class="gn-ejec-export__btn-icon">&#128279;</span> JSON API</a>';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    public function ajax_reporte_dis_export(): void {
+        $anio        = absint( $_GET['anio'] ?? 0 );
+        $mes         = absint( $_GET['mes'] ?? 0 );
+        $compania    = sanitize_text_field( $_GET['compania'] ?? '001' );
+        $dependencia = sanitize_text_field( $_GET['dependencia'] ?? '' );
+        $format      = sanitize_text_field( $_GET['format'] ?? 'csv' );
+
+        if ( ! $anio || ! $mes ) {
+            wp_die( 'Parametros anio y mes son requeridos.', 'Error', [ 'response' => 400 ] );
+        }
+
+        $repo = Repository::instance();
+        $data = $repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia );
+
+        $filename = 'DIS_' . $compania . '_' . $anio . '_' . $mes . '_' . gmdate( 'Y-m-d' );
+
+        $col_headers = [
+            'Numero', 'Tercero', 'Nombre Tercero', 'Rubro', 'Nombre Rubro', 'Descripcion',
+            'Nro Documento', 'Valor Debito', 'Valor Credito', 'Saldo por Ejecutar',
+            'Cpte Afectado', 'Fecha', 'Anio', 'Mes',
+            'Dependencia', 'Nombre Dependencia', 'Destino', 'Naturaleza',
+            'Sector', 'Programa', 'Subprograma', 'Codigo Producto', 'Codigo BPIN',
+        ];
+
+        $keys = [
+            'numero', 'tercero', 'nombretercero', 'rubro', 'nombrerubro', 'descripcion',
+            'nrodocumento', 'valordebito', 'valorcredito', 'saldoporejecutaresp',
+            'cmpteafectado', 'fecha', 'anio', 'mes',
+            'dependencia', 'nombredependencia', 'destino', 'naturaleza',
+            'sector', 'programa', 'subprograma', 'codigoproducto', 'codigobpin',
+        ];
+
+        if ( 'txt' === $format ) {
+            header( 'Content-Type: text/plain; charset=utf-8' );
+            header( 'Content-Disposition: attachment; filename="' . $filename . '.txt"' );
+
+            echo implode( "\t", $col_headers ) . "\n";
+            foreach ( $data as $row ) {
+                $values = [];
+                foreach ( $keys as $k ) {
+                    $values[] = $row[ $k ] ?? '';
+                }
+                echo implode( "\t", $values ) . "\n";
+            }
+        } else {
+            header( 'Content-Type: text/csv; charset=utf-8' );
+            header( 'Content-Disposition: attachment; filename="' . $filename . '.csv"' );
+
+            $output = fopen( 'php://output', 'w' );
+            fprintf( $output, "\xEF\xBB\xBF" );
+            fputcsv( $output, $col_headers, ';' );
+            foreach ( $data as $row ) {
+                $values = [];
+                foreach ( $keys as $k ) {
+                    $values[] = $row[ $k ] ?? '';
+                }
+                fputcsv( $output, $values, ';' );
+            }
+            fclose( $output );
+        }
+
+        exit;
+    }
+
+    public function shortcode_reporte_dis( $atts ): string {
+        $atts = shortcode_atts( [
+            'anio'        => '',
+            'mes'         => '',
+            'compania'    => '001',
+            'dependencia' => '',
+        ], $atts, 'gn_reporte_dis' );
+
+        $anio     = absint( $atts['anio'] );
+        $mes      = absint( $atts['mes'] );
+        $compania = sanitize_text_field( $atts['compania'] );
+        $dep      = sanitize_text_field( $atts['dependencia'] );
+
+        if ( ! $anio || ! $mes ) {
+            return '<p style="color:#dc2626;">Shortcode <code>[gn_reporte_dis]</code>: atributos <strong>anio</strong> y <strong>mes</strong> son requeridos.</p>';
+        }
+
+        wp_enqueue_style( 'gn-ejecucion', SYSMAN_SUITE_URL . 'assets/css/ejecucion.css', [], filemtime( SYSMAN_SUITE_PATH . 'assets/css/ejecucion.css' ) );
+
+        $base_params = 'anio=' . $anio . '&mes=' . $mes . '&compania=' . rawurlencode( $compania );
+        if ( '' !== $dep ) {
+            $base_params .= '&dependencia=' . rawurlencode( $dep );
+        }
+
+        $csv_url  = admin_url( 'admin-ajax.php?action=gn_reporte_dis_export&format=csv&' . $base_params );
+        $txt_url  = admin_url( 'admin-ajax.php?action=gn_reporte_dis_export&format=txt&' . $base_params );
+        $json_url = rest_url( 'gn-sisman/v1/reporte/disponibilidades?' . $base_params );
+
+        $meses = [ 1=>'Ene',2=>'Feb',3=>'Mar',4=>'Abr',5=>'May',6=>'Jun',7=>'Jul',8=>'Ago',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dic' ];
+        $subtitle = ( $meses[ $mes ] ?? $mes ) . ' ' . $anio;
+        if ( '' !== $dep ) {
+            $subtitle = $dep . ' — ' . $subtitle;
+        }
+
+        $html  = '<div class="gn-ejec-export">';
+        $html .= '<div class="gn-ejec-export__header">';
+        $html .= '<strong class="gn-ejec-export__title">Reporte Disponibilidades (DIS)</strong>';
+        $html .= '<span class="gn-ejec-export__meta">' . esc_html( $subtitle ) . '</span>';
         $html .= '</div>';
         $html .= '<div class="gn-ejec-export__body">';
         $html .= '<a href="' . esc_url( $csv_url ) . '" class="gn-ejec-export__btn gn-ejec-export__btn--csv">';

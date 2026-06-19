@@ -98,6 +98,17 @@ class RestController {
                 'codigobpin' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
             ],
         ] );
+        register_rest_route( $ns, '/reporte/disponibilidades', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'get_reporte_dis' ],
+            'permission_callback' => '__return_true',
+            'args' => [
+                'anio'        => [ 'required' => true,  'type' => 'integer', 'sanitize_callback' => 'absint' ],
+                'mes'         => [ 'required' => true,  'type' => 'integer', 'sanitize_callback' => 'absint' ],
+                'compania'    => [ 'required' => false, 'type' => 'string', 'default' => '001', 'sanitize_callback' => 'sanitize_text_field' ],
+                'dependencia' => [ 'required' => false, 'type' => 'string', 'default' => '',    'sanitize_callback' => 'sanitize_text_field' ],
+            ],
+        ] );
     }
 
     public function check_admin(): bool {
@@ -184,6 +195,30 @@ class RestController {
             ],
             'total' => count( $data ),
             'data'  => $data,
+        ] );
+    }
+
+    public function get_reporte_dis( \WP_REST_Request $request ): \WP_REST_Response {
+        $anio        = (int) $request->get_param( 'anio' );
+        $mes         = (int) $request->get_param( 'mes' );
+        $compania    = $request->get_param( 'compania' );
+        $dependencia = $request->get_param( 'dependencia' );
+
+        $data = $this->repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia );
+
+        $meses = [ 1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
+                   7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre' ];
+
+        return new \WP_REST_Response( [
+            'meta'  => [
+                'anio'        => $anio,
+                'mes'         => $mes,
+                'mes_nombre'  => $meses[ $mes ] ?? $mes,
+                'compania'    => $compania,
+                'dependencia' => $dependencia,
+            ],
+            'total' => count( $data ),
+            'data'  => $this->enrich_with_contracts( $data ),
         ] );
     }
 
