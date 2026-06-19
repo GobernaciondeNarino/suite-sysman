@@ -39,8 +39,10 @@ class EjecucionModule {
     }
 
     public function admin_menu(): void {
+        // Hidden page (parent = null): accessible by URL
+        // (admin.php?page=sysman-ejecucion) but not shown in the menu.
         add_submenu_page(
-            'sysman-suite',
+            '',
             __( 'Ejecución', 'sysman-suite' ),
             __( 'Ejecución', 'sysman-suite' ),
             'manage_options',
@@ -68,7 +70,8 @@ class EjecucionModule {
     }
 
     public function enqueue_assets( string $hook ): void {
-        if ( 'sysman-suite_page_sysman-ejecucion' !== $hook ) {
+        // Hidden page hook is 'admin_page_sysman-ejecucion'.
+        if ( ! in_array( $hook, [ 'admin_page_sysman-ejecucion', 'sysman-suite_page_sysman-ejecucion' ], true ) ) {
             return;
         }
 

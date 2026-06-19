@@ -34,12 +34,16 @@ $site_url     = rest_url( 'gn-sisman/v1/' );
 
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
                 <span class="dashicons dashicons-chart-line" style="color:#1a5276;font-size:22px;width:22px;height:22px;"></span>
-                <div>
+                <div style="flex:1;">
                     <strong style="color:#1a5276;font-size:1.05rem;"><?php esc_html_e( 'Ejecucion Presupuestal', 'sysman-suite' ); ?></strong>
                     <p style="margin:2px 0 0;font-size:0.85rem;color:#6b7280;">
                         <?php esc_html_e( 'Exporta los rubros con datos de ejecucion consolidada (apropiaciones, compromisos, obligaciones, pagos) para un seguimiento especifico.', 'sysman-suite' ); ?>
                     </p>
                 </div>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=sysman-ejecucion' ) ); ?>" class="button button-small" style="white-space:nowrap;">
+                    <span class="dashicons dashicons-admin-settings" style="vertical-align:middle;margin-top:-2px;"></span>
+                    <?php esc_html_e( 'Gestionar seguimientos', 'sysman-suite' ); ?>
+                </a>
             </div>
 
             <table class="widefat striped" style="margin-bottom:1rem;">

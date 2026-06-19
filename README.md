@@ -142,15 +142,33 @@ wp sysman truncate --yes
 | `/wp-json/sysman-suite/v1/chart/{id}/csv` | GET | Descargar CSV de un grafico |
 | `/wp-json/sysman-suite/v1/years/{tabla}` | GET | Anos disponibles |
 
-### Endpoints Ejecucion
+### Endpoints Ejecucion (`gn-sisman/v1`)
 
-| Endpoint | Metodo | Descripcion |
-|----------|--------|-------------|
-| `/wp-json/gn-sisman/v1/dependencias` | GET | Dependencias unicas del plan presupuestal |
-| `/wp-json/gn-sisman/v1/ejecucion/{post_id}/rubros` | GET | Rubros de la dependencia |
-| `/wp-json/gn-sisman/v1/consolidado` | GET | Ejecucion consolidada por rubro |
-| `/wp-json/gn-sisman/v1/dis` | GET | Disponibilidades por cuenta |
-| `/wp-json/gn-sisman/v1/res` | GET | Reservas por disponibilidad |
+| Endpoint | Metodo | Acceso | Descripcion |
+|----------|--------|--------|-------------|
+| `/dependencias` | GET | Admin | Dependencias unicas del plan presupuestal |
+| `/vigencias` | GET | Admin | Vigencias unicas del plan presupuestal |
+| `/ejecucion/{post_id}/rubros` | GET | Publico | Rubros de la dependencia |
+| `/ejecucion/{post_id}/consolidado?codigo=X` | GET | Publico | Ejecucion consolidada por rubro |
+| `/ejecucion/{post_id}/dis?codigocuenta=X` | GET | Publico | Disponibilidades por cuenta |
+| `/ejecucion/{post_id}/res?numero_dis=X&rubro=X` | GET | Publico | Reservas por disponibilidad |
+| `/ejecucion/{post_id}/proyecto?codigobpin=X` | GET | Publico | Datos del proyecto BPIN |
+
+### Endpoints Datos Abiertos (`gn-sisman/v1`)
+
+| Endpoint | Metodo | Acceso | Descripcion |
+|----------|--------|--------|-------------|
+| `/ejecucion/{post_id}/export` | GET | Publico | Rubros + ejecucion consolidada de un seguimiento (JSON) |
+| `/reporte/disponibilidades?anio=X&mes=X` | GET | Publico | Disponibilidades (DIS) cruzadas con plan presupuestal (JSON) |
+
+Parametros opcionales de `/reporte/disponibilidades`: `compania` (def. `001`), `dependencia` (filtro).
+
+### Descargas (admin-ajax, publico)
+
+| Accion | Formatos | Descripcion |
+|--------|----------|-------------|
+| `gn_ejecucion_export` | `csv`, `txt` | Exporta la ejecucion consolidada de un seguimiento |
+| `gn_reporte_dis_export` | `csv`, `txt` | Exporta el reporte de disponibilidades |
 
 ## API SYSMAN
 
@@ -190,37 +208,80 @@ sisman-suite/
 │   ├── class-logger.php          # Sistema de logs
 │   ├── class-updater.php         # Actualizaciones desde GitHub
 │   ├── class-cli.php             # Comandos WP-CLI
-│   └── Ejecucion/                # Modulo Ejecucion
-│       ├── Schema.php            # Migracion de tablas (v5.0.0)
-│       ├── EjecucionModule.php   # Bootstrap del modulo
-│       ├── PostType.php          # CPT gn_ejecucion
-│       ├── RestController.php    # Endpoints REST del acordeon
-│       ├── Repository.php        # Consultas SQL
-│       └── AccordionRenderer.php # HTML del acordeon
+│   ├── Ejecucion/                # Modulo Ejecucion
+│   │   ├── Schema.php            # Migracion de tablas (v5.0.0)
+│   │   ├── EjecucionModule.php   # Bootstrap del modulo
+│   │   ├── PostType.php          # CPT gn_ejecucion
+│   │   ├── RestController.php    # Endpoints REST del acordeon + exportacion
+│   │   ├── Repository.php        # Consultas SQL
+│   │   └── AccordionRenderer.php # HTML del acordeon
+│   └── DatosAbiertos/            # Modulo Datos Abiertos (v5.7.0)
+│       └── DatosAbiertosModule.php # Shortcodes de exportacion + descargas CSV/TXT
 ├── templates/admin/
 │   ├── dashboard-page.php
 │   ├── import-page.php
 │   ├── records-page.php
 │   ├── logs-page.php
 │   ├── settings-page.php
-│   └── ejecucion/
-│       ├── ejecucion-list.php
-│       ├── ejecucion-edit.php
-│       └── ejecucion-view.php
+│   ├── ejecucion/
+│   │   ├── ejecucion-list.php
+│   │   ├── ejecucion-edit.php
+│   │   └── ejecucion-view.php
+│   └── datos-abiertos/
+│       └── datos-abiertos.php
 ├── assets/
 │   ├── css/
 │   │   ├── admin.css
 │   │   ├── ejecucion.css
+│   │   ├── datos-abiertos.css
 │   │   └── frontend.css
 │   └── js/
 │       ├── admin-import.js
 │       ├── admin-charts.js
 │       ├── ejecucion.js
+│       ├── datos-abiertos.js
 │       └── frontend.js
 └── logs/
 ```
 
 ## Changelog
+
+### 5.7.1
+- **Menus**: Eliminado el submenu duplicado "Panel de Control" — el panel ahora abre al hacer clic en el menu principal "SYSMAN Suite" (`remove_submenu_page` del item autogenerado)
+- **Menus**: El submenu "Ejecucion" se oculta del menu (pagina con parent `null`); sigue accesible por URL `admin.php?page=sysman-ejecucion` y enlazado desde "Datos Abiertos" con el boton "Gestionar seguimientos"
+- **Seguridad**: Proteccion contra inyeccion de formulas CSV (valores que inician con `=`, `+`, `-`, `@`, tab o CR se prefijan con apostrofe) en exportaciones CSV y TXT
+- **Seguridad**: Saneamiento de celdas TXT (colapsa tabs/saltos de linea para no romper la estructura del archivo)
+- **Seguridad**: `Content-Disposition` con nombre de archivo saneado (`sanitize_file_name`) + `nocache_headers()`
+- **Rendimiento/Seguridad**: Cache transient (5 min) en las consultas de exportacion y reporte DIS para mitigar carga de DB en endpoints publicos
+- `@set_time_limit(300)` en las descargas para datasets grandes
+
+### 5.7.0
+- **Nuevo modulo "Datos Abiertos"**: pagina admin dedicada con generador interactivo de shortcodes, tablas de parametros y documentacion de endpoints API
+- Los shortcodes `[gn_ejecucion_export]` y `[gn_reporte_dis]` se trasladan del modulo Ejecucion al nuevo modulo
+- Nuevas tarjetas frontend con cabecera en degradado, copiar-al-portapapeles de la URL del API y pie institucional
+- Metodo compartido `stream_download()` elimina la logica duplicada de CSV/TXT
+- Assets propios: `datos-abiertos.css` y `datos-abiertos.js`
+
+### 5.6.4
+- **Nuevo shortcode `[gn_reporte_dis anio="" mes=""]`**: reporte de disponibilidades (DIS) cruzado con plan presupuestal
+- Endpoint publico `GET /gn-sisman/v1/reporte/disponibilidades` con filtros opcionales `compania` y `dependencia`
+- Descargas CSV/TXT y enlace al API JSON
+
+### 5.6.3
+- **Nueva tarjeta de exportacion** en la vista del seguimiento: descargas CSV/TXT y endpoint JSON publico `/ejecucion/{id}/export`
+- Nuevo shortcode `[gn_ejecucion_export id="X"]`
+
+### 5.6.2
+- **Fix**: "Error al cargar datos." en multiples rubros — `Promise.all()` rechazaba todo si una sola llamada fallaba (p.ej. proyecto BPIN inexistente)
+- Cada llamada (consolidado, DIS, proyecto) tiene su propio `.catch()`; el proyecto se omite en silencio si no existe, consolidado/DIS muestran error especifico
+
+### 5.6.1
+- **Fix**: error al sincronizar — timeout de PHP durante 4 llamadas secuenciales al API. Solucion: `set_time_limit(600)`, try/catch por importacion, timeout jQuery 600s y mensajes de error detallados
+- Eliminadas las columnas "Aplazamiento" y "Desplazamiento" de la tabla consolidada en el frontend
+
+### 5.6.0
+- **Nueva pestana "Vistas"** en el modulo de graficos: JOIN entre `plan_presupuestal` y `ejecucion_gastos`
+- Configuracion personalizada de etiquetas de tooltip (categoria, valor, serie)
 
 ### 5.5.2
 - **Fix**: Multiples shortcodes `[gn_ejecucion]` en la misma pagina — solo el primero funcionaba

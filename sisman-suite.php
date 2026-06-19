@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     5.7.0
+ * Version:     5.7.1
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '5.7.0' );
+define( 'SYSMAN_SUITE_VERSION', '5.7.1' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -86,6 +86,7 @@ final class Sysman_Suite {
         register_deactivation_hook( SYSMAN_SUITE_FILE, [ $this, 'deactivate' ] );
 
         add_action( 'admin_menu', [ $this, 'admin_menu' ] );
+        add_action( 'admin_menu', [ $this, 'cleanup_submenu' ], 999 );
         add_action( 'admin_enqueue_scripts', [ $this, 'admin_assets' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_init', [ $this, 'maybe_create_tables' ] );
@@ -170,15 +171,6 @@ final class Sysman_Suite {
 
         add_submenu_page(
             'sysman-suite',
-            __( 'Panel de Control', 'sysman-suite' ),
-            __( 'Panel de Control', 'sysman-suite' ),
-            'manage_options',
-            'sysman-suite',
-            [ $this, 'render_dashboard_page' ]
-        );
-
-        add_submenu_page(
-            'sysman-suite',
             __( 'Importar Datos', 'sysman-suite' ),
             __( 'Importar Datos', 'sysman-suite' ),
             'manage_options',
@@ -214,6 +206,14 @@ final class Sysman_Suite {
         );
     }
 
+    /**
+     * Remove the auto-generated duplicate first submenu item so the
+     * dashboard is reachable only by clicking the top-level menu.
+     */
+    public function cleanup_submenu(): void {
+        remove_submenu_page( 'sysman-suite', 'sysman-suite' );
+    }
+
     public function render_dashboard_page(): void {
         include SYSMAN_SUITE_PATH . 'templates/admin/dashboard-page.php';
     }
@@ -241,8 +241,8 @@ final class Sysman_Suite {
             'sysman-suite_page_sysman-records',
             'sysman-suite_page_sysman-logs',
             'sysman-suite_page_sysman-settings',
-            'sysman-suite_page_sysman-ejecucion',
             'sysman-suite_page_sysman-datos-abiertos',
+            'admin_page_sysman-ejecucion',
         ];
 
         if ( ! in_array( $hook, $plugin_pages, true ) ) {

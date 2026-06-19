@@ -264,15 +264,23 @@ class DatosAbiertosModule {
     // ─── Download streamer ───────────────────────────────────────
 
     private function stream_download( array $data, array $col_headers, array $keys, string $filename, string $format ): void {
+        @set_time_limit( 300 );
+
+        // Sanitize filename for the Content-Disposition header (no quotes/CRLF).
+        $filename = sanitize_file_name( $filename );
+        $format   = ( 'txt' === $format ) ? 'txt' : 'csv';
+
+        nocache_headers();
+
         if ( 'txt' === $format ) {
             header( 'Content-Type: text/plain; charset=utf-8' );
             header( 'Content-Disposition: attachment; filename="' . $filename . '.txt"' );
 
-            echo implode( "\t", $col_headers ) . "\n";
+            echo implode( "\t", array_map( [ $this, 'sanitize_txt_cell' ], $col_headers ) ) . "\n";
             foreach ( $data as $row ) {
                 $values = [];
                 foreach ( $keys as $k ) {
-                    $values[] = $row[ $k ] ?? '';
+                    $values[] = $this->sanitize_txt_cell( $row[ $k ] ?? '' );
                 }
                 echo implode( "\t", $values ) . "\n";
             }
@@ -282,11 +290,11 @@ class DatosAbiertosModule {
 
             $output = fopen( 'php://output', 'w' );
             fprintf( $output, "\xEF\xBB\xBF" );
-            fputcsv( $output, $col_headers, ';' );
+            fputcsv( $output, array_map( [ $this, 'sanitize_csv_cell' ], $col_headers ), ';' );
             foreach ( $data as $row ) {
                 $values = [];
                 foreach ( $keys as $k ) {
-                    $values[] = $row[ $k ] ?? '';
+                    $values[] = $this->sanitize_csv_cell( $row[ $k ] ?? '' );
                 }
                 fputcsv( $output, $values, ';' );
             }
@@ -294,5 +302,26 @@ class DatosAbiertosModule {
         }
 
         exit;
+    }
+
+    /**
+     * Neutralize CSV formula injection: prefix values that a spreadsheet
+     * could interpret as a formula (=, +, -, @, tab, CR) with an apostrophe.
+     */
+    private function sanitize_csv_cell( $value ): string {
+        $value = (string) $value;
+        if ( '' !== $value && in_array( $value[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+            $value = "'" . $value;
+        }
+        return $value;
+    }
+
+    /**
+     * For tab-delimited TXT: collapse tabs/newlines so they cannot break the
+     * row/column structure, then apply the formula-injection guard.
+     */
+    private function sanitize_txt_cell( $value ): string {
+        $value = str_replace( [ "\t", "\r\n", "\r", "\n" ], ' ', (string) $value );
+        return $this->sanitize_csv_cell( $value );
     }
 }

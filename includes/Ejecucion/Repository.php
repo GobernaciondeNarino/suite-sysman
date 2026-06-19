@@ -201,6 +201,12 @@ class Repository {
             return [];
         }
 
+        $cache_key = 'gn_sisman_ejec_export_' . md5( wp_json_encode( $meta ) );
+        $cached = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
         global $wpdb;
         $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
         $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
@@ -234,10 +240,18 @@ class Repository {
 
         $sql .= " ORDER BY pp.codigo";
 
-        return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+        $results = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+        set_transient( $cache_key, $results, 5 * MINUTE_IN_SECONDS );
+        return $results;
     }
 
     public function get_disponibilidades_report( int $anio, int $mes, string $compania = '001', string $dependencia = '' ): array {
+        $cache_key = 'gn_sisman_dis_report_' . md5( $compania . '_' . $anio . '_' . $mes . '_' . $dependencia );
+        $cached = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
         global $wpdb;
         $ac = $wpdb->prefix . 'sysman_auxiliar_cuentas';
         $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
@@ -262,7 +276,9 @@ class Repository {
 
         $sql .= " ORDER BY ac.fecha, ac.numero";
 
-        return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+        $results = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+        set_transient( $cache_key, $results, 5 * MINUTE_IN_SECONDS );
+        return $results;
     }
 
     public function get_contract_urls( array $nrodocumentos ): array {
