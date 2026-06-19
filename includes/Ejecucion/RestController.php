@@ -158,6 +158,40 @@ class RestController {
         return new \WP_REST_Response( $this->enrich_with_contracts( $rows ) );
     }
 
+    private function extract_options( \WP_REST_Request $request, array $filter_defs ): array {
+        $options = [];
+
+        $filtros = [];
+        foreach ( array_keys( $filter_defs ) as $key ) {
+            $val = $request->get_param( $key );
+            if ( null !== $val && '' !== (string) $val ) {
+                $filtros[ $key ] = sanitize_text_field( (string) $val );
+            }
+        }
+        if ( ! empty( $filtros ) ) {
+            $options['filtros'] = $filtros;
+        }
+
+        $buscar = $request->get_param( 'buscar' );
+        if ( null !== $buscar && '' !== $buscar ) {
+            $options['buscar'] = sanitize_text_field( $buscar );
+        }
+
+        $per_page = $request->get_param( 'per_page' );
+        if ( null !== $per_page ) {
+            $options['per_page'] = absint( $per_page );
+            $options['pagina']   = max( 1, absint( $request->get_param( 'pagina' ) ?: 1 ) );
+        }
+
+        $orderby = $request->get_param( 'orderby' );
+        if ( null !== $orderby && '' !== $orderby ) {
+            $options['orderby'] = sanitize_text_field( $orderby );
+            $options['order']   = sanitize_text_field( $request->get_param( 'order' ) ?: 'ASC' );
+        }
+
+        return $options;
+    }
+
     private function enrich_with_contracts( array $rows ): array {
         $docs = array_filter( array_unique( array_column( $rows, 'nrodocumento' ) ) );
         if ( empty( $docs ) ) {
@@ -182,20 +216,40 @@ class RestController {
             return new \WP_REST_Response( [ 'error' => 'Not found' ], 404 );
         }
 
-        $data = $this->repo->get_export_data( $post_id );
+        $options = $this->extract_options( $request, Repository::EXPORT_FILTERS );
+        $result  = $this->repo->get_export_data( $post_id, $options );
 
-        return new \WP_REST_Response( [
-            'meta'  => [
-                'titulo'      => $post->post_title,
-                'dependencia' => get_post_meta( $post_id, '_gn_dependencia', true ),
-                'anio'        => (int) get_post_meta( $post_id, '_gn_anio', true ),
-                'mes'         => (int) get_post_meta( $post_id, '_gn_mes', true ),
-                'compania'    => get_post_meta( $post_id, '_gn_compania', true ) ?: '001',
-                'vigencia'    => get_post_meta( $post_id, '_gn_vigencia', true ),
-            ],
-            'total' => count( $data ),
-            'data'  => $data,
-        ] );
+        $meta = [
+            'titulo'      => $post->post_title,
+            'dependencia' => get_post_meta( $post_id, '_gn_dependencia', true ),
+            'anio'        => (int) get_post_meta( $post_id, '_gn_anio', true ),
+            'mes'         => (int) get_post_meta( $post_id, '_gn_mes', true ),
+            'compania'    => get_post_meta( $post_id, '_gn_compania', true ) ?: '001',
+            'vigencia'    => get_post_meta( $post_id, '_gn_vigencia', true ),
+        ];
+
+        $paginated = isset( $result['data'] );
+        $rows      = $paginated ? $result['data'] : $result;
+
+        $response = [
+            'meta'  => $meta,
+            'total' => $paginated ? $result['total'] : count( $rows ),
+            'data'  => $rows,
+        ];
+
+        if ( $paginated ) {
+            $response['pagina']   = $result['pagina'];
+            $response['per_page'] = $result['per_page'];
+            $response['paginas']  = $result['paginas'];
+        }
+        if ( ! empty( $options['filtros'] ) ) {
+            $response['filtros'] = $options['filtros'];
+        }
+        if ( ! empty( $options['buscar'] ) ) {
+            $response['buscar'] = $options['buscar'];
+        }
+
+        return new \WP_REST_Response( $response );
     }
 
     public function get_reporte_dis( \WP_REST_Request $request ): \WP_REST_Response {
@@ -204,22 +258,43 @@ class RestController {
         $compania    = $request->get_param( 'compania' );
         $dependencia = $request->get_param( 'dependencia' );
 
-        $data = $this->repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia );
+        $options = $this->extract_options( $request, Repository::DIS_FILTERS );
+        $result  = $this->repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia, $options );
 
         $meses = [ 1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
                    7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre' ];
 
-        return new \WP_REST_Response( [
-            'meta'  => [
-                'anio'        => $anio,
-                'mes'         => $mes,
-                'mes_nombre'  => $meses[ $mes ] ?? $mes,
-                'compania'    => $compania,
-                'dependencia' => $dependencia,
-            ],
-            'total' => count( $data ),
-            'data'  => $this->enrich_with_contracts( $data ),
-        ] );
+        $meta = [
+            'anio'        => $anio,
+            'mes'         => $mes,
+            'mes_nombre'  => $meses[ $mes ] ?? $mes,
+            'compania'    => $compania,
+            'dependencia' => $dependencia,
+        ];
+
+        $paginated = isset( $result['data'] );
+        $rows      = $paginated ? $result['data'] : $result;
+        $enriched  = $this->enrich_with_contracts( $rows );
+
+        $response = [
+            'meta'  => $meta,
+            'total' => $paginated ? $result['total'] : count( $enriched ),
+            'data'  => $enriched,
+        ];
+
+        if ( $paginated ) {
+            $response['pagina']   = $result['pagina'];
+            $response['per_page'] = $result['per_page'];
+            $response['paginas']  = $result['paginas'];
+        }
+        if ( ! empty( $options['filtros'] ) ) {
+            $response['filtros'] = $options['filtros'];
+        }
+        if ( ! empty( $options['buscar'] ) ) {
+            $response['buscar'] = $options['buscar'];
+        }
+
+        return new \WP_REST_Response( $response );
     }
 
     public function get_proyecto( \WP_REST_Request $request ): \WP_REST_Response {

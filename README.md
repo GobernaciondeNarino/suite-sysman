@@ -161,7 +161,24 @@ wp sysman truncate --yes
 | `/ejecucion/{post_id}/export` | GET | Publico | Rubros + ejecucion consolidada de un seguimiento (JSON) |
 | `/reporte/disponibilidades?anio=X&mes=X` | GET | Publico | Disponibilidades (DIS) cruzadas con plan presupuestal (JSON) |
 
-Parametros opcionales de `/reporte/disponibilidades`: `compania` (def. `001`), `dependencia` (filtro).
+#### Filtros dinamicos (v5.7.2+)
+
+Ambos endpoints aceptan parametros adicionales para filtrar, buscar, paginar y ordenar:
+
+| Parametro | Tipo | Descripcion |
+|-----------|------|-------------|
+| `buscar` | string | Busqueda global LIKE en todos los campos de texto |
+| `per_page` | int | Registros por pagina (1–1000). Activa paginacion |
+| `pagina` | int | Numero de pagina (def: 1) |
+| `orderby` | string | Campo para ordenar (nombre de filtro valido) |
+| `order` | string | ASC o DESC (def: ASC) |
+
+**Filtros por campo** — cada columna del resultado se puede usar como parametro de filtro:
+
+- `/reporte/disponibilidades`: `numero`, `tercero`, `nombretercero`, `rubro`, `nombrerubro`, `descripcion`, `nrodocumento`, `cmpteafectado`, `fecha`, `nombredependencia`, `destino`, `naturaleza`, `sector`, `programa`, `subprograma`, `codigoproducto`, `codigobpin`
+- `/ejecucion/{id}/export`: `codigo`, `nombre`, `destino`, `naturaleza`, `sector`, `programa`, `subprograma`, `codigoproducto`, `codigobpin`
+
+Ejemplo: `/reporte/disponibilidades?anio=2026&mes=5&numero=2026040001&per_page=50&pagina=1`
 
 ### Descargas (admin-ajax, publico)
 
@@ -169,6 +186,8 @@ Parametros opcionales de `/reporte/disponibilidades`: `compania` (def. `001`), `
 |--------|----------|-------------|
 | `gn_ejecucion_export` | `csv`, `txt` | Exporta la ejecucion consolidada de un seguimiento |
 | `gn_reporte_dis_export` | `csv`, `txt` | Exporta el reporte de disponibilidades |
+
+Los endpoints de descarga tambien aceptan los filtros dinamicos y `buscar` como parametros GET.
 
 ## API SYSMAN
 
@@ -245,6 +264,16 @@ sisman-suite/
 ```
 
 ## Changelog
+
+### 5.7.2
+- **APIs flexibles**: Los endpoints `/ejecucion/{id}/export` y `/reporte/disponibilidades` ahora aceptan filtros dinamicos por cualquier campo del resultado (ej: `?numero=2026040001&nombretercero=empresa`)
+- **Busqueda global**: parametro `buscar` busca simultaneamente en todos los campos de texto (LIKE)
+- **Paginacion**: parametros `per_page` y `pagina` para paginacion server-side; la respuesta incluye `total`, `paginas`, `pagina` y `per_page`
+- **Ordenamiento**: parametros `orderby` y `order` (ASC/DESC) para ordenar por cualquier campo filtrable
+- Los filtros tipo "exacto" usan `=` y los tipo "contiene" usan `LIKE %valor%`; ambos con `$wpdb->prepare()` para seguridad
+- Las descargas CSV/TXT via AJAX tambien aceptan los filtros dinamicos y `buscar`
+- Panel de Datos Abiertos actualizado con documentacion completa de filtros, tipos de busqueda y ejemplo de paginacion
+- Cache transient se mantiene para consultas sin filtros (retrocompatible); consultas con filtros se ejecutan directamente
 
 ### 5.7.1
 - **Menus**: Eliminado el submenu duplicado "Panel de Control" — el panel ahora abre al hacer clic en el menu principal "SYSMAN Suite" (`remove_submenu_page` del item autogenerado)

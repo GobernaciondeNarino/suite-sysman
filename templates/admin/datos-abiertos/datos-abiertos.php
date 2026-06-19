@@ -191,7 +191,7 @@ $site_url     = rest_url( 'gn-sisman/v1/' );
     <!-- ================================================================
          API Endpoints Reference
          ================================================================ -->
-    <div class="sysman-card">
+    <div class="sysman-card" style="margin-bottom:1.25rem;">
         <div class="sysman-card-body" style="padding:1.25rem;">
 
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
@@ -244,6 +244,143 @@ $site_url     = rest_url( 'gn-sisman/v1/' );
                     </tr>
                 </tbody>
             </table>
+
+        </div>
+    </div>
+
+    <!-- ================================================================
+         Filtros dinamicos
+         ================================================================ -->
+    <div class="sysman-card" style="margin-bottom:1.25rem;">
+        <div class="sysman-card-body" style="padding:1.25rem;">
+
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
+                <span class="dashicons dashicons-filter" style="color:#7c3aed;font-size:22px;width:22px;height:22px;"></span>
+                <strong style="color:#7c3aed;font-size:1.05rem;"><?php esc_html_e( 'Filtros Dinamicos en la API', 'sysman-suite' ); ?></strong>
+            </div>
+
+            <p style="font-size:0.88rem;color:#6b7280;margin:0 0 0.75rem;">
+                <?php esc_html_e( 'Los endpoints de export y reporte/disponibilidades aceptan parametros adicionales para filtrar, buscar, ordenar y paginar los resultados.', 'sysman-suite' ); ?>
+            </p>
+
+            <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;padding:1rem;margin-bottom:1rem;">
+                <strong style="font-size:0.88rem;color:#1f2937;display:block;margin-bottom:6px;">
+                    <?php esc_html_e( 'Ejemplo:', 'sysman-suite' ); ?>
+                </strong>
+                <code style="font-size:0.82rem;word-break:break-all;display:block;background:#fff;padding:8px 12px;border-radius:4px;border:1px solid #e5e7eb;">
+                    <?php echo esc_html( $site_url . 'reporte/disponibilidades?anio=2026&mes=5&numero=2026040001' ); ?>
+                </code>
+                <p style="font-size:0.82rem;color:#6b7280;margin:6px 0 0;">
+                    <?php esc_html_e( 'Filtra las disponibilidades del 2026-05 donde el numero sea exactamente "2026040001".', 'sysman-suite' ); ?>
+                </p>
+            </div>
+
+            <table class="widefat striped" style="margin-bottom:1rem;">
+                <thead>
+                    <tr>
+                        <th style="width:160px;"><?php esc_html_e( 'Parametro', 'sysman-suite' ); ?></th>
+                        <th style="width:90px;"><?php esc_html_e( 'Tipo', 'sysman-suite' ); ?></th>
+                        <th><?php esc_html_e( 'Descripcion', 'sysman-suite' ); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background:#f0f9ff;">
+                        <td colspan="3"><strong style="color:#1e40af;"><?php esc_html_e( 'Parametros generales (ambos endpoints)', 'sysman-suite' ); ?></strong></td>
+                    </tr>
+                    <tr>
+                        <td><code>buscar</code></td>
+                        <td>LIKE</td>
+                        <td><?php esc_html_e( 'Busqueda global en todos los campos de texto (nombre, descripcion, tercero, etc.)', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>per_page</code></td>
+                        <td>int</td>
+                        <td><?php esc_html_e( 'Registros por pagina (1–1000). Activa la paginacion en la respuesta.', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>pagina</code></td>
+                        <td>int</td>
+                        <td><?php esc_html_e( 'Numero de pagina (por defecto: 1). Requiere per_page.', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>orderby</code></td>
+                        <td>string</td>
+                        <td><?php esc_html_e( 'Campo para ordenar (debe ser un nombre de filtro valido).', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>order</code></td>
+                        <td>string</td>
+                        <td><?php esc_html_e( 'Direccion del orden: ASC o DESC (por defecto: ASC).', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr style="background:#f0fdf4;">
+                        <td colspan="3"><strong style="color:#166534;"><?php esc_html_e( 'Filtros — reporte/disponibilidades', 'sysman-suite' ); ?></strong></td>
+                    </tr>
+                    <?php
+                    $dis_filters = [
+                        'numero'            => [ 'exacto', 'Numero de disponibilidad' ],
+                        'tercero'           => [ 'exacto', 'Codigo del tercero' ],
+                        'nombretercero'     => [ 'contiene', 'Nombre del tercero' ],
+                        'rubro'             => [ 'exacto', 'Codigo del rubro' ],
+                        'nombrerubro'       => [ 'contiene', 'Nombre del rubro' ],
+                        'descripcion'       => [ 'contiene', 'Descripcion del registro' ],
+                        'nrodocumento'      => [ 'exacto', 'Numero de documento' ],
+                        'cmpteafectado'     => [ 'exacto', 'Comprobante afectado' ],
+                        'fecha'             => [ 'exacto', 'Fecha (YYYY-MM-DD)' ],
+                        'nombredependencia' => [ 'contiene', 'Nombre de la dependencia' ],
+                        'destino'           => [ 'exacto', 'Destino del gasto' ],
+                        'naturaleza'        => [ 'exacto', 'Naturaleza' ],
+                        'sector'            => [ 'contiene', 'Sector' ],
+                        'programa'          => [ 'contiene', 'Programa' ],
+                        'subprograma'       => [ 'contiene', 'Subprograma' ],
+                        'codigoproducto'    => [ 'exacto', 'Codigo del producto' ],
+                        'codigobpin'        => [ 'exacto', 'Codigo BPIN del proyecto' ],
+                    ];
+                    foreach ( $dis_filters as $param => $info ) : ?>
+                        <tr>
+                            <td><code><?php echo esc_html( $param ); ?></code></td>
+                            <td><span style="font-size:0.8rem;color:<?php echo 'exacto' === $info[0] ? '#dc2626' : '#2563eb'; ?>;"><?php echo esc_html( $info[0] ); ?></span></td>
+                            <td style="font-size:0.85rem;"><?php echo esc_html( $info[1] ); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr style="background:#fffbeb;">
+                        <td colspan="3"><strong style="color:#92400e;"><?php esc_html_e( 'Filtros — ejecucion/{id}/export', 'sysman-suite' ); ?></strong></td>
+                    </tr>
+                    <?php
+                    $export_filters = [
+                        'codigo'         => [ 'exacto', 'Codigo del rubro' ],
+                        'nombre'         => [ 'contiene', 'Nombre del rubro' ],
+                        'destino'        => [ 'exacto', 'Destino del gasto' ],
+                        'naturaleza'     => [ 'exacto', 'Naturaleza' ],
+                        'sector'         => [ 'contiene', 'Sector' ],
+                        'programa'       => [ 'contiene', 'Programa' ],
+                        'subprograma'    => [ 'contiene', 'Subprograma' ],
+                        'codigoproducto' => [ 'exacto', 'Codigo del producto' ],
+                        'codigobpin'     => [ 'exacto', 'Codigo BPIN del proyecto' ],
+                    ];
+                    foreach ( $export_filters as $param => $info ) : ?>
+                        <tr>
+                            <td><code><?php echo esc_html( $param ); ?></code></td>
+                            <td><span style="font-size:0.8rem;color:<?php echo 'exacto' === $info[0] ? '#dc2626' : '#2563eb'; ?>;"><?php echo esc_html( $info[0] ); ?></span></td>
+                            <td style="font-size:0.85rem;"><?php echo esc_html( $info[1] ); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;padding:1rem;">
+                <strong style="font-size:0.88rem;color:#1e40af;display:block;margin-bottom:6px;">
+                    <?php esc_html_e( 'Respuesta con paginacion:', 'sysman-suite' ); ?>
+                </strong>
+                <pre style="font-size:0.8rem;margin:0;background:#fff;padding:10px;border-radius:4px;border:1px solid #e5e7eb;overflow-x:auto;">{
+  "meta": { ... },
+  "total": 500,
+  "pagina": 1,
+  "per_page": 50,
+  "paginas": 10,
+  "filtros": { "numero": "2026040001" },
+  "data": [ ... ]
+}</pre>
+            </div>
 
         </div>
     </div>

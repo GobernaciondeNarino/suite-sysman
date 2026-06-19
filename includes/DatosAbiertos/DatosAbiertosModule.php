@@ -189,6 +189,30 @@ class DatosAbiertosModule {
         return $html;
     }
 
+    // ─── AJAX filter extraction ─────────────────────────────────
+
+    private function extract_ajax_options( array $filter_defs ): array {
+        $options = [];
+
+        $filtros = [];
+        foreach ( array_keys( $filter_defs ) as $key ) {
+            $val = $_GET[ $key ] ?? null;
+            if ( null !== $val && '' !== (string) $val ) {
+                $filtros[ $key ] = sanitize_text_field( (string) $val );
+            }
+        }
+        if ( ! empty( $filtros ) ) {
+            $options['filtros'] = $filtros;
+        }
+
+        $buscar = sanitize_text_field( $_GET['buscar'] ?? '' );
+        if ( '' !== $buscar ) {
+            $options['buscar'] = $buscar;
+        }
+
+        return $options;
+    }
+
     // ─── AJAX: Ejecucion export (CSV / TXT) ─────────────────────
 
     public function ajax_ejecucion_export(): void {
@@ -200,8 +224,10 @@ class DatosAbiertosModule {
             wp_die( 'Seguimiento no encontrado.', 'Error', [ 'response' => 404 ] );
         }
 
-        $repo = Repository::instance();
-        $data = $repo->get_export_data( $post_id );
+        $options = $this->extract_ajax_options( Repository::EXPORT_FILTERS );
+        $repo    = Repository::instance();
+        $result  = $repo->get_export_data( $post_id, $options );
+        $data    = isset( $result['data'] ) ? $result['data'] : $result;
 
         $filename = sanitize_file_name( $post->post_title ) . '_' . gmdate( 'Y-m-d' );
 
@@ -237,8 +263,10 @@ class DatosAbiertosModule {
             wp_die( 'Parametros anio y mes son requeridos.', 'Error', [ 'response' => 400 ] );
         }
 
-        $repo = Repository::instance();
-        $data = $repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia );
+        $options = $this->extract_ajax_options( Repository::DIS_FILTERS );
+        $repo    = Repository::instance();
+        $result  = $repo->get_disponibilidades_report( $anio, $mes, $compania, $dependencia, $options );
+        $data    = isset( $result['data'] ) ? $result['data'] : $result;
 
         $filename = 'DIS_' . $compania . '_' . $anio . '_' . $mes . '_' . gmdate( 'Y-m-d' );
 
