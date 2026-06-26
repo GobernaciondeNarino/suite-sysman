@@ -134,6 +134,7 @@ class Repository {
                     pagos, obligacionesporpagar
              FROM {$table}
              WHERE compania = %s AND anio = %d AND mes = %d AND codigocuenta = %s
+                   AND movimiento = 'SI'
              LIMIT 1",
             $meta['compania'], $meta['anio'], $meta['mes'], $codigo
         ), ARRAY_A );
@@ -265,7 +266,8 @@ class Repository {
 
         $from = "{$pp} pp
                  LEFT JOIN {$eg} eg ON pp.codigo = eg.codigocuenta
-                     AND eg.compania = pp.compania AND eg.anio = pp.anio AND eg.mes = pp.mes";
+                     AND eg.compania = pp.compania AND eg.anio = pp.anio AND eg.mes = pp.mes
+                     AND eg.movimiento = 'SI'";
 
         $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
                    AND pp.nombredependencia = %s AND pp.movimiento = 'SI'";

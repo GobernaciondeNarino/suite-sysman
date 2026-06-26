@@ -265,6 +265,15 @@ sisman-suite/
 
 ## Changelog
 
+### 5.7.3
+- **Fix critico (graficos)**: Todas las consultas del modulo de graficos ahora filtran por `movimiento = 'SI'` en las tablas `plan_presupuestal`, `ejecucion_gastos` y `ejecucion_ingresos`
+- Las queries en modo "tabla" (`build_chart_query`, `build_multi_y_query`) inyectan automaticamente el filtro cuando la tabla es financiera
+- Las queries en modo "Vista" ahora filtran tanto `pp.movimiento = 'SI'` como `eg.movimiento = 'SI'` (antes solo filtraban pp)
+- La vista previa (preview AJAX) aplica el mismo filtro en ambos modos
+- `get_dependencias()` del Visualizer ahora solo muestra dependencias con rubros de movimiento
+- `get_consolidado()` en Repository ahora filtra `movimiento = 'SI'` al consultar `ejecucion_gastos`
+- `get_export_data()` agrega `eg.movimiento = 'SI'` en la condicion LEFT JOIN para excluir registros sin movimiento
+
 ### 5.7.2
 - **APIs flexibles**: Los endpoints `/ejecucion/{id}/export` y `/reporte/disponibilidades` ahora aceptan filtros dinamicos por cualquier campo del resultado (ej: `?numero=2026040001&nombretercero=empresa`)
 - **Busqueda global**: parametro `buscar` busca simultaneamente en todos los campos de texto (LIKE)

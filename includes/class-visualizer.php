@@ -12,6 +12,12 @@ class Visualizer {
     private const ALLOWED_AGGREGATES = [ 'SUM', 'COUNT', 'AVG', 'MAX', 'MIN' ];
     private const ALLOWED_OPERATORS  = [ '=', '!=', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN' ];
 
+    private const TABLES_REQUIRE_MOVIMIENTO = [
+        'sysman_plan_presupuestal',
+        'sysman_ejecucion_gastos',
+        'sysman_ejecucion_ingresos',
+    ];
+
     public function __construct( Database $database ) {
         $this->database = $database;
 
@@ -220,6 +226,15 @@ class Visualizer {
         }
     }
 
+    private function requires_movimiento_filter( string $table ): bool {
+        foreach ( self::TABLES_REQUIRE_MOVIMIENTO as $suffix ) {
+            if ( str_ends_with( $table, $suffix ) ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Build WHERE clause parts from chart filters.
      */
@@ -228,6 +243,10 @@ class Visualizer {
 
         $where   = [];
         $prepare = [];
+
+        if ( $this->requires_movimiento_filter( $table ) ) {
+            $where[] = "movimiento = 'SI'";
+        }
 
         $filter_anio = (int) get_post_meta( $chart_id, '_sysman_filter_anio', true );
         $filter_mes  = (int) get_post_meta( $chart_id, '_sysman_filter_mes', true );
@@ -448,7 +467,7 @@ class Visualizer {
             $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
         }
 
-        $where   = [ "pp.movimiento = 'SI'", 'pp.compania = %s' ];
+        $where   = [ "pp.movimiento = 'SI'", "eg.movimiento = 'SI'", 'pp.compania = %s' ];
         $prepare = [ $compania ];
 
         if ( ! empty( $dependencia ) ) {
@@ -525,7 +544,7 @@ class Visualizer {
 
         $table = $wpdb->prefix . 'sysman_plan_presupuestal';
 
-        $where   = [ 'compania = %s', "nombredependencia != ''" ];
+        $where   = [ 'compania = %s', "nombredependencia != ''", "movimiento = 'SI'" ];
         $prepare = [ $compania ];
 
         if ( $anio > 0 ) {
@@ -730,6 +749,10 @@ class Visualizer {
                 $prepare[] = $filter_destino;
             }
 
+            if ( $this->requires_movimiento_filter( $table ) ) {
+                $where[] = "movimiento = 'SI'";
+            }
+
             $where_clause = $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
 
             if ( count( $value_cols ) > 1 ) {
@@ -813,7 +836,7 @@ class Visualizer {
         $pp_table = $wpdb->prefix . 'sysman_plan_presupuestal';
         $eg_table = $wpdb->prefix . 'sysman_ejecucion_gastos';
 
-        $where   = [ "pp.movimiento = 'SI'", 'pp.compania = %s' ];
+        $where   = [ "pp.movimiento = 'SI'", "eg.movimiento = 'SI'", 'pp.compania = %s' ];
         $prepare = [ $compania ];
 
         if ( ! empty( $dependencia ) ) {
