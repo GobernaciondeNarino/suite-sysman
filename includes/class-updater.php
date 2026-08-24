@@ -324,6 +324,9 @@ class Updater {
      */
     public function dismiss_update_notice(): void {
         check_ajax_referer( 'sysman_dismiss_notice', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( '', '', [ 'response' => 403 ] );
+        }
         $version = sanitize_text_field( $_POST['version'] ?? '' );
         if ( $version ) {
             update_option( 'sysman_update_notice_dismissed', $version );

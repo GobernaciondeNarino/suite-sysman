@@ -21,12 +21,7 @@ class AccordionRenderer {
         $repo   = Repository::instance();
         $rubros = $repo->get_rubros( $post_id );
 
-        $meses = [
-            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
-            5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
-            9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
-        ];
-        $mes_nombre = $meses[ $mes ] ?? $mes;
+        $mes_nombre = \SysmanSuite\Helpers::month_name( $mes );
 
         $bpid_mode = ( '1' === $agrupar_bpid ) && ! empty( $rubros );
         $root_class = 'gn-ejec' . ( $bpid_mode ? ' gn-ejec--bpid-mode' : '' );

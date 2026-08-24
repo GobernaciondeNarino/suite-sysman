@@ -115,8 +115,8 @@ class Rest_Api {
         }
 
         $result = $this->database->get_records( $table, [
-            'page'     => $request->get_param( 'page' ),
-            'per_page' => min( $request->get_param( 'per_page' ), 100 ),
+            'page'     => max( 1, (int) $request->get_param( 'page' ) ),
+            'per_page' => max( 1, min( (int) $request->get_param( 'per_page' ), 100 ) ),
             'search'   => $request->get_param( 'search' ),
             'orderby'  => $request->get_param( 'orderby' ),
             'order'    => $request->get_param( 'order' ),
@@ -181,7 +181,7 @@ class Rest_Api {
         ] );
     }
 
-    public function download_chart_csv( \WP_REST_Request $request ): \WP_REST_Response {
+    public function download_chart_csv( \WP_REST_Request $request ) {
         $id = $request->get_param( 'id' );
 
         if ( 'sysman_chart' !== get_post_type( $id ) ) {
@@ -193,28 +193,48 @@ class Rest_Api {
 
         $has_group = ! empty( $data ) && isset( $data[0]['group'] );
 
+        // Serve the file directly: returning the string in a WP_REST_Response
+        // would JSON-encode it and corrupt the CSV.
+        nocache_headers();
+        header( 'Content-Type: text/csv; charset=UTF-8' );
+        header( 'Content-Disposition: attachment; filename="sysman-chart-' . absint( $id ) . '.csv"' );
+
+        $output = fopen( 'php://output', 'w' );
+        fprintf( $output, "\xEF\xBB\xBF" );
+
         if ( $has_group ) {
-            $csv = "Serie,Etiqueta,Valor\n";
+            fputcsv( $output, [ 'Serie', 'Etiqueta', 'Valor' ] );
             foreach ( $data as $row ) {
-                $group = str_replace( '"', '""', $row['group'] ?? '' );
-                $label = str_replace( '"', '""', $row['label'] ?? '' );
-                $value = $row['value'] ?? 0;
-                $csv  .= "\"{$group}\",\"{$label}\",{$value}\n";
+                fputcsv( $output, [
+                    $this->sanitize_csv_cell( $row['group'] ?? '' ),
+                    $this->sanitize_csv_cell( $row['label'] ?? '' ),
+                    $row['value'] ?? 0,
+                ] );
             }
         } else {
-            $csv = "Etiqueta,Valor\n";
+            fputcsv( $output, [ 'Etiqueta', 'Valor' ] );
             foreach ( $data as $row ) {
-                $label = str_replace( '"', '""', $row['label'] ?? '' );
-                $value = $row['value'] ?? 0;
-                $csv  .= "\"{$label}\",{$value}\n";
+                fputcsv( $output, [
+                    $this->sanitize_csv_cell( $row['label'] ?? '' ),
+                    $row['value'] ?? 0,
+                ] );
             }
         }
 
-        $response = new \WP_REST_Response( $csv );
-        $response->header( 'Content-Type', 'text/csv; charset=UTF-8' );
-        $response->header( 'Content-Disposition', 'attachment; filename="sysman-chart-' . $id . '.csv"' );
+        fclose( $output );
+        exit;
+    }
 
-        return $response;
+    /**
+     * Neutralize CSV formula injection: prefix values a spreadsheet could
+     * interpret as a formula (=, +, -, @, tab, CR) with an apostrophe.
+     */
+    private function sanitize_csv_cell( $value ): string {
+        $value = (string) $value;
+        if ( '' !== $value && in_array( $value[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+            $value = "'" . $value;
+        }
+        return $value;
     }
 
     public function get_years( \WP_REST_Request $request ): \WP_REST_Response {

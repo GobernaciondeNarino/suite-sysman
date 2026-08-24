@@ -265,6 +265,22 @@ sisman-suite/
 
 ## Changelog
 
+### 5.8.0
+- **Seguridad (critico)**: Las queries personalizadas de graficos (`custom_query`) ahora pasan por `Visualizer::validate_custom_query()` en cada ejecucion: solo se admite una unica sentencia SELECT, sin comentarios SQL ni palabras clave peligrosas (INSERT/UPDATE/DELETE/DROP/OUTFILE/SLEEP/etc.), y unicamente sobre las tablas del plugin. Antes, una query almacenada se ejecutaba sin validacion a traves del endpoint REST publico `/chart/{id}`
+- **Seguridad**: Guardar una query personalizada ahora requiere la capacidad `manage_options` (antes bastaba `edit_post`, lo que permitia a un Editor ejecutar SQL arbitrario)
+- **Seguridad**: Verificacion SSL activada por defecto en todas las peticiones a la API SYSMAN (`sslverify => true`). Si el certificado del endpoint no es validable, puede desactivarse con el filtro `sysman_suite_sslverify`
+- **Seguridad**: El log de importaciones se movio a `wp-content/uploads/sysman-suite/` con nombre no adivinable, `.htaccess` (Require all denied) e `index.php`; antes vivia dentro del plugin (se borraba al actualizar y era descargable publicamente en servidores Nginx). El log antiguo se migra automaticamente
+- **Seguridad**: Proteccion contra inyeccion de formulas CSV en la descarga `/chart/{id}/csv` (igual que en Datos Abiertos)
+- **Seguridad**: Chequeos de capacidad agregados en `ajax_import_status` y `ajax_dismiss_update_notice`
+- **Fix**: La descarga CSV de graficos (`/chart/{id}/csv`) devolvia el CSV codificado como cadena JSON (comillas escapadas); ahora sirve el archivo real con BOM UTF-8 y `fputcsv`
+- **Fix**: `uninstall.php` ahora elimina las 5 tablas (faltaban `personal_nomina` y `ejecucion_ingresos`), todas las opciones (`sysman_api_base_url`, CDNs, `gn_sisman_*`), los transients `gn_sisman_*`, los seguimientos `gn_ejecucion` y el directorio de logs
+- **Fix**: `per_page`/`page` del endpoint `/records` se acotan a un minimo de 1 (per_page=0 devolvia vacio)
+- **Refactor**: Mapa de etiquetas de columnas unificado en `Visualizer::COLUMN_LABELS` (estaba triplicado); consultas Vista unificadas en `compose_vista_query()` (guardadas y preview compartian ~100 lineas duplicadas)
+- **Refactor**: `Database::validate_column()` reutiliza `get_table_columns()` (cache duplicada); `Importer::build_url()` acepta `mes` opcional (elimina construccion manual en `import_personal`); helper `save_last_import()`; `ajax_sync` del modulo Ejecucion refactorizado a un bucle
+- **Refactor**: Nombres de meses centralizados en `SysmanSuite\Helpers::month_name()` (estaban cuadruplicados)
+- **Herramientas**: Instalado el skill `ui-ux-pro-max` en `.claude/skills/`, workflows de GitHub Actions `claude.yml` (asistente @claude, anthropics/claude-code-action) y `claude-security-review.yml` (anthropics/claude-code-security-review), y guia `CLAUDE.md` para Claude Code
+- **Documentacion**: Nueva lista de auditoria `AUDITORIA.md` con hallazgos pendientes y plan de mejora priorizado
+
 ### 5.7.3
 - **Fix critico (graficos)**: Todas las consultas del modulo de graficos ahora filtran por `movimiento = 'SI'` en las tablas `plan_presupuestal`, `ejecucion_gastos` y `ejecucion_ingresos`
 - Las queries en modo "tabla" (`build_chart_query`, `build_multi_y_query`) inyectan automaticamente el filtro cuando la tabla es financiera

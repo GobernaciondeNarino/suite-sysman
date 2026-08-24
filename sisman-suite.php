@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     5.7.3
+ * Version:     5.8.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '5.7.3' );
+define( 'SYSMAN_SUITE_VERSION', '5.8.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -322,7 +322,10 @@ final class Sysman_Suite {
         $api_url = sanitize_url( $_POST['api_url'] ?? '' );
         if ( $api_url ) {
             $test_url  = $api_url . '?compania=001&anio=' . date( 'Y' ) . '&mes=1&numinforme=1';
-            $response  = wp_remote_get( $test_url, [ 'timeout' => 15, 'sslverify' => false ] );
+            $response  = wp_remote_get( $test_url, [
+                'timeout'   => 15,
+                'sslverify' => (bool) apply_filters( 'sysman_suite_sslverify', true ),
+            ] );
             $results[] = [
                 'label'   => 'API SYSMAN',
                 'ok'      => ! is_wp_error( $response ) && in_array( wp_remote_retrieve_response_code( $response ), [ 200, 201 ], true ),

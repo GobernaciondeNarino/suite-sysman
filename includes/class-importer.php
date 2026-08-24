@@ -32,13 +32,16 @@ class Importer {
     /**
      * Build the API URL.
      */
-    private function build_url( string $compania, int $anio, int $mes, int $numinforme, array $extra = [] ): string {
-        $params = array_merge( [
+    private function build_url( string $compania, int $anio, ?int $mes, int $numinforme, array $extra = [] ): string {
+        $params = [
             'compania'   => $compania,
             'anio'       => $anio,
-            'mes'        => $mes,
             'numinforme' => $numinforme,
-        ], $extra );
+        ];
+        if ( null !== $mes ) {
+            $params['mes'] = $mes;
+        }
+        $params = array_merge( $params, $extra );
 
         $base_url = get_option( 'sysman_api_base_url', self::DEFAULT_API_URL );
         return $base_url . '?' . http_build_query( $params );
@@ -51,9 +54,14 @@ class Importer {
         $this->logger->log( "Consultando API: {$url}" );
         $start = microtime( true );
 
+        /**
+         * SSL verification is on by default. If the SYSMAN endpoint uses a
+         * certificate the server cannot validate, disable it explicitly with:
+         * add_filter( 'sysman_suite_sslverify', '__return_false' );
+         */
         $response = wp_remote_get( $url, [
             'timeout'   => self::TIMEOUT,
-            'sslverify' => false,
+            'sslverify' => (bool) apply_filters( 'sysman_suite_sslverify', true ),
             'headers'   => [
                 'Accept' => 'application/json',
             ],
@@ -193,14 +201,8 @@ class Importer {
     public function import_personal( string $compania, int $anio ): array {
         $this->logger->log( '--- Importando: ' . self::REPORT_LABELS['personal'] . ' ---' );
 
-        // Build URL without 'mes' parameter
-        $base_url = get_option( 'sysman_api_base_url', self::DEFAULT_API_URL );
-        $url = $base_url . '?' . http_build_query( [
-            'compania'   => $compania,
-            'anio'       => $anio,
-            'numinforme' => 5,
-        ] );
-
+        // This report does not use the 'mes' parameter.
+        $url    = $this->build_url( $compania, $anio, null, 5 );
         $result = $this->fetch_api( $url );
 
         if ( ! $result['success'] ) {
@@ -269,8 +271,15 @@ class Importer {
         $results['ingresos'] = $this->import_ingresos( $compania, $anio, $mes );
 
         delete_transient( 'sysman_import_status' );
+        $this->save_last_import( $compania, $anio, $mes, $results );
 
-        // Save last import info
+        return $results;
+    }
+
+    /**
+     * Persist the summary of the most recent import.
+     */
+    private function save_last_import( string $compania, int $anio, int $mes, array $results ): void {
         update_option( 'sysman_last_import', [
             'date'     => current_time( 'mysql' ),
             'compania' => $compania,
@@ -278,8 +287,6 @@ class Importer {
             'mes'      => $mes,
             'results'  => $results,
         ] );
-
-        return $results;
     }
 
     /**
@@ -351,15 +358,7 @@ class Importer {
         }
 
         delete_transient( 'sysman_import_status' );
-
-        // Save last import info
-        update_option( 'sysman_last_import', [
-            'date'     => current_time( 'mysql' ),
-            'compania' => $compania,
-            'anio'     => $anio,
-            'mes'      => $mes,
-            'results'  => $results,
-        ] );
+        $this->save_last_import( $compania, $anio, $mes, $results );
 
         // Log import end
         $elapsed = round( microtime( true ) - $start_time, 2 );
@@ -388,6 +387,10 @@ class Importer {
      */
     public function ajax_import_status(): void {
         check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
 
         $status = get_transient( 'sysman_import_status' );
 

@@ -74,18 +74,7 @@ class Database {
      * Validate a column exists in the given table.
      */
     public function validate_column( string $table, string $column ): bool {
-        if ( ! $this->validate_table( $table ) ) {
-            return false;
-        }
-
-        if ( ! isset( $this->column_cache[ $table ] ) ) {
-            global $wpdb;
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $columns = $wpdb->get_col( "DESCRIBE `{$table}`", 0 );
-            $this->column_cache[ $table ] = $columns ?: [];
-        }
-
-        return in_array( $column, $this->column_cache[ $table ], true );
+        return in_array( $column, $this->get_table_columns( $table ), true );
     }
 
     /**
