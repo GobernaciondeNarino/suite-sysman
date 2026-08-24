@@ -18,6 +18,55 @@ class Visualizer {
         'sysman_ejecucion_ingresos',
     ];
 
+    /** Columns allowed as Y-values in Vista (JOIN) queries. */
+    private const ALLOWED_VISTA_COLS = [
+        'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+        'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+        'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
+        'obligacion', 'pagos', 'obligacionesporpagar',
+    ];
+
+    /** Human-readable labels for value columns (series names). */
+    private const COLUMN_LABELS = [
+        'apropiacioninicial'       => 'Apropiacion Inicial',
+        'adicion'                  => 'Adicion',
+        'reduccion'                => 'Reduccion',
+        'credito'                  => 'Credito',
+        'contracredito'            => 'Contracredito',
+        'aplazamiento'             => 'Aplazamiento',
+        'desplazamiento'           => 'Desplazamiento',
+        'apropiacionvigente'       => 'Apropiacion Vigente',
+        'disponibilidades'         => 'Disponibilidades',
+        'saldodisponible'          => 'Saldo Disponible',
+        'compromisos'              => 'Compromisos',
+        'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
+        'obligacion'               => 'Obligacion',
+        'pagos'                    => 'Pagos',
+        'obligacionesporpagar'     => 'Obligaciones por Pagar',
+        'valordebito'              => 'Valor Debito',
+        'valorcredito'             => 'Valor Credito',
+        'saldoporejecutaresp'      => 'Saldo por Ejecutar',
+        // Personal
+        'salariobaseibc'           => 'Salario Base IBC',
+        // Ingresos
+        'apropiado'                => 'Apropiado',
+        'modificaciones'           => 'Modificaciones',
+        'totalpresupuesto'         => 'Total Presupuesto',
+        'recaudosanteriores'       => 'Recaudos Anteriores',
+        'recaudosmes'              => 'Recaudos Mes',
+        'recaudosacumulados'       => 'Recaudos Acumulados',
+        'porrecaudar'              => 'Por Recaudar',
+        'porcrecaudado'            => '% Recaudado',
+    ];
+
+    /** Keywords that must never appear in a custom chart query. */
+    private const FORBIDDEN_QUERY_TOKENS = [
+        'insert', 'update', 'delete', 'drop', 'alter', 'create', 'truncate',
+        'replace', 'grant', 'revoke', 'rename', 'call', 'handler', 'load_file',
+        'outfile', 'dumpfile', 'information_schema', 'performance_schema',
+        'benchmark', 'sleep', 'user()', 'load data',
+    ];
+
     public function __construct( Database $database ) {
         $this->database = $database;
 
@@ -198,10 +247,11 @@ class Visualizer {
             delete_post_meta( $post_id, '_sysman_value_columns' );
         }
 
-        // Handle custom query (sanitize but allow SQL)
-        if ( isset( $_POST['sysman_custom_query'] ) ) {
-            $query = sanitize_textarea_field( $_POST['sysman_custom_query'] );
-            if ( ! empty( $query ) ) {
+        // Handle custom query. Only administrators may store SQL, and only
+        // queries that pass validate_custom_query() are accepted.
+        if ( isset( $_POST['sysman_custom_query'] ) && current_user_can( 'manage_options' ) ) {
+            $query = sanitize_textarea_field( wp_unslash( $_POST['sysman_custom_query'] ) );
+            if ( ! empty( $query ) && null !== $this->validate_custom_query( $query ) ) {
                 update_post_meta( $post_id, '_sysman_custom_query', $query );
             } else {
                 delete_post_meta( $post_id, '_sysman_custom_query' );
@@ -224,6 +274,66 @@ class Visualizer {
         } else {
             delete_post_meta( $post_id, '_sysman_filters' );
         }
+    }
+
+    /**
+     * Get the display label for a value column.
+     */
+    private function column_label( string $col ): string {
+        return self::COLUMN_LABELS[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
+    }
+
+    /**
+     * Validate a user-supplied custom chart query.
+     *
+     * Only a single read-only SELECT over the plugin (or integration) tables
+     * is allowed. Returns the trimmed query on success or null when the query
+     * must be rejected. This runs at execution time, so legacy stored queries
+     * are also covered.
+     */
+    public function validate_custom_query( string $query ): ?string {
+        global $wpdb;
+
+        $query = trim( $query );
+        if ( '' === $query ) {
+            return null;
+        }
+
+        // Single statement, starting with SELECT, without comments.
+        if ( ! preg_match( '/^select\s/i', $query )
+            || str_contains( $query, ';' )
+            || preg_match( '/(--|#|\/\*)/', $query ) ) {
+            return null;
+        }
+
+        foreach ( self::FORBIDDEN_QUERY_TOKENS as $token ) {
+            if ( preg_match( '/\b' . preg_quote( $token, '/' ) . '/i', $query ) ) {
+                return null;
+            }
+        }
+
+        // Every prefixed table referenced must belong to the allowed set.
+        $allowed_tables = array_map( 'strtolower', array_keys( $this->database->get_available_tables() ) );
+        $allowed_tables[] = strtolower( $wpdb->prefix . 'bpid_suite_contratos' );
+        $allowed_tables[] = strtolower( $wpdb->prefix . 'secop_contracts' );
+
+        $prefix_pattern = preg_quote( $wpdb->prefix, '/' );
+        if ( ! preg_match_all( '/' . $prefix_pattern . '[a-z0-9_]+/i', $query, $matches ) ) {
+            return null; // Must reference at least one plugin table.
+        }
+
+        foreach ( $matches[0] as $referenced ) {
+            if ( ! in_array( strtolower( $referenced ), $allowed_tables, true ) ) {
+                return null;
+            }
+        }
+
+        // Cap the result size if the author did not.
+        if ( ! preg_match( '/\blimit\s+\d+/i', $query ) ) {
+            $query .= ' LIMIT 1000';
+        }
+
+        return $query;
     }
 
     private function requires_movimiento_filter( string $table ): bool {
@@ -303,10 +413,10 @@ class Visualizer {
     public function build_chart_query( int $chart_id ): ?string {
         global $wpdb;
 
-        // Check for custom query first
+        // Check for custom query first (re-validated on every execution).
         $custom_query = get_post_meta( $chart_id, '_sysman_custom_query', true );
         if ( ! empty( $custom_query ) ) {
-            return $custom_query;
+            return $this->validate_custom_query( $custom_query );
         }
 
         // Check data source mode
@@ -376,43 +486,11 @@ class Visualizer {
     private function build_multi_y_query( string $table, string $group_col, array $value_cols, string $aggregate, string $where_clause, array $prepare ): ?string {
         global $wpdb;
 
-        $column_labels = [
-            'apropiacioninicial'      => 'Apropiacion Inicial',
-            'adicion'                 => 'Adicion',
-            'reduccion'              => 'Reduccion',
-            'credito'                => 'Credito',
-            'contracredito'          => 'Contracredito',
-            'aplazamiento'           => 'Aplazamiento',
-            'desplazamiento'         => 'Desplazamiento',
-            'apropiacionvigente'     => 'Apropiacion Vigente',
-            'disponibilidades'       => 'Disponibilidades',
-            'saldodisponible'        => 'Saldo Disponible',
-            'compromisos'            => 'Compromisos',
-            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
-            'obligacion'             => 'Obligacion',
-            'pagos'                  => 'Pagos',
-            'obligacionesporpagar'   => 'Obligaciones por Pagar',
-            'valordebito'            => 'Valor Debito',
-            'valorcredito'           => 'Valor Credito',
-            'saldoporejecutaresp'    => 'Saldo por Ejecutar',
-            // Personal
-            'salariobaseibc'         => 'Salario Base IBC',
-            // Ingresos
-            'apropiado'              => 'Apropiado',
-            'modificaciones'         => 'Modificaciones',
-            'totalpresupuesto'       => 'Total Presupuesto',
-            'recaudosanteriores'     => 'Recaudos Anteriores',
-            'recaudosmes'            => 'Recaudos Mes',
-            'recaudosacumulados'     => 'Recaudos Acumulados',
-            'porrecaudar'            => 'Por Recaudar',
-            'porcrecaudado'          => '% Recaudado',
-        ];
-
         $unions      = [];
         $all_prepare = [];
 
         foreach ( $value_cols as $col ) {
-            $label = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
+            $label = $this->column_label( $col );
             $sub   = "SELECT `{$group_col}` AS label, {$aggregate}(`{$col}`) AS value, '{$label}' AS `group` FROM `{$table}`{$where_clause} GROUP BY `{$group_col}`";
             $unions[] = "({$sub})";
             $all_prepare = array_merge( $all_prepare, $prepare );
@@ -432,108 +510,76 @@ class Visualizer {
      * Build a Vista query (pre-built JOINs between plan_presupuestal and ejecucion_gastos).
      */
     private function build_vista_query( int $chart_id ): ?string {
+        return $this->compose_vista_query( [
+            'dependencia' => get_post_meta( $chart_id, '_sysman_vista_dependencia', true ) ?: '',
+            'compania'    => get_post_meta( $chart_id, '_sysman_vista_compania', true ) ?: '001',
+            'anio'        => (int) get_post_meta( $chart_id, '_sysman_filter_anio', true ),
+            'mes'         => (int) get_post_meta( $chart_id, '_sysman_filter_mes', true ),
+            'aggregate'   => strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' ),
+            'value_cols'  => get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [],
+        ] );
+    }
+
+    /**
+     * Compose the Vista query (JOIN plan_presupuestal ↔ ejecucion_gastos)
+     * from a normalized config. Shared by saved charts and admin previews.
+     */
+    private function compose_vista_query( array $config ): ?string {
         global $wpdb;
 
-        $vista_type    = get_post_meta( $chart_id, '_sysman_vista_type', true ) ?: 'ejecucion_dependencia';
-        $dependencia   = get_post_meta( $chart_id, '_sysman_vista_dependencia', true ) ?: '';
-        $compania      = get_post_meta( $chart_id, '_sysman_vista_compania', true ) ?: '001';
-        $filter_anio   = (int) get_post_meta( $chart_id, '_sysman_filter_anio', true );
-        $filter_mes    = (int) get_post_meta( $chart_id, '_sysman_filter_mes', true );
-        $aggregate     = strtoupper( get_post_meta( $chart_id, '_sysman_aggregate', true ) ?: 'SUM' );
-        $value_cols    = get_post_meta( $chart_id, '_sysman_value_columns', true ) ?: [];
-
+        $aggregate = $config['aggregate'];
         if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
             $aggregate = 'SUM';
+        }
+
+        $valid_cols = array_values( array_intersect( $config['value_cols'], self::ALLOWED_VISTA_COLS ) );
+        if ( empty( $valid_cols ) ) {
+            $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
         }
 
         $pp_table = $wpdb->prefix . 'sysman_plan_presupuestal';
         $eg_table = $wpdb->prefix . 'sysman_ejecucion_gastos';
 
-        $allowed_vista_cols = [
-            'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
-            'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
-            'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
-            'obligacion', 'pagos', 'obligacionesporpagar',
-        ];
-
-        $valid_cols = [];
-        foreach ( $value_cols as $vc ) {
-            if ( in_array( $vc, $allowed_vista_cols, true ) ) {
-                $valid_cols[] = $vc;
-            }
-        }
-
-        if ( empty( $valid_cols ) ) {
-            $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
-        }
-
         $where   = [ "pp.movimiento = 'SI'", "eg.movimiento = 'SI'", 'pp.compania = %s' ];
-        $prepare = [ $compania ];
+        $prepare = [ $config['compania'] ];
 
-        if ( ! empty( $dependencia ) ) {
+        if ( ! empty( $config['dependencia'] ) ) {
             $where[]   = 'pp.nombredependencia = %s';
-            $prepare[] = $dependencia;
+            $prepare[] = $config['dependencia'];
         }
-
-        if ( $filter_anio > 0 ) {
+        if ( $config['anio'] > 0 ) {
             $where[]   = 'pp.anio = %d';
-            $prepare[] = $filter_anio;
+            $prepare[] = $config['anio'];
         }
-
-        if ( $filter_mes > 0 ) {
+        if ( $config['mes'] > 0 ) {
             $where[]   = 'pp.mes = %d';
-            $prepare[] = $filter_mes;
+            $prepare[] = $config['mes'];
         }
 
         $where_clause = ' WHERE ' . implode( ' AND ', $where );
-
         $join = "FROM `{$pp_table}` pp INNER JOIN `{$eg_table}` eg "
               . 'ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania AND pp.anio = eg.anio AND pp.mes = eg.mes';
-
-        $column_labels = [
-            'apropiacioninicial'      => 'Apropiacion Inicial',
-            'adicion'                 => 'Adicion',
-            'reduccion'              => 'Reduccion',
-            'credito'                => 'Credito',
-            'contracredito'          => 'Contracredito',
-            'aplazamiento'           => 'Aplazamiento',
-            'desplazamiento'         => 'Desplazamiento',
-            'apropiacionvigente'     => 'Apropiacion Vigente',
-            'disponibilidades'       => 'Disponibilidades',
-            'saldodisponible'        => 'Saldo Disponible',
-            'compromisos'            => 'Compromisos',
-            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
-            'obligacion'             => 'Obligacion',
-            'pagos'                  => 'Pagos',
-            'obligacionesporpagar'   => 'Obligaciones por Pagar',
-        ];
 
         if ( count( $valid_cols ) > 1 ) {
             $unions      = [];
             $all_prepare = [];
 
             foreach ( $valid_cols as $col ) {
-                $label     = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
-                $sub       = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value, '{$label}' AS `group` {$join}{$where_clause} GROUP BY pp.nombre";
-                $unions[]  = "({$sub})";
+                $label       = $this->column_label( $col );
+                $sub         = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value, '{$label}' AS `group` {$join}{$where_clause} GROUP BY pp.nombre";
+                $unions[]    = "({$sub})";
                 $all_prepare = array_merge( $all_prepare, $prepare );
             }
 
             $query = implode( ' UNION ALL ', $unions ) . " ORDER BY label, `group` LIMIT 1000";
-
-            if ( $all_prepare ) {
-                return $wpdb->prepare( $query, ...$all_prepare );
-            }
-            return $query;
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            return $all_prepare ? $wpdb->prepare( $query, ...$all_prepare ) : $query;
         }
 
         $col   = $valid_cols[0];
         $query = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value {$join}{$where_clause} GROUP BY pp.nombre ORDER BY value DESC LIMIT 100";
-
-        if ( $prepare ) {
-            return $wpdb->prepare( $query, ...$prepare );
-        }
-        return $query;
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        return $prepare ? $wpdb->prepare( $query, ...$prepare ) : $query;
     }
 
     /**
@@ -696,7 +742,10 @@ class Visualizer {
         $data_source_mode = sanitize_text_field( $_POST['data_source_mode'] ?? 'table' );
 
         if ( ! empty( $custom_query ) ) {
-            $query = $custom_query;
+            $query = $this->validate_custom_query( $custom_query );
+            if ( ! $query ) {
+                wp_send_json_error( [ 'message' => 'Query no permitida: solo se admite un único SELECT sobre las tablas del plugin.' ] );
+            }
         } elseif ( 'vista' === $data_source_mode ) {
             $query = $this->build_vista_preview_query( $_POST );
         } else {
@@ -798,100 +847,19 @@ class Visualizer {
      * Build a Vista query from AJAX POST data (preview mode).
      */
     private function build_vista_preview_query( array $post ): ?string {
-        global $wpdb;
-
-        $dependencia = sanitize_text_field( $post['vista_dependencia'] ?? '' );
-        $compania    = sanitize_text_field( $post['vista_compania'] ?? '001' );
-        $filter_anio = absint( $post['filter_anio'] ?? 0 );
-        $filter_mes  = absint( $post['filter_mes'] ?? 0 );
-        $aggregate   = strtoupper( sanitize_text_field( $post['aggregate'] ?? 'SUM' ) );
-
-        if ( ! in_array( $aggregate, self::ALLOWED_AGGREGATES, true ) ) {
-            $aggregate = 'SUM';
-        }
-
         $raw_value_cols = $post['value_columns'] ?? [];
         if ( ! is_array( $raw_value_cols ) ) {
             $raw_value_cols = [ $raw_value_cols ];
         }
 
-        $allowed = [
-            'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
-            'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
-            'saldodisponible', 'compromisos', 'disponibilidadesabiertas',
-            'obligacion', 'pagos', 'obligacionesporpagar',
-        ];
-
-        $valid_cols = [];
-        foreach ( $raw_value_cols as $vc ) {
-            $vc = sanitize_text_field( $vc );
-            if ( in_array( $vc, $allowed, true ) ) {
-                $valid_cols[] = $vc;
-            }
-        }
-        if ( empty( $valid_cols ) ) {
-            $valid_cols = [ 'apropiacionvigente', 'compromisos', 'pagos' ];
-        }
-
-        $pp_table = $wpdb->prefix . 'sysman_plan_presupuestal';
-        $eg_table = $wpdb->prefix . 'sysman_ejecucion_gastos';
-
-        $where   = [ "pp.movimiento = 'SI'", "eg.movimiento = 'SI'", 'pp.compania = %s' ];
-        $prepare = [ $compania ];
-
-        if ( ! empty( $dependencia ) ) {
-            $where[]   = 'pp.nombredependencia = %s';
-            $prepare[] = $dependencia;
-        }
-        if ( $filter_anio > 0 ) {
-            $where[]   = 'pp.anio = %d';
-            $prepare[] = $filter_anio;
-        }
-        if ( $filter_mes > 0 ) {
-            $where[]   = 'pp.mes = %d';
-            $prepare[] = $filter_mes;
-        }
-
-        $where_clause = ' WHERE ' . implode( ' AND ', $where );
-        $join = "FROM `{$pp_table}` pp INNER JOIN `{$eg_table}` eg "
-              . 'ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania AND pp.anio = eg.anio AND pp.mes = eg.mes';
-
-        $column_labels = [
-            'apropiacioninicial'      => 'Apropiacion Inicial',
-            'adicion'                 => 'Adicion',
-            'reduccion'              => 'Reduccion',
-            'credito'                => 'Credito',
-            'contracredito'          => 'Contracredito',
-            'aplazamiento'           => 'Aplazamiento',
-            'desplazamiento'         => 'Desplazamiento',
-            'apropiacionvigente'     => 'Apropiacion Vigente',
-            'disponibilidades'       => 'Disponibilidades',
-            'saldodisponible'        => 'Saldo Disponible',
-            'compromisos'            => 'Compromisos',
-            'disponibilidadesabiertas' => 'Disponibilidades Abiertas',
-            'obligacion'             => 'Obligacion',
-            'pagos'                  => 'Pagos',
-            'obligacionesporpagar'   => 'Obligaciones por Pagar',
-        ];
-
-        if ( count( $valid_cols ) > 1 ) {
-            $unions      = [];
-            $all_prepare = [];
-
-            foreach ( $valid_cols as $col ) {
-                $label     = $column_labels[ $col ] ?? ucwords( str_replace( '_', ' ', $col ) );
-                $sub       = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value, '{$label}' AS `group` {$join}{$where_clause} GROUP BY pp.nombre";
-                $unions[]  = "({$sub})";
-                $all_prepare = array_merge( $all_prepare, $prepare );
-            }
-
-            $query = implode( ' UNION ALL ', $unions ) . " ORDER BY label, `group` LIMIT 1000";
-            return $all_prepare ? $wpdb->prepare( $query, ...$all_prepare ) : $query;
-        }
-
-        $col   = $valid_cols[0];
-        $query = "SELECT pp.nombre AS label, {$aggregate}(eg.`{$col}`) AS value {$join}{$where_clause} GROUP BY pp.nombre ORDER BY value DESC LIMIT 100";
-        return $prepare ? $wpdb->prepare( $query, ...$prepare ) : $query;
+        return $this->compose_vista_query( [
+            'dependencia' => sanitize_text_field( $post['vista_dependencia'] ?? '' ),
+            'compania'    => sanitize_text_field( $post['vista_compania'] ?? '001' ),
+            'anio'        => absint( $post['filter_anio'] ?? 0 ),
+            'mes'         => absint( $post['filter_mes'] ?? 0 ),
+            'aggregate'   => strtoupper( sanitize_text_field( $post['aggregate'] ?? 'SUM' ) ),
+            'value_cols'  => array_map( 'sanitize_text_field', $raw_value_cols ),
+        ] );
     }
 
     /**

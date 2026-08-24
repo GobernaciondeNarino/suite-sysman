@@ -100,12 +100,10 @@ class DatosAbiertosModule {
         $dependencia = get_post_meta( $post_id, '_gn_dependencia', true );
         $anio = get_post_meta( $post_id, '_gn_anio', true );
         $mes  = (int) get_post_meta( $post_id, '_gn_mes', true );
-        $meses = [ 1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
-                   7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre' ];
 
         return $this->render_card( [
             'title'    => __( 'Ejecucion Presupuestal', 'sysman-suite' ),
-            'meta'     => esc_html( $dependencia . ' — ' . ( $meses[ $mes ] ?? $mes ) . ' ' . $anio ),
+            'meta'     => esc_html( $dependencia . ' — ' . \SysmanSuite\Helpers::month_name( $mes ) . ' ' . $anio ),
             'desc'     => __( 'Datos de ejecucion presupuestal consolidados por rubro: apropiaciones, adiciones, creditos, compromisos, obligaciones y pagos.', 'sysman-suite' ),
             'csv_url'  => $csv_url,
             'txt_url'  => $txt_url,
@@ -144,10 +142,7 @@ class DatosAbiertosModule {
         $txt_url  = admin_url( 'admin-ajax.php?action=gn_reporte_dis_export&format=txt&' . $base_params );
         $json_url = rest_url( 'gn-sisman/v1/reporte/disponibilidades?' . $base_params );
 
-        $meses = [ 1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',
-                   7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre' ];
-
-        $subtitle = ( $meses[ $mes ] ?? $mes ) . ' ' . $anio;
+        $subtitle = \SysmanSuite\Helpers::month_name( $mes ) . ' ' . $anio;
         if ( '' !== $dep ) {
             $subtitle = $dep . ' — ' . $subtitle;
         }

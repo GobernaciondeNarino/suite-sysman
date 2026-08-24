@@ -1,0 +1,29 @@
+name: Claude Security Review
+
+# Revisión de seguridad automática con IA para cada pull request,
+# usando anthropics/claude-code-security-review.
+# Requiere el secreto ANTHROPIC_API_KEY configurado en
+# Settings → Secrets and variables → Actions.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+
+      - name: Claude security review
+        uses: anthropics/claude-code-security-review@main
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -17,18 +17,55 @@ class Logger {
     ];
 
     public function __construct() {
-        $this->log_file = SYSMAN_SUITE_PATH . 'logs/import.log';
+        // The log lives in uploads (survives plugin updates) with an
+        // unguessable name, protected by .htaccess + index.php. The old
+        // location inside the plugin folder was wiped on every update and
+        // was publicly downloadable on servers that ignore .htaccess.
+        $upload         = wp_upload_dir( null, false );
+        $dir            = trailingslashit( $upload['basedir'] ) . 'sysman-suite';
+        $this->log_file = $dir . '/import-' . substr( wp_hash( 'sysman-suite-log' ), 0, 12 ) . '.log';
+
         $this->ensure_log_dir();
+        $this->maybe_migrate_legacy_log();
     }
 
     /**
-     * Ensure the log directory exists.
+     * Ensure the log directory exists and is not web-readable.
      */
     private function ensure_log_dir(): void {
         $dir = dirname( $this->log_file );
         if ( ! is_dir( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+
+        $htaccess = $dir . '/.htaccess';
+        if ( ! file_exists( $htaccess ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+            file_put_contents( $htaccess, "Require all denied\nDeny from all\n" );
+        }
+
+        $index = $dir . '/index.php';
+        if ( ! file_exists( $index ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+            file_put_contents( $index, "<?php // Silence is golden.\n" );
+        }
+    }
+
+    /**
+     * One-time migration of the legacy log stored inside the plugin folder.
+     */
+    private function maybe_migrate_legacy_log(): void {
+        $legacy = SYSMAN_SUITE_PATH . 'logs/import.log';
+        if ( ! file_exists( $legacy ) || ! is_readable( $legacy ) || filesize( $legacy ) === 0 ) {
+            return;
+        }
+
+        $content = file_get_contents( $legacy );
+        if ( $content ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+            file_put_contents( $this->log_file, $content, FILE_APPEND | LOCK_EX );
+        }
+        @unlink( $legacy );
     }
 
     /**

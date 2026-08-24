@@ -182,40 +182,22 @@ class EjecucionModule {
         $importer = \Sysman_Suite::instance()->importer;
         $results  = [];
 
-        try {
-            $r = $importer->import_plan( $compania, $anio, $mes );
-            $results['plan'] = $r['success']
-                ? [ 'inserted' => $r['imported'] ]
-                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
-        } catch ( \Throwable $e ) {
-            $results['plan'] = [ 'error' => $e->getMessage() ];
-        }
+        $steps = [
+            'plan'      => fn() => $importer->import_plan( $compania, $anio, $mes ),
+            'ejecucion' => fn() => $importer->import_ejecucion( $compania, $anio, $mes ),
+            'dis'       => fn() => $importer->import_auxiliar( $compania, $anio, $mes, 'DIS' ),
+            'res'       => fn() => $importer->import_auxiliar( $compania, $anio, $mes, 'RES' ),
+        ];
 
-        try {
-            $r = $importer->import_ejecucion( $compania, $anio, $mes );
-            $results['ejecucion'] = $r['success']
-                ? [ 'inserted' => $r['imported'] ]
-                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
-        } catch ( \Throwable $e ) {
-            $results['ejecucion'] = [ 'error' => $e->getMessage() ];
-        }
-
-        try {
-            $r = $importer->import_auxiliar( $compania, $anio, $mes, 'DIS' );
-            $results['dis'] = $r['success']
-                ? [ 'inserted' => $r['imported'] ]
-                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
-        } catch ( \Throwable $e ) {
-            $results['dis'] = [ 'error' => $e->getMessage() ];
-        }
-
-        try {
-            $r = $importer->import_auxiliar( $compania, $anio, $mes, 'RES' );
-            $results['res'] = $r['success']
-                ? [ 'inserted' => $r['imported'] ]
-                : [ 'error' => $r['error'] ?? 'Error desconocido' ];
-        } catch ( \Throwable $e ) {
-            $results['res'] = [ 'error' => $e->getMessage() ];
+        foreach ( $steps as $key => $step ) {
+            try {
+                $r = $step();
+                $results[ $key ] = $r['success']
+                    ? [ 'inserted' => $r['imported'] ]
+                    : [ 'error' => $r['error'] ?? 'Error desconocido' ];
+            } catch ( \Throwable $e ) {
+                $results[ $key ] = [ 'error' => $e->getMessage() ];
+            }
         }
 
         update_option( 'gn_sisman_last_sync_ejecucion_module', current_time( 'mysql' ) );
