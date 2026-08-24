@@ -260,10 +260,31 @@ sisman-suite/
 │       ├── ejecucion.js
 │       ├── datos-abiertos.js
 │       └── frontend.js
-└── logs/
+├── tests/                  # Tests unitarios standalone (php tests/run-tests.php)
+├── .github/workflows/      # CI, asistente @claude y revisión de seguridad
+└── .claude/skills/         # Skill ui-ux-pro-max para Claude Code
 ```
 
+> Nota: el log de importaciones vive en `wp-content/uploads/sysman-suite/`
+> (protegido con `.htaccess` + `index.php`), no dentro del plugin.
+
 ## Changelog
+
+### 5.9.0
+Implementación del plan de mejora de `AUDITORIA.md` (v5.8.0):
+- **Seguridad**: Rate-limiting por IP en todos los endpoints públicos (REST `sysman-suite/v1/chart/*`, `gn-sisman/v1/*` y exports AJAX `nopriv`): 120 req/min para lectura, 30 req/min para exports pesados, 20 req/min para descargas de Datos Abiertos; devuelve HTTP 429. Los administradores no se limitan; ajustable con el filtro `sysman_suite_rate_limit`
+- **Seguridad**: Los CPTs `sysman_chart` y `gn_ejecucion` ahora exigen `manage_options` en todas sus capacidades (antes cualquier Autor/Editor podia crear graficos entrando por `post-new.php?post_type=sysman_chart`)
+- **Seguridad**: Cabecera `X-Content-Type-Options: nosniff` en todas las descargas (CSV/TXT), unificadas en `Helpers::download_headers()`
+- **Fix**: Todas las fechas por defecto usan la zona horaria de WordPress (`current_time`) en lugar de la del servidor (`date`) — evita importar el mes equivocado cerca de medianoche
+- **Fix**: Cambiar la frecuencia de importacion en Configuracion ahora reprograma el cron inmediatamente (antes solo se aplicaba al reactivar el plugin); la frecuencia se valida contra la lista de schedules permitidos
+- **Fix**: Los graficos dentro de widgets o page builders ahora cargan D3/D3plus (encolado tardio desde el propio shortcode ademas de la deteccion en `post_content`)
+- **Fix**: El updater ya no referencia `assets/icon-128.png` si el archivo no existe
+- **Rendimiento**: Importaciones por lotes (INSERT de 500 filas) para los 5 informes — antes ejecucion/auxiliar/personal/ingresos insertaban fila por fila
+- **Robustez**: Cada importacion (DELETE + INSERT) se ejecuta dentro de una transaccion: un fallo a mitad de carga revierte todo y conserva los datos anteriores (antes el mes quedaba vacio o a medias)
+- **Robustez**: Rotacion automatica del log al superar 5 MB (una generacion de respaldo `.log.1`)
+- **Refactor**: Los 5 metodos de insercion duplicados en `Database` se unifican en `replace_records()` (~180 lineas menos); `get_dependencias()` unificado en `Repository` (el Visualizer delega); invalidacion de cache de dependencias completa (todas las combinaciones compania/anio/mes)
+- **Calidad**: Nueva suite de tests standalone (`tests/run-tests.php`, 31 aserciones: validador SQL, rate limiter, sanitizador CSV, helpers) y workflow de CI (`.github/workflows/ci.yml`) con lint de sintaxis y tests en PHP 8.1 y 8.3
+- **Calidad**: `frontend.js` construye las tablas del modal con una sola escritura de `innerHTML` (antes reparseaba el nodo en cada fila)
 
 ### 5.8.0
 - **Seguridad (critico)**: Las queries personalizadas de graficos (`custom_query`) ahora pasan por `Visualizer::validate_custom_query()` en cada ejecucion: solo se admite una unica sentencia SELECT, sin comentarios SQL ni palabras clave peligrosas (INSERT/UPDATE/DELETE/DROP/OUTFILE/SLEEP/etc.), y unicamente sobre las tablas del plugin. Antes, una query almacenada se ejecutaba sin validacion a traves del endpoint REST publico `/chart/{id}`

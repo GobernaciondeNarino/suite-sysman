@@ -43,7 +43,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/rubros', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_rubros' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_public', 120 ),
             'args' => [
                 'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
             ],
@@ -52,7 +52,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/consolidado', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_consolidado' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_public', 120 ),
             'args' => [
                 'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'codigo'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -62,7 +62,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/dis', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_dis' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_public', 120 ),
             'args' => [
                 'post_id'      => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'codigocuenta' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -72,7 +72,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/res', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_res' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_public', 120 ),
             'args' => [
                 'post_id'    => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'numero_dis' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -83,7 +83,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/export', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_export' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_export', 30 ),
             'args' => [
                 'post_id' => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
             ],
@@ -92,7 +92,7 @@ class RestController {
         register_rest_route( $ns, '/ejecucion/(?P<post_id>\d+)/proyecto', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_proyecto' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_public', 120 ),
             'args' => [
                 'post_id'    => [ 'required' => true, 'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'codigobpin' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -101,7 +101,7 @@ class RestController {
         register_rest_route( $ns, '/reporte/disponibilidades', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_reporte_dis' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'gn_export', 30 ),
             'args' => [
                 'anio'        => [ 'required' => true,  'type' => 'integer', 'sanitize_callback' => 'absint' ],
                 'mes'         => [ 'required' => true,  'type' => 'integer', 'sanitize_callback' => 'absint' ],
@@ -113,6 +113,23 @@ class RestController {
 
     public function check_admin(): bool {
         return current_user_can( 'edit_posts' );
+    }
+
+    /**
+     * Permission callback for public endpoints: allows access but throttles
+     * abusive clients per IP.
+     *
+     * @return true|\WP_Error
+     */
+    public function public_permission( string $bucket, int $max ) {
+        if ( ! \SysmanSuite\Helpers::rate_limit_check( $bucket, $max ) ) {
+            return new \WP_Error(
+                'rest_rate_limited',
+                __( 'Demasiadas solicitudes. Intente de nuevo en un minuto.', 'sysman-suite' ),
+                [ 'status' => 429 ]
+            );
+        }
+        return true;
     }
 
     public function get_vigencias( \WP_REST_Request $request ): \WP_REST_Response {

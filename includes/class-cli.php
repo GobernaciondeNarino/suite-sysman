@@ -46,8 +46,8 @@ class Cli {
      */
     public function import( array $args, array $assoc_args ): void {
         $compania  = $assoc_args['compania'] ?? '001';
-        $anio      = (int) ( $assoc_args['anio'] ?? date( 'Y' ) );
-        $mes       = (int) ( $assoc_args['mes'] ?? date( 'n' ) );
+        $anio      = (int) ( $assoc_args['anio'] ?? current_time( 'Y' ) );
+        $mes       = (int) ( $assoc_args['mes'] ?? current_time( 'n' ) );
         $report    = $assoc_args['report'] ?? 'all';
         $tipo_cpte = $assoc_args['tipo_cpte'] ?? 'RES';
 

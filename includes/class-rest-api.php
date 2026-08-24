@@ -58,21 +58,21 @@ class Rest_Api {
             ],
         ] );
 
-        // Chart data endpoint (public)
+        // Chart data endpoint (public, rate limited per IP)
         register_rest_route( $namespace, '/chart/(?P<id>\d+)', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'get_chart_data' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'chart', 120 ),
             'args'                => [
                 'id' => [ 'required' => true, 'sanitize_callback' => 'absint' ],
             ],
         ] );
 
-        // Chart CSV download (public)
+        // Chart CSV download (public, rate limited per IP)
         register_rest_route( $namespace, '/chart/(?P<id>\d+)/csv', [
             'methods'             => 'GET',
             'callback'            => [ $this, 'download_chart_csv' ],
-            'permission_callback' => '__return_true',
+            'permission_callback' => fn() => $this->public_permission( 'chart_csv', 30 ),
             'args'                => [
                 'id' => [ 'required' => true, 'sanitize_callback' => 'absint' ],
             ],
@@ -103,6 +103,23 @@ class Rest_Api {
 
     public function admin_permission(): bool {
         return current_user_can( 'manage_options' );
+    }
+
+    /**
+     * Permission callback for public endpoints: allows access but throttles
+     * abusive clients per IP.
+     *
+     * @return true|\WP_Error
+     */
+    public function public_permission( string $bucket, int $max ) {
+        if ( ! Helpers::rate_limit_check( $bucket, $max ) ) {
+            return new \WP_Error(
+                'rest_rate_limited',
+                __( 'Demasiadas solicitudes. Intente de nuevo en un minuto.', 'sysman-suite' ),
+                [ 'status' => 429 ]
+            );
+        }
+        return true;
     }
 
     public function get_records( \WP_REST_Request $request ): \WP_REST_Response {
@@ -195,9 +212,7 @@ class Rest_Api {
 
         // Serve the file directly: returning the string in a WP_REST_Response
         // would JSON-encode it and corrupt the CSV.
-        nocache_headers();
-        header( 'Content-Type: text/csv; charset=UTF-8' );
-        header( 'Content-Disposition: attachment; filename="sysman-chart-' . absint( $id ) . '.csv"' );
+        Helpers::download_headers( 'text/csv; charset=UTF-8', 'sysman-chart-' . absint( $id ) . '.csv' );
 
         $output = fopen( 'php://output', 'w' );
         fprintf( $output, "\xEF\xBB\xBF" );

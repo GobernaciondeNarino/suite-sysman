@@ -102,7 +102,7 @@ class EjecucionModule {
             'restUrl'  => rest_url( 'gn-sisman/v1/' ),
             'nonce'    => wp_create_nonce( 'gn_ejecucion_nonce' ),
             'restNonce' => wp_create_nonce( 'wp_rest' ),
-            'currentYear' => (int) date( 'Y' ),
+            'currentYear' => (int) current_time( 'Y' ),
         ] );
     }
 
@@ -115,8 +115,8 @@ class EjecucionModule {
         $post_id     = absint( $_POST['post_id'] ?? 0 );
         $title       = sanitize_text_field( $_POST['title'] ?? '' );
         $dependencia = sanitize_text_field( $_POST['dependencia'] ?? '' );
-        $anio        = absint( $_POST['anio'] ?? date( 'Y' ) );
-        $mes         = absint( $_POST['mes'] ?? date( 'n' ) );
+        $anio        = absint( $_POST['anio'] ?? current_time( 'Y' ) );
+        $mes         = absint( $_POST['mes'] ?? current_time( 'n' ) );
         $compania    = sanitize_text_field( $_POST['compania'] ?? '001' );
         $vigencia      = sanitize_text_field( $_POST['vigencia'] ?? '' );
         $agrupar_bpid  = sanitize_text_field( $_POST['agrupar_bpid'] ?? '0' );
@@ -176,8 +176,8 @@ class EjecucionModule {
         @set_time_limit( 600 );
 
         $compania = sanitize_text_field( $_POST['compania'] ?? '001' );
-        $anio     = absint( $_POST['anio'] ?? date( 'Y' ) );
-        $mes      = absint( $_POST['mes'] ?? date( 'n' ) );
+        $anio     = absint( $_POST['anio'] ?? current_time( 'Y' ) );
+        $mes      = absint( $_POST['mes'] ?? current_time( 'n' ) );
 
         $importer = \Sysman_Suite::instance()->importer;
         $results  = [];

@@ -8,8 +8,8 @@ $github_repo    = get_option( 'sysman_github_repo', 'GobernaciondeNarino/sysman-
 $d3_cdn_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
 $d3plus_cdn_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
 $compania       = get_option( 'sysman_api_compania', '001' );
-$anio           = get_option( 'sysman_api_anio', (int) date( 'Y' ) );
-$mes            = get_option( 'sysman_api_mes', (int) date( 'n' ) );
+$anio           = get_option( 'sysman_api_anio', (int) current_time( 'Y' ) );
+$mes            = get_option( 'sysman_api_mes', (int) current_time( 'n' ) );
 $frequency      = get_option( 'sysman_import_frequency', 'daily' );
 ?>
 <div class="wrap sysman-admin-wrap">

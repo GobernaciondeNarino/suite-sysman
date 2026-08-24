@@ -300,8 +300,8 @@ class Importer {
         }
 
         $compania = sanitize_text_field( $_POST['compania'] ?? '001' );
-        $anio     = absint( $_POST['anio'] ?? date( 'Y' ) );
-        $mes      = absint( $_POST['mes'] ?? date( 'n' ) );
+        $anio     = absint( $_POST['anio'] ?? current_time( 'Y' ) );
+        $mes      = absint( $_POST['mes'] ?? current_time( 'n' ) );
         $report   = sanitize_text_field( $_POST['report'] ?? 'all' );
 
         if ( $anio < 2000 || $anio > 2100 ) {
@@ -409,8 +409,8 @@ class Importer {
      */
     public function run_scheduled_import(): void {
         $compania = get_option( 'sysman_api_compania', '001' );
-        $anio     = (int) get_option( 'sysman_api_anio', date( 'Y' ) );
-        $mes      = (int) get_option( 'sysman_api_mes', date( 'n' ) );
+        $anio     = (int) get_option( 'sysman_api_anio', current_time( 'Y' ) );
+        $mes      = (int) get_option( 'sysman_api_mes', current_time( 'n' ) );
 
         $this->logger->log( '======================================================', 'info' );
         $this->logger->log( 'INICIO DE IMPORTACIÓN PROGRAMADA (CRON)', 'info' );

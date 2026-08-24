@@ -7,8 +7,8 @@ $plugin     = Sysman_Suite::instance();
 $last_import = get_option( 'sysman_last_import', null );
 
 $compania  = get_option( 'sysman_api_compania', '001' );
-$anio      = get_option( 'sysman_api_anio', date( 'Y' ) );
-$mes       = get_option( 'sysman_api_mes', date( 'n' ) );
+$anio      = get_option( 'sysman_api_anio', current_time( 'Y' ) );
+$mes       = get_option( 'sysman_api_mes', current_time( 'n' ) );
 $frequency = get_option( 'sysman_import_frequency', 'daily' );
 
 $meses = [

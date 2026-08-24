@@ -336,25 +336,20 @@
             const tbody = modal.querySelector('tbody');
             const hasGroups = this.data.some(d => d.group);
 
-            // Build header
-            thead.innerHTML = '';
-            if (hasGroups) {
-                thead.innerHTML += '<th>Serie</th>';
-            }
-            thead.innerHTML += '<th>Categoria</th><th>Valor</th>';
+            // Build header and body with a single innerHTML write each
+            // (repeated `innerHTML +=` reparses the node on every append).
+            thead.innerHTML = (hasGroups ? '<th>Serie</th>' : '') + '<th>Categoria</th><th>Valor</th>';
 
-            tbody.innerHTML = '';
-            this.data.forEach((row) => {
-                const tr = document.createElement('tr');
-                let html = '';
+            const rowsHtml = this.data.map((row) => {
+                let html = '<tr>';
                 if (hasGroups) {
                     html += `<td>${this.escapeHtml(String(row.group || ''))}</td>`;
                 }
                 html += `<td>${this.escapeHtml(String(row.label || ''))}</td>`;
                 html += `<td>${NumberFormatter.fullFormat(parseFloat(row.value) || 0, this.config.numberFormat)}</td>`;
-                tr.innerHTML = html;
-                tbody.appendChild(tr);
+                return html + '</tr>';
             });
+            tbody.innerHTML = rowsHtml.join('');
 
             modal.style.display = 'flex';
         }

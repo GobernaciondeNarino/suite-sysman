@@ -47,15 +47,18 @@ class Updater {
         $current_version = SYSMAN_SUITE_VERSION;
 
         if ( version_compare( $current_version, $remote['version'], '<' ) ) {
+            // Only reference the icon if the asset actually ships with the plugin.
+            $icons = file_exists( SYSMAN_SUITE_PATH . 'assets/icon-128.png' )
+                ? [ 'default' => SYSMAN_SUITE_URL . 'assets/icon-128.png' ]
+                : [];
+
             $transient->response[ SYSMAN_SUITE_BASENAME ] = (object) [
                 'slug'        => 'sysman-suite',
                 'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $remote['version'],
                 'url'         => $remote['url'],
                 'package'     => $remote['download_url'],
-                'icons'       => [
-                    'default' => SYSMAN_SUITE_URL . 'assets/icon-128.png',
-                ],
+                'icons'       => $icons,
                 'tested'      => $remote['tested'] ?? '',
                 'requires'    => $remote['requires'] ?? '6.0',
                 'requires_php' => $remote['requires_php'] ?? '8.1',

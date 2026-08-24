@@ -211,6 +211,7 @@ class DatosAbiertosModule {
     // ─── AJAX: Ejecucion export (CSV / TXT) ─────────────────────
 
     public function ajax_ejecucion_export(): void {
+        $this->enforce_rate_limit();
         $post_id = absint( $_GET['id'] ?? 0 );
         $format  = sanitize_text_field( $_GET['format'] ?? 'csv' );
 
@@ -248,6 +249,7 @@ class DatosAbiertosModule {
     // ─── AJAX: Reporte DIS export (CSV / TXT) ───────────────────
 
     public function ajax_reporte_dis_export(): void {
+        $this->enforce_rate_limit();
         $anio        = absint( $_GET['anio'] ?? 0 );
         $mes         = absint( $_GET['mes'] ?? 0 );
         $compania    = sanitize_text_field( $_GET['compania'] ?? '001' );
@@ -286,6 +288,20 @@ class DatosAbiertosModule {
 
     // ─── Download streamer ───────────────────────────────────────
 
+    /**
+     * Throttle unauthenticated export downloads per IP (open data stays
+     * public by design; this only limits abuse of the heavy JOIN queries).
+     */
+    private function enforce_rate_limit(): void {
+        if ( ! \SysmanSuite\Helpers::rate_limit_check( 'da_export', 20 ) ) {
+            wp_die(
+                esc_html__( 'Demasiadas solicitudes. Intente de nuevo en un minuto.', 'sysman-suite' ),
+                esc_html__( 'Límite de solicitudes', 'sysman-suite' ),
+                [ 'response' => 429 ]
+            );
+        }
+    }
+
     private function stream_download( array $data, array $col_headers, array $keys, string $filename, string $format ): void {
         @set_time_limit( 300 );
 
@@ -293,11 +309,8 @@ class DatosAbiertosModule {
         $filename = sanitize_file_name( $filename );
         $format   = ( 'txt' === $format ) ? 'txt' : 'csv';
 
-        nocache_headers();
-
         if ( 'txt' === $format ) {
-            header( 'Content-Type: text/plain; charset=utf-8' );
-            header( 'Content-Disposition: attachment; filename="' . $filename . '.txt"' );
+            \SysmanSuite\Helpers::download_headers( 'text/plain; charset=utf-8', $filename . '.txt' );
 
             echo implode( "\t", array_map( [ $this, 'sanitize_txt_cell' ], $col_headers ) ) . "\n";
             foreach ( $data as $row ) {
@@ -308,8 +321,7 @@ class DatosAbiertosModule {
                 echo implode( "\t", $values ) . "\n";
             }
         } else {
-            header( 'Content-Type: text/csv; charset=utf-8' );
-            header( 'Content-Disposition: attachment; filename="' . $filename . '.csv"' );
+            \SysmanSuite\Helpers::download_headers( 'text/csv; charset=utf-8', $filename . '.csv' );
 
             $output = fopen( 'php://output', 'w' );
             fprintf( $output, "\xEF\xBB\xBF" );

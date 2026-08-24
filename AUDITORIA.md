@@ -1,6 +1,6 @@
 # Auditoría de Código — SYSMAN Suite
 
-**Fecha:** 2026-08-24 · **Versión auditada:** 5.7.3 → **Versión resultante:** 5.8.0
+**Fecha:** 2026-08-24 · **Versión auditada:** 5.7.3 → **Versiones resultantes:** 5.8.0 (hallazgos críticos) y 5.9.0 (plan de mejora implementado)
 **Alcance:** todo el código PHP (~6.000 líneas), JavaScript (~2.300 líneas), plantillas y configuración del plugin.
 
 ---
@@ -29,36 +29,37 @@
 
 > ⚠️ **Acción requerida:** los dos workflows necesitan el secreto `ANTHROPIC_API_KEY` (o `CLAUDE_CODE_OAUTH_TOKEN` en `claude.yml`) en *Settings → Secrets and variables → Actions* del repositorio. Hasta que se configure, los workflows fallarán silenciosamente en los PRs.
 
-## 3. Lista de auditoría — mejoras pendientes (priorizada)
+## 3. Lista de auditoría — plan de mejora
 
-### Prioridad alta (seguridad / integridad)
+### 3.1 Implementado en v5.9.0
 
-- [ ] **Endpoints públicos sin rate-limiting.** `/gn-sisman/v1/reporte/disponibilidades`, `/ejecucion/{id}/export` y los exports AJAX `nopriv` ejecutan JOINs pesados sin límite de frecuencia. Añadir caché de objeto/transient también para consultas con filtros, o un throttle por IP.
-- [ ] **Capacidades del CPT `sysman_chart`.** Sigue usando `capability_type => post`: cualquier Autor/Editor puede crear/editar gráficos entrando por URL directa (`post-new.php?post_type=sysman_chart`). Definir capacidades propias (`manage_sysman_charts`) y mapearlas a administradores.
-- [ ] **Nonce ausente en los exports públicos de Datos Abiertos** es intencional (datos abiertos), pero conviene documentarlo y validar `format`/`id` contra abuso (hecho parcialmente). Revisar si `per_page` debería ser obligatorio en los exports para evitar volcados completos repetidos.
-- [ ] **Escapado de la variable `filename` en descargas**: ya se usa `sanitize_file_name`, pero conviene añadir `Content-Length` y `X-Content-Type-Options: nosniff`.
-- [ ] **`date('Y')`/`date('n')` usan la zona horaria del servidor.** Migrar a `wp_date()`/`current_time()` para evitar desfases de mes/año en importaciones programadas cerca de medianoche.
+- [x] **Rate-limiting en endpoints públicos.** Throttle por IP con transients (`Helpers::rate_limit_check()`): 120 req/min lectura (`chart`, `gn_public`), 30 req/min exports REST (`chart_csv`, `gn_export`), 20 req/min descargas AJAX de Datos Abiertos (`da_export`). Respuesta HTTP 429; administradores exentos; ajustable/desactivable con el filtro `sysman_suite_rate_limit`.
+- [x] **Capacidades del CPT `sysman_chart`.** Todas las capacidades de `sysman_chart` y `gn_ejecucion` mapeadas a `manage_options` (`Visualizer::admin_only_caps()`); un Autor/Editor ya no puede crear gráficos por URL directa.
+- [x] **Cabeceras de descarga.** `X-Content-Type-Options: nosniff` + `nocache_headers()` + filename saneado, unificado en `Helpers::download_headers()` para todas las descargas CSV/TXT.
+- [x] **Zona horaria.** Todos los `date('Y')`/`date('n')` migrados a `current_time()` (22 ocurrencias en PHP y plantillas).
+- [x] **Reprogramación del cron.** Hook `update_option_sysman_import_frequency` reprograma el evento al guardar; la frecuencia se valida contra la whitelist de schedules (`sanitize_import_frequency`).
+- [x] **Assets del shortcode.** `render_shortcode()` encola D3/D3plus tardíamente (`enqueue_chart_assets()`), cubriendo widgets y page builders.
+- [x] **`get_dependencias` unificado.** Implementación única en `Repository` (flexible, con caché 12 h y filtro `movimiento='SI'`); el Visualizer delega. La invalidación ahora limpia todas las combinaciones de caché.
+- [x] **Importaciones atómicas.** `Database::replace_records()` envuelve DELETE + INSERT en una transacción (best effort, requiere InnoDB): un fallo a mitad de carga hace ROLLBACK y conserva los datos anteriores.
+- [x] **Inserción por lotes.** Los 5 informes insertan en lotes de 500 filas (antes 4 de ellos iban fila por fila); los 5 métodos duplicados quedaron unificados en `replace_records()`.
+- [x] **Rotación de log.** Al superar 5 MB el log rota a `.log.1` (una generación de respaldo).
+- [x] **Suite de pruebas.** `tests/run-tests.php` standalone (31 aserciones: validador SQL con 19 casos, rate limiter, sanitizador CSV, helpers) — sin necesidad de instalación WordPress.
+- [x] **CI.** `.github/workflows/ci.yml`: lint de sintaxis de todo el PHP + tests en PHP 8.1 y 8.3, en cada push/PR.
+- [x] **JS `innerHTML +=`.** `frontend.js` construye las tablas del modal con una sola escritura de `innerHTML`.
+- [x] **Ícono del updater.** Solo se referencia `assets/icon-128.png` si el archivo existe.
+- [x] **README.** Árbol del proyecto actualizado (tests, workflows, skill; log en uploads).
+- [x] **Exports públicos documentados.** El acceso sin nonce es intencional (datos abiertos); el abuso se mitiga con el rate-limiting anterior.
 
-### Prioridad media (bugs y robustez)
+### 3.2 Pendiente (requiere decisión o herramientas externas)
 
-- [ ] **El cambio de `sysman_import_frequency` no reprograma el cron.** La frecuencia solo se aplica al activar el plugin. Añadir un hook `update_option_sysman_import_frequency` que haga `wp_clear_scheduled_hook` + `wp_schedule_event`.
-- [ ] **`enqueue_frontend_assets` solo detecta el shortcode en `post_content`.** Los gráficos dentro de widgets, plantillas de tema o page builders no cargan D3. Considerar encolar desde `render_shortcode()` con `wp_enqueue_script` tardío (como ya hace el módulo Ejecución).
-- [ ] **`Visualizer::get_dependencias()` y `Repository::get_dependencias()` duplican lógica** con firmas distintas (una con caché, otra sin). Unificar en `Repository`.
-- [ ] **`Importer::import_all()` no reintenta** peticiones fallidas; una caída transitoria de la API deja el mes vacío (los datos previos se borran con DELETE antes del INSERT). Considerar transacción o staging table + swap para importaciones atómicas.
-- [ ] **`insert_ejecucion_records` inserta fila por fila** (lento con miles de registros); `insert_plan_records` ya usa INSERT por lotes. Unificar al patrón por lotes.
-- [ ] **`Logger` sin rotación**: el log crece sin límite. Rotar al superar ~5 MB.
-- [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: impide ordenar/filtrar por fecha real. Migrar a DATE con normalización en importación.
-
-### Prioridad baja (calidad / mantenimiento)
-
-- [ ] **Sin suite de pruebas.** Añadir PHPUnit + wp-env (o Pest) con pruebas para `validate_custom_query`, `build_chart_query`, `Repository::build_filters` y los sanitizadores CSV.
-- [ ] **Sin PHPCS/PHPStan en CI.** Añadir workflow con `wordpress-coding-standards` y PHPStan nivel 5+ (los `phpcs:ignore` existentes deberían revisarse).
-- [ ] **JS con patrones mixtos** (jQuery en admin, vanilla en frontend) y `innerHTML +=` en `frontend.js` (reflow y pérdida de listeners). Homogeneizar y usar `createElement`/`insertAdjacentHTML` una sola vez.
-- [ ] **Traducciones**: el `Text Domain` está declarado pero no existe carpeta `languages/` con `.pot`. Generar con `wp i18n make-pot`.
-- [ ] **`Updater::format_changelog`**: conversión Markdown manual frágil; considerar `Parsedown` o mostrar texto plano.
-- [ ] **`README.md` desactualizado en estructura** (menciona `logs/` dentro del plugin). Actualizar el árbol del proyecto.
-- [ ] **Accesibilidad UI admin**: revisar contraste y focus-visible de los botones personalizados con el skill `ui-ux-pro-max` (prioridad 1: contraste 4.5:1, navegación por teclado en acordeones de Ejecución).
-- [ ] **Íconos del updater**: `assets/icon-128.png` referenciado pero no existe en el repo.
+- [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
+- [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
+- [ ] **Traducciones**: generar `languages/sysman-suite.pot` con `wp i18n make-pot` (la UI es solo en español, prioridad baja).
+- [ ] **`Updater::format_changelog`**: conversión Markdown manual frágil; considerar `Parsedown` o texto plano.
+- [ ] **Homogeneizar JS** (jQuery en admin vs. vanilla en frontend) — refactor mayor, sin impacto funcional.
+- [ ] **Accesibilidad UI admin**: pasada de contraste/focus-visible con el skill `ui-ux-pro-max` sobre `admin.css` y los acordeones de Ejecución.
+- [ ] **Crear `assets/icon-128.png`** (ícono del plugin para el updater y la pantalla de plugins).
+- [ ] **Reintentos ante fallos de la API** en `import_all()` (backoff simple); con las transacciones de v5.9.0 un fallo ya no destruye datos, solo pospone la actualización.
 
 ## 4. Metodología
 

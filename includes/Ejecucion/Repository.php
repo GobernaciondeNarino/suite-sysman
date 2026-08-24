@@ -46,7 +46,12 @@ class Repository {
         return self::$instance;
     }
 
-    public function get_dependencias( int $anio, int $mes, string $compania = '001' ): array {
+    /**
+     * Distinct dependencias with active (movimiento='SI') rubros.
+     * Pass 0 for anio/mes to skip that filter. Single source of truth —
+     * the Visualizer delegates here.
+     */
+    public function get_dependencias( int $anio = 0, int $mes = 0, string $compania = '001' ): array {
         $cache_key = "gn_sisman_pp_dependencias_{$compania}_{$anio}_{$mes}";
         $cached = get_transient( $cache_key );
         if ( false !== $cached ) {
@@ -56,12 +61,23 @@ class Repository {
         global $wpdb;
         $table = $wpdb->prefix . 'sysman_plan_presupuestal';
 
-        $results = $wpdb->get_col( $wpdb->prepare(
-            "SELECT DISTINCT nombredependencia FROM {$table}
-             WHERE compania = %s AND anio = %d AND mes = %d AND nombredependencia != ''
-             ORDER BY nombredependencia",
-            $compania, $anio, $mes
-        ) );
+        $where   = [ 'compania = %s', "nombredependencia != ''", "movimiento = 'SI'" ];
+        $params  = [ $compania ];
+
+        if ( $anio > 0 ) {
+            $where[]  = 'anio = %d';
+            $params[] = $anio;
+        }
+        if ( $mes > 0 ) {
+            $where[]  = 'mes = %d';
+            $params[] = $mes;
+        }
+
+        $sql = "SELECT DISTINCT nombredependencia FROM {$table}
+                WHERE " . implode( ' AND ', $where ) . '
+                ORDER BY nombredependencia';
+
+        $results = $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) ?: [];
 
         set_transient( $cache_key, $results, 12 * HOUR_IN_SECONDS );
         return $results;
