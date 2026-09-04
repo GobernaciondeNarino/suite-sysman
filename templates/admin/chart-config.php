@@ -221,12 +221,15 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
                     </div>
                 </div>
 
-                <!-- Vista Y-value columns (reuses the ejecucion_gastos numeric columns) -->
+                <!-- Vista Y-value columns (reuses the ejecucion_gastos numeric columns).
+                     These use their own field names (sysman_vista_*) so the two panels
+                     never overwrite each other; PHP picks the set that matches the
+                     active data source mode. -->
                 <div class="sysman-form-group">
                     <label><?php esc_html_e( 'Columnas de Valor (Eje Y)', 'sysman-suite' ); ?></label>
                     <p class="description"><?php esc_html_e( 'Seleccione las métricas de ejecución a visualizar. Cada una genera una serie en el gráfico.', 'sysman-suite' ); ?></p>
                     <div id="sysman-vista-value-columns-list">
-                        <!-- JS will populate saved values here for vista mode -->
+                        <!-- JS populates the saved (or default) columns here -->
                     </div>
                     <button type="button" id="sysman-vista-add-value-column" class="button" style="margin-top:8px;">
                         <span class="dashicons dashicons-plus-alt2" aria-hidden="true" style="vertical-align:middle;margin-top:-2px;"></span>
@@ -236,7 +239,7 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
 
                 <div class="sysman-form-group">
                     <label for="sysman_aggregate_vista"><?php esc_html_e( 'Función de Agregación', 'sysman-suite' ); ?></label>
-                    <select id="sysman_aggregate_vista">
+                    <select id="sysman_aggregate_vista" name="sysman_vista_aggregate">
                         <option value="SUM" <?php selected( $aggregate, 'SUM' ); ?>>SUM - <?php esc_html_e( 'Suma', 'sysman-suite' ); ?></option>
                         <option value="COUNT" <?php selected( $aggregate, 'COUNT' ); ?>>COUNT - <?php esc_html_e( 'Contar', 'sysman-suite' ); ?></option>
                         <option value="AVG" <?php selected( $aggregate, 'AVG' ); ?>>AVG - <?php esc_html_e( 'Promedio', 'sysman-suite' ); ?></option>
@@ -495,4 +498,12 @@ wp_nonce_field( 'sysman_chart_save', 'sysman_chart_nonce' );
     <input type="hidden" id="sysman-saved-color-column" value="<?php echo esc_attr( $color_column ); ?>">
     <input type="hidden" id="sysman-saved-filters" value="<?php echo esc_attr( wp_json_encode( $filters ) ); ?>">
     <input type="hidden" id="sysman-saved-vista-dependencia" value="<?php echo esc_attr( $vista_dependencia ); ?>">
+    <?php
+    // Y columns the Vista panel should start with: the saved ones when this
+    // chart was stored as a Vista, otherwise the three usual execution metrics.
+    $vista_saved_columns = ( 'vista' === $data_source_mode && ! empty( $value_columns ) )
+        ? $value_columns
+        : [ 'apropiacionvigente', 'compromisos', 'pagos' ];
+    ?>
+    <input type="hidden" id="sysman-saved-vista-value-columns" value="<?php echo esc_attr( wp_json_encode( array_values( (array) $vista_saved_columns ) ) ); ?>">
 </div>

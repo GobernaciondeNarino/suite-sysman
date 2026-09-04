@@ -1549,3 +1549,104 @@
 .sysman-source-panel {
     padding: 16px 0 0;
 }
+
+/* ── Panel "Datos a Graficar" (columna lateral, bajo Publicar) ───────── */
+.sysman-data-panel__toolbar {
+    margin-bottom: 12px;
+}
+.sysman-data-panel__refresh {
+    width: 100%;
+    justify-content: center;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+}
+.sysman-data-panel__refresh .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+.sysman-data-panel__summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.sysman-data-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    background: var(--sysman-primary-bg, rgba(26, 86, 50, 0.06));
+    border-radius: 5px;
+    text-align: center;
+}
+.sysman-data-stat__value {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--sysman-primary, #1a5632);
+    word-break: break-word;
+}
+.sysman-data-stat__label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--sysman-gray-600, #6c757d);
+    margin-top: 2px;
+}
+.sysman-data-panel__source {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--sysman-gray-600, #6c757d);
+    margin: 0 0 10px;
+    padding-left: 8px;
+    border-left: 3px solid var(--sysman-primary-light, #2d7a4a);
+}
+.sysman-data-panel__table-wrap {
+    max-height: 260px;
+    overflow: auto;
+    border: 1px solid #e2e4e7;
+    border-radius: 5px;
+}
+.sysman-data-panel__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+.sysman-data-panel__table th,
+.sysman-data-panel__table td {
+    padding: 5px 7px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f1;
+    vertical-align: top;
+}
+.sysman-data-panel__table thead th {
+    position: sticky;
+    top: 0;
+    background: #f6f7f7;
+    font-weight: 600;
+    color: #1d2327;
+    z-index: 1;
+}
+.sysman-data-panel__table td.num,
+.sysman-data-panel__table th.num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.sysman-data-panel__table tbody tr:last-child td {
+    border-bottom: none;
+}
+.sysman-data-panel__more {
+    font-size: 11px;
+    color: var(--sysman-gray-600, #6c757d);
+    margin: 8px 0 0;
+    text-align: center;
+}
+.sysman-data-panel__msg {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--sysman-gray-600, #6c757d);
+    margin: 0;
+}

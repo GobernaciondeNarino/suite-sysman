@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     5.9.0
+ * Version:     5.10.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '5.9.0' );
+define( 'SYSMAN_SUITE_VERSION', '5.10.0' );
+
+/** D3plus v4 bundle (@d3plus/core). Ships its own D3 modules. */
+define( 'SYSMAN_SUITE_D3PLUS_CDN', 'https://cdn.jsdelivr.net/npm/@d3plus/core@4.3.0/umd/d3plus-core.full.min.js' );
+define( 'SYSMAN_SUITE_D3PLUS_VERSION', '4.3.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -137,14 +141,25 @@ final class Sysman_Suite {
      */
     private function migrate_options(): void {
         $current_d3plus = get_option( 'sysman_d3plus_cdn_url', '' );
-        $broken_urls    = [
+
+        // URLs from previous versions: dead CDNs and the legacy d3plus v2
+        // package, which is frozen upstream. Everything moves to @d3plus/core v4.
+        $legacy_urls = [
             'https://d3plus.org/js/d3plus.v2.0.full.min.js',
             'https://d3plus.org/js/d3plus.v2.0.0.full.min.js',
             'https://d3plus.org/js/d3plus.full.min.js',
+            'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js',
         ];
-        if ( in_array( $current_d3plus, $broken_urls, true ) || empty( $current_d3plus ) ) {
-            update_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
+
+        $is_legacy_v2 = str_contains( $current_d3plus, '/npm/d3plus@2' )
+            || str_contains( $current_d3plus, '/npm/d3plus@1' );
+
+        if ( empty( $current_d3plus ) || in_array( $current_d3plus, $legacy_urls, true ) || $is_legacy_v2 ) {
+            update_option( 'sysman_d3plus_cdn_url', SYSMAN_SUITE_D3PLUS_CDN );
         }
+
+        // D3 is no longer loaded separately: v4 bundles the D3 modules it needs.
+        delete_option( 'sysman_d3_cdn_url' );
     }
 
     /**
@@ -306,16 +321,13 @@ final class Sysman_Suite {
         // Chart config assets for CPT edit screen
         $screen = get_current_screen();
         if ( $screen && 'sysman_chart' === $screen->post_type ) {
-            // D3.js and D3plus for live admin preview (URLs from settings)
-            $d3_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
-            $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
-            wp_enqueue_script( 'd3-v5', $d3_url, [], '5.16.0', true );
-            wp_enqueue_script( 'd3plus', $d3plus_url, [ 'd3-v5' ], '2.0.0', true );
+            // D3plus v4 for the live admin preview (bundles its own D3 modules).
+            \SysmanSuite\Visualizer::enqueue_d3plus();
 
             wp_enqueue_script(
                 'sysman-admin-charts',
                 SYSMAN_SUITE_URL . 'assets/js/admin-charts.js',
-                [ 'jquery', 'd3-v5', 'd3plus' ],
+                [ 'jquery', 'd3plus' ],
                 SYSMAN_SUITE_VERSION,
                 true
             );
@@ -357,25 +369,12 @@ final class Sysman_Suite {
             ];
         }
 
-        // Test D3.js CDN
-        $d3_url = sanitize_url( $_POST['d3_url'] ?? '' );
-        if ( $d3_url ) {
-            $response  = wp_remote_head( $d3_url, [ 'timeout' => 10 ] );
-            $results[] = [
-                'label'   => 'D3.js CDN',
-                'ok'      => ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ),
-                'message' => is_wp_error( $response )
-                    ? $response->get_error_message()
-                    : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
-            ];
-        }
-
         // Test D3Plus CDN
         $d3plus_url = sanitize_url( $_POST['d3plus_url'] ?? '' );
         if ( $d3plus_url ) {
             $response  = wp_remote_head( $d3plus_url, [ 'timeout' => 10 ] );
             $results[] = [
-                'label'   => 'D3Plus CDN',
+                'label'   => 'D3Plus CDN (v4)',
                 'ok'      => ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ),
                 'message' => is_wp_error( $response )
                     ? $response->get_error_message()
@@ -436,14 +435,9 @@ final class Sysman_Suite {
             'default'           => 'GobernaciondeNarino/sysman-suite',
             'sanitize_callback' => 'sanitize_text_field',
         ] );
-        register_setting( 'sysman_settings', 'sysman_d3_cdn_url', [
-            'type'              => 'string',
-            'default'           => 'https://d3js.org/d3.v5.min.js',
-            'sanitize_callback' => 'esc_url_raw',
-        ] );
         register_setting( 'sysman_settings', 'sysman_d3plus_cdn_url', [
             'type'              => 'string',
-            'default'           => 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js',
+            'default'           => SYSMAN_SUITE_D3PLUS_CDN,
             'sanitize_callback' => 'esc_url_raw',
         ] );
     }
