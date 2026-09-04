@@ -248,210 +248,185 @@ class Database {
     }
 
     /**
-     * Insert records into plan presupuestal table (numinforme=4).
-     * Uses batch INSERT for performance.
+     * Clear every cached dependencias transient (all compania/anio/mes keys).
      */
-    public function insert_plan_records( array $records, int $anio, int $mes, string $compania ): int {
+    private function flush_dependencias_cache(): void {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $wpdb->query(
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_gn\\_sisman\\_pp\\_dependencias\\_%' "
+            . "OR option_name LIKE '\\_transient\\_timeout\\_gn\\_sisman\\_pp\\_dependencias\\_%'"
+        );
+    }
 
-        $table_name = $wpdb->prefix . 'sysman_plan_presupuestal';
-        $field_map  = $this->get_plan_field_map();
+    /**
+     * Transactional, batched replace of a scope of records.
+     *
+     * Deletes the scope and bulk-inserts the new rows inside a transaction so
+     * a mid-import failure never leaves the scope half-empty (best effort:
+     * requires InnoDB; on MyISAM the statements simply run sequentially).
+     * Shared by all five report importers.
+     *
+     * @param string $table_name    Full table name (already validated by caller).
+     * @param array  $records       Decoded API records.
+     * @param array  $base          Fixed columns for every row (col => value).
+     * @param string $delete_sql    WHERE clause for the scope delete (with placeholders).
+     * @param array  $delete_params Values for $delete_sql.
+     * @param array  $field_map     API field => DB column.
+     * @param array  $numeric_cols  DB columns stored as floats.
+     * @param string $label         Report label for logging.
+     */
+    private function replace_records( string $table_name, array $records, array $base, string $delete_sql, array $delete_params, array $field_map, array $numeric_cols, string $label ): int {
+        global $wpdb;
 
         if ( ! $this->ensure_table_exists( $table_name ) ) {
             $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
             return 0;
         }
 
-        $wpdb->query( $wpdb->prepare(
-            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
-            $compania, $anio, $mes
-        ) );
+        // Uniform column list: base + mapped columns that exist in the table.
+        $existing = $this->get_table_columns( $table_name );
+        $mapped   = array_values( array_unique( array_values( $field_map ) ) );
+        if ( ! empty( $existing ) ) {
+            $mapped = array_values( array_intersect( $mapped, $existing ) );
+        }
+        $columns  = array_merge( array_keys( $base ), $mapped );
+        $col_list = '`' . implode( '`, `', $columns ) . '`';
+
+        $base_ph = [];
+        foreach ( $base as $value ) {
+            $base_ph[] = is_int( $value ) ? '%d' : '%s';
+        }
+
+        $row_ph = $base_ph;
+        foreach ( $mapped as $col ) {
+            $row_ph[] = in_array( $col, $numeric_cols, true ) ? '%f' : '%s';
+        }
+        $row_ph = '(' . implode( ',', $row_ph ) . ')';
+
+        $wpdb->query( 'START TRANSACTION' );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query( $wpdb->prepare( "DELETE FROM `{$table_name}` WHERE {$delete_sql}", $delete_params ) );
 
         if ( empty( $records ) ) {
+            $wpdb->query( 'COMMIT' );
+            $this->logger->log( "Insertados 0 registros en {$table_name} ({$label}: la API no devolvió datos)." );
             return 0;
         }
 
-        $columns  = array_merge( [ 'compania', 'anio', 'mes' ], array_values( $field_map ) );
-        $col_list = implode( ', ', $columns );
-        $inserted = 0;
+        $first = reset( $records );
+        if ( is_array( $first ) ) {
+            $this->logger->log( "Claves del primer registro API ({$label}): " . implode( ', ', array_keys( $first ) ) );
+        }
 
+        $inserted = 0;
         foreach ( array_chunk( $records, 500 ) as $batch ) {
             $placeholders = [];
             $values       = [];
 
-            foreach ( $batch as $index => $row ) {
-                if ( 0 === $inserted && 0 === $index ) {
-                    $record_keys = implode( ', ', array_keys( $row ) );
-                    $this->logger->log( "Claves del primer registro API (plan): {$record_keys}" );
-                }
-
-                $ph   = [ '%s', '%d', '%d' ];
-                $vals = [ $compania, $anio, $mes ];
-
+            foreach ( $batch as $record ) {
+                $data = [];
                 foreach ( $field_map as $api_key => $db_col ) {
-                    $ph[]   = '%s';
-                    $vals[] = (string) ( $row[ $api_key ] ?? '' );
+                    if ( isset( $record[ $api_key ] ) ) {
+                        $data[ $db_col ] = in_array( $db_col, $numeric_cols, true )
+                            ? floatval( $record[ $api_key ] )
+                            : sanitize_text_field( (string) $record[ $api_key ] );
+                    }
                 }
 
-                $placeholders[] = '(' . implode( ',', $ph ) . ')';
+                $vals = array_values( $base );
+                foreach ( $mapped as $col ) {
+                    $vals[] = $data[ $col ] ?? ( in_array( $col, $numeric_cols, true ) ? 0.0 : '' );
+                }
+
+                $placeholders[] = $row_ph;
                 $values         = array_merge( $values, $vals );
             }
 
-            $sql    = "INSERT INTO `{$table_name}` ({$col_list}) VALUES " . implode( ',', $placeholders );
+            $sql = "INSERT INTO `{$table_name}` ({$col_list}) VALUES " . implode( ',', $placeholders );
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
             $result = $wpdb->query( $wpdb->prepare( $sql, $values ) );
+
             if ( false === $result ) {
-                $this->logger->log( "Error al insertar registros en {$table_name}: {$wpdb->last_error}" );
-                break;
+                $this->logger->log( "Error al insertar registros en {$table_name}: {$wpdb->last_error}. Se revierte la importación.", 'error' );
+                $wpdb->query( 'ROLLBACK' );
+                return 0;
             }
             $inserted += count( $batch );
         }
 
-        delete_transient( "gn_sisman_pp_dependencias_{$compania}_{$anio}_{$mes}" );
-        $this->logger->log( "Insertados {$inserted} registros en {$table_name} (Año: {$anio}, Mes: {$mes})." );
+        $wpdb->query( 'COMMIT' );
+        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros en {$table_name} ({$label})." );
         return $inserted;
     }
 
     /**
-     * Filter a data array to only include keys that match actual columns in the table.
-     * Defensive measure against schema mismatches.
+     * Insert records into plan presupuestal table (numinforme=4).
      */
-    private function filter_to_existing_columns( string $table_name, array $data ): array {
-        $existing = $this->get_table_columns( $table_name );
-        if ( empty( $existing ) ) {
-            return $data;
-        }
-        return array_intersect_key( $data, array_flip( $existing ) );
+    public function insert_plan_records( array $records, int $anio, int $mes, string $compania ): int {
+        global $wpdb;
+
+        $inserted = $this->replace_records(
+            $wpdb->prefix . 'sysman_plan_presupuestal',
+            $records,
+            [ 'compania' => $compania, 'anio' => $anio, 'mes' => $mes ],
+            'compania = %s AND anio = %d AND mes = %d',
+            [ $compania, $anio, $mes ],
+            $this->get_plan_field_map(),
+            [],
+            "plan, Año: {$anio}, Mes: {$mes}"
+        );
+
+        $this->flush_dependencias_cache();
+        return $inserted;
     }
 
     /**
-     * Insert records into ejecucion table.
+     * Insert records into ejecucion table (numinforme=1).
      */
     public function insert_ejecucion_records( array $records, string $table_name, int $anio, int $mes, string $compania ): int {
-        global $wpdb;
-
         if ( ! $this->validate_table( $table_name ) ) {
             $this->logger->log( "Tabla no válida: {$table_name}" );
             return 0;
         }
 
-        if ( ! $this->ensure_table_exists( $table_name ) ) {
-            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
-            return 0;
-        }
-
-        $field_map = $this->get_ejecucion_field_map();
-        $inserted  = 0;
-        $errors    = 0;
-
-        // Delete existing records for same year, month and company to avoid duplicates
-        $wpdb->query( $wpdb->prepare(
-            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
-            $compania, $anio, $mes
-        ) );
-
-        foreach ( $records as $index => $record ) {
-            if ( 0 === $index ) {
-                $record_keys = implode( ', ', array_keys( $record ) );
-                $this->logger->log( "Claves del primer registro API (ejecucion): {$record_keys}" );
-            }
-
-            $data = [
-                'anio'     => $anio,
-                'mes'      => $mes,
-                'compania' => $compania,
-            ];
-
-            foreach ( $field_map as $api_field => $db_column ) {
-                if ( isset( $record[ $api_field ] ) ) {
-                    $value = $record[ $api_field ];
-                    if ( in_array( $db_column, [
-                        'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
-                        'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
-                        'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
-                        'pagos', 'obligacionesporpagar',
-                    ], true ) ) {
-                        $data[ $db_column ] = floatval( $value );
-                    } else {
-                        $data[ $db_column ] = sanitize_text_field( $value );
-                    }
-                }
-            }
-
-            $data   = $this->filter_to_existing_columns( $table_name, $data );
-            $result = $wpdb->insert( $table_name, $data );
-            if ( false === $result ) {
-                $errors++;
-                if ( $errors <= 3 ) {
-                    $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
-                }
-                continue;
-            }
-            $inserted++;
-        }
-
-        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros en {$table_name} (Año: {$anio}, Mes: {$mes}, Errores: {$errors})." );
-        return $inserted;
+        return $this->replace_records(
+            $table_name,
+            $records,
+            [ 'anio' => $anio, 'mes' => $mes, 'compania' => $compania ],
+            'compania = %s AND anio = %d AND mes = %d',
+            [ $compania, $anio, $mes ],
+            $this->get_ejecucion_field_map(),
+            [
+                'apropiacioninicial', 'adicion', 'reduccion', 'credito', 'contracredito',
+                'aplazamiento', 'desplazamiento', 'apropiacionvigente', 'disponibilidades',
+                'saldodisponible', 'compromisos', 'disponibilidadesabiertas', 'obligacion',
+                'pagos', 'obligacionesporpagar',
+            ],
+            "ejecucion, Año: {$anio}, Mes: {$mes}"
+        );
     }
 
     /**
-     * Insert records into auxiliar table.
+     * Insert records into auxiliar table (numinforme=2).
      */
     public function insert_auxiliar_records( array $records, int $anio, int $mes, string $compania, string $tipo_cpte ): int {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        $field_map  = $this->get_auxiliar_field_map();
-        $numeric_cols = [
-            'valordebito', 'valorcredito', 'debitoafectado', 'creditoafectado',
-            'modificaciondebito', 'modificacioncredito', 'saldoporejecutaresp',
-        ];
-        $inserted   = 0;
-
-        if ( ! $this->ensure_table_exists( $table_name ) ) {
-            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
-            return 0;
-        }
-
-        // Delete only records matching year, month, company AND tipo_cpte
-        $wpdb->query( $wpdb->prepare(
-            "DELETE FROM {$table_name} WHERE compania = %s AND anio = %d AND mes = %d AND tipocpte = %s",
-            $compania, $anio, $mes, $tipo_cpte
-        ) );
-
-        foreach ( $records as $index => $record ) {
-            if ( 0 === $index ) {
-                $record_keys = implode( ', ', array_keys( $record ) );
-                $this->logger->log( "Claves del primer registro API (auxiliar): {$record_keys}" );
-            }
-
-            $data = [
-                'anio'     => $anio,
-                'mes'      => $mes,
-                'compania' => $compania,
-            ];
-
-            foreach ( $field_map as $api_field => $db_column ) {
-                if ( isset( $record[ $api_field ] ) ) {
-                    $value = $record[ $api_field ];
-                    if ( in_array( $db_column, $numeric_cols, true ) ) {
-                        $data[ $db_column ] = floatval( $value );
-                    } else {
-                        $data[ $db_column ] = sanitize_text_field( $value );
-                    }
-                }
-            }
-
-            $data   = $this->filter_to_existing_columns( $table_name, $data );
-            $result = $wpdb->insert( $table_name, $data );
-            if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
-                continue;
-            }
-            $inserted++;
-        }
-
-        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros auxiliares (Año: {$anio}, Mes: {$mes}, Tipo: {$tipo_cpte})." );
-        return $inserted;
+        return $this->replace_records(
+            $wpdb->prefix . 'sysman_auxiliar_cuentas',
+            $records,
+            [ 'anio' => $anio, 'mes' => $mes, 'compania' => $compania ],
+            'compania = %s AND anio = %d AND mes = %d AND tipocpte = %s',
+            [ $compania, $anio, $mes, $tipo_cpte ],
+            $this->get_auxiliar_field_map(),
+            [
+                'valordebito', 'valorcredito', 'debitoafectado', 'creditoafectado',
+                'modificaciondebito', 'modificacioncredito', 'saldoporejecutaresp',
+            ],
+            "auxiliar, Año: {$anio}, Mes: {$mes}, Tipo: {$tipo_cpte}"
+        );
     }
 
     /**
@@ -461,54 +436,16 @@ class Database {
     public function insert_personal_records( array $records, int $anio, string $compania ): int {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'sysman_personal_nomina';
-        $field_map  = $this->get_personal_field_map();
-        $inserted   = 0;
-
-        if ( ! $this->ensure_table_exists( $table_name ) ) {
-            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
-            return 0;
-        }
-
-        // Delete existing records for same year and company
-        $wpdb->delete( $table_name, [
-            'anio'     => $anio,
-            'compania' => $compania,
-        ], [ '%d', '%s' ] );
-
-        foreach ( $records as $index => $record ) {
-            if ( 0 === $index ) {
-                $record_keys = implode( ', ', array_keys( $record ) );
-                $this->logger->log( "Claves del primer registro API (personal): {$record_keys}" );
-            }
-
-            $data = [
-                'anio'     => $anio,
-                'compania' => $compania,
-            ];
-
-            foreach ( $field_map as $api_field => $db_column ) {
-                if ( isset( $record[ $api_field ] ) ) {
-                    $value = $record[ $api_field ];
-                    if ( 'salariobaseibc' === $db_column ) {
-                        $data[ $db_column ] = floatval( $value );
-                    } else {
-                        $data[ $db_column ] = sanitize_text_field( $value );
-                    }
-                }
-            }
-
-            $data   = $this->filter_to_existing_columns( $table_name, $data );
-            $result = $wpdb->insert( $table_name, $data );
-            if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
-                continue;
-            }
-            $inserted++;
-        }
-
-        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros de personal (Año: {$anio}, Compañía: {$compania})." );
-        return $inserted;
+        return $this->replace_records(
+            $wpdb->prefix . 'sysman_personal_nomina',
+            $records,
+            [ 'anio' => $anio, 'compania' => $compania ],
+            'anio = %d AND compania = %s',
+            [ $anio, $compania ],
+            $this->get_personal_field_map(),
+            [ 'salariobaseibc' ],
+            "personal, Año: {$anio}, Compañía: {$compania}"
+        );
     }
 
     /**
@@ -517,56 +454,16 @@ class Database {
     public function insert_ingresos_records( array $records, int $anio, int $mes, string $compania ): int {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'sysman_ejecucion_ingresos';
-        $field_map  = $this->get_ingresos_field_map();
-        $numeric_cols = [ 'apropiado', 'modificaciones', 'totalpresupuesto', 'recaudosanteriores', 'recaudosmes', 'recaudosacumulados', 'porrecaudar', 'porcrecaudado' ];
-        $inserted   = 0;
-
-        if ( ! $this->ensure_table_exists( $table_name ) ) {
-            $this->logger->log( "La tabla no existe en la base de datos: {$table_name}" );
-            return 0;
-        }
-
-        // Delete existing records for same year, month and company
-        $wpdb->query( $wpdb->prepare(
-            "DELETE FROM `{$table_name}` WHERE compania = %s AND anio = %d AND mes = %d",
-            $compania, $anio, $mes
-        ) );
-
-        foreach ( $records as $index => $record ) {
-            if ( 0 === $index ) {
-                $record_keys = implode( ', ', array_keys( $record ) );
-                $this->logger->log( "Claves del primer registro API (ingresos): {$record_keys}" );
-            }
-
-            $data = [
-                'anio'     => $anio,
-                'mes'      => $mes,
-                'compania' => $compania,
-            ];
-
-            foreach ( $field_map as $api_field => $db_column ) {
-                if ( isset( $record[ $api_field ] ) ) {
-                    $value = $record[ $api_field ];
-                    if ( in_array( $db_column, $numeric_cols, true ) ) {
-                        $data[ $db_column ] = floatval( $value );
-                    } else {
-                        $data[ $db_column ] = sanitize_text_field( $value ?? '' );
-                    }
-                }
-            }
-
-            $data   = $this->filter_to_existing_columns( $table_name, $data );
-            $result = $wpdb->insert( $table_name, $data );
-            if ( false === $result ) {
-                $this->logger->log( "Error al insertar registro en {$table_name}: {$wpdb->last_error}", 'error' );
-                continue;
-            }
-            $inserted++;
-        }
-
-        $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros de ingresos (Año: {$anio}, Mes: {$mes})." );
-        return $inserted;
+        return $this->replace_records(
+            $wpdb->prefix . 'sysman_ejecucion_ingresos',
+            $records,
+            [ 'anio' => $anio, 'mes' => $mes, 'compania' => $compania ],
+            'compania = %s AND anio = %d AND mes = %d',
+            [ $compania, $anio, $mes ],
+            $this->get_ingresos_field_map(),
+            [ 'apropiado', 'modificaciones', 'totalpresupuesto', 'recaudosanteriores', 'recaudosmes', 'recaudosacumulados', 'porrecaudar', 'porcrecaudado' ],
+            "ingresos, Año: {$anio}, Mes: {$mes}"
+        );
     }
 
     /**

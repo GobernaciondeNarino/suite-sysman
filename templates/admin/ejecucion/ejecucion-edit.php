@@ -7,8 +7,8 @@ $is_new  = ( 0 === $post_id );
 $title       = '';
 $dependencia = '';
 $vigencia    = '';
-$anio        = (int) date( 'Y' );
-$mes         = (int) date( 'n' );
+$anio        = (int) current_time( 'Y' );
+$mes         = (int) current_time( 'n' );
 $compania    = get_option( 'sysman_api_compania', '001' );
 
 $agrupar_bpid = '0';
@@ -32,7 +32,7 @@ $meses = [
     9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
 ];
 
-$current_year = (int) date( 'Y' );
+$current_year = (int) current_time( 'Y' );
 ?>
 <div class="wrap sysman-admin-wrap">
 

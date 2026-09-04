@@ -72,12 +72,29 @@ class Logger {
      * Write a log message with severity level.
      */
     public function log( string $message, string $level = 'info' ): void {
+        $this->maybe_rotate();
+
         $timestamp = current_time( 'Y-m-d H:i:s' );
         $level_tag = self::LEVEL_ICONS[ $level ] ?? 'INFO';
         $entry     = "[{$timestamp}] [{$level_tag}] {$message}" . PHP_EOL;
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
         file_put_contents( $this->log_file, $entry, FILE_APPEND | LOCK_EX );
+    }
+
+    /**
+     * Rotate the log when it grows past 5 MB (one backup generation, .1).
+     */
+    private function maybe_rotate(): void {
+        if ( ! file_exists( $this->log_file ) || filesize( $this->log_file ) < 5 * MB_IN_BYTES ) {
+            return;
+        }
+
+        $backup = $this->log_file . '.1';
+        if ( file_exists( $backup ) ) {
+            @unlink( $backup );
+        }
+        @rename( $this->log_file, $backup );
     }
 
     /**

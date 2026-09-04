@@ -9,7 +9,7 @@ $ejecucion_posts = get_posts( [
     'order'          => 'ASC',
 ] );
 
-$current_year = (int) date( 'Y' );
+$current_year = (int) current_time( 'Y' );
 $site_url     = rest_url( 'gn-sisman/v1/' );
 ?>
 <div class="wrap sysman-admin-wrap">

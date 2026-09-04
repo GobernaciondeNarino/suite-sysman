@@ -28,8 +28,9 @@ class PostType {
             'show_in_menu'       => false,
             'show_in_rest'       => false,
             'supports'           => [ 'title' ],
-            'capability_type'    => 'post',
-            'map_meta_cap'       => true,
+            // Managed exclusively through the plugin's own AJAX handlers
+            // (gated by manage_options); block direct wp-admin editing.
+            'capabilities'       => \SysmanSuite\Visualizer::admin_only_caps(),
         ] );
     }
 }

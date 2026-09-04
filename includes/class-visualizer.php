@@ -108,7 +108,24 @@ class Visualizer {
             'supports'     => [ 'title' ],
             'has_archive'  => false,
             'rewrite'      => false,
+            // Only administrators may manage charts: a chart can hold a custom
+            // SQL query, so the default 'post' capabilities (any Author via
+            // post-new.php?post_type=sysman_chart) are not acceptable.
+            'capabilities' => self::admin_only_caps(),
         ] );
+    }
+
+    /**
+     * Capability map that restricts a CPT to users with manage_options.
+     */
+    public static function admin_only_caps(): array {
+        return array_fill_keys( [
+            'edit_post', 'read_post', 'delete_post',
+            'edit_posts', 'edit_others_posts', 'delete_posts',
+            'delete_others_posts', 'delete_published_posts', 'delete_private_posts',
+            'edit_published_posts', 'edit_private_posts',
+            'publish_posts', 'read_private_posts', 'create_posts',
+        ], 'manage_options' );
     }
 
     /**
@@ -584,28 +601,10 @@ class Visualizer {
 
     /**
      * Get distinct dependencias from plan_presupuestal for a given compania/anio/mes.
+     * Delegates to the Ejecucion Repository (single implementation, cached).
      */
     public function get_dependencias( string $compania = '001', int $anio = 0, int $mes = 0 ): array {
-        global $wpdb;
-
-        $table = $wpdb->prefix . 'sysman_plan_presupuestal';
-
-        $where   = [ 'compania = %s', "nombredependencia != ''", "movimiento = 'SI'" ];
-        $prepare = [ $compania ];
-
-        if ( $anio > 0 ) {
-            $where[]   = 'anio = %d';
-            $prepare[] = $anio;
-        }
-        if ( $mes > 0 ) {
-            $where[]   = 'mes = %d';
-            $prepare[] = $mes;
-        }
-
-        $where_clause = ' WHERE ' . implode( ' AND ', $where );
-        $query = "SELECT DISTINCT nombredependencia FROM `{$table}`{$where_clause} ORDER BY nombredependencia";
-
-        return $wpdb->get_col( $wpdb->prepare( $query, ...$prepare ) ) ?: [];
+        return \SysmanSuite\Ejecucion\Repository::instance()->get_dependencias( $anio, $mes, $compania );
     }
 
     /**
@@ -668,6 +667,10 @@ class Visualizer {
         if ( ! $post || 'publish' !== $post->post_status ) {
             return '';
         }
+
+        // Late enqueue: covers charts rendered from widgets or page builders
+        // where has_shortcode() on post_content never matches.
+        $this->enqueue_chart_assets();
 
         ob_start();
         include SYSMAN_SUITE_PATH . 'templates/frontend/chart.php';
@@ -872,6 +875,16 @@ class Visualizer {
             return;
         }
 
+        $this->enqueue_chart_assets();
+    }
+
+    /**
+     * Enqueue D3/D3plus and the frontend chart assets. Called early when the
+     * shortcode is detected in post_content, and again from the shortcode
+     * itself so charts inside widgets or page builders also load (all
+     * scripts print in the footer, so the late call still works).
+     */
+    public function enqueue_chart_assets(): void {
         // D3.js and D3plus (URLs from settings)
         $d3_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
         $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );

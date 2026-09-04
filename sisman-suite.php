@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     5.8.0
+ * Version:     5.9.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '5.8.0' );
+define( 'SYSMAN_SUITE_VERSION', '5.9.0' );
 define( 'SYSMAN_SUITE_FILE', __FILE__ );
 define( 'SYSMAN_SUITE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SYSMAN_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -97,6 +97,7 @@ final class Sysman_Suite {
         // Cron
         add_action( 'sysman_scheduled_import', [ $this->importer, 'run_scheduled_import' ] );
         add_filter( 'cron_schedules', [ $this, 'add_cron_schedules' ] );
+        add_action( 'update_option_sysman_import_frequency', [ $this, 'reschedule_import' ], 10, 2 );
 
         // WP-CLI
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -144,6 +145,27 @@ final class Sysman_Suite {
         if ( in_array( $current_d3plus, $broken_urls, true ) || empty( $current_d3plus ) ) {
             update_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
         }
+    }
+
+    /**
+     * Re-schedule the import cron when the frequency setting changes.
+     * Before this hook existed the frequency was only applied on activation.
+     */
+    public function reschedule_import( $old_value, $new_value ): void {
+        if ( $old_value === $new_value ) {
+            return;
+        }
+        wp_clear_scheduled_hook( 'sysman_scheduled_import' );
+        wp_schedule_event( time(), $new_value, 'sysman_scheduled_import' );
+    }
+
+    /**
+     * Restrict the import frequency to registered cron schedules.
+     */
+    public function sanitize_import_frequency( $value ): string {
+        $allowed = [ 'hourly', 'twicedaily', 'daily', 'weekly', 'monthly' ];
+        $value   = sanitize_text_field( (string) $value );
+        return in_array( $value, $allowed, true ) ? $value : 'daily';
     }
 
     public function add_cron_schedules( array $schedules ): array {
@@ -321,7 +343,7 @@ final class Sysman_Suite {
         // Test SYSMAN API
         $api_url = sanitize_url( $_POST['api_url'] ?? '' );
         if ( $api_url ) {
-            $test_url  = $api_url . '?compania=001&anio=' . date( 'Y' ) . '&mes=1&numinforme=1';
+            $test_url  = $api_url . '?compania=001&anio=' . current_time( 'Y' ) . '&mes=1&numinforme=1';
             $response  = wp_remote_get( $test_url, [
                 'timeout'   => 15,
                 'sslverify' => (bool) apply_filters( 'sysman_suite_sslverify', true ),
@@ -389,18 +411,18 @@ final class Sysman_Suite {
         ] );
         register_setting( 'sysman_settings', 'sysman_api_anio', [
             'type'              => 'integer',
-            'default'           => (int) date( 'Y' ),
+            'default'           => (int) current_time( 'Y' ),
             'sanitize_callback' => 'absint',
         ] );
         register_setting( 'sysman_settings', 'sysman_api_mes', [
             'type'              => 'integer',
-            'default'           => (int) date( 'n' ),
+            'default'           => (int) current_time( 'n' ),
             'sanitize_callback' => 'absint',
         ] );
         register_setting( 'sysman_settings', 'sysman_import_frequency', [
             'type'              => 'string',
             'default'           => 'daily',
-            'sanitize_callback' => 'sanitize_text_field',
+            'sanitize_callback' => [ $this, 'sanitize_import_frequency' ],
         ] );
 
         // API & CDN URL settings
