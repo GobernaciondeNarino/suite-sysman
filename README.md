@@ -32,6 +32,16 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Shortcode `[gn_ejecucion id="X"]` para embebido en paginas publicas
 - Paleta institucional: azul `#1a5276`, dorado `#E8A020`, azul oscuro `#003087`
 
+### Modulos Gastos e Ingresos (v5.12.0)
+- Vistas presupuestales prediseñadas y publicables con shortcodes, sin configurar nada
+- **Gastos**: agrupa por dependencia y detalla por rubro, con la cadena DIS > RES > OBL > EGR
+- **Ingresos**: agrupa por tipo o fuente de recurso y detalla por cuenta, con avance del recaudo
+- Seis componentes por modulo: `treemap`, `lista`, `ejecucion`, `explora`, `analisis`, `selector`
+- Filtrado cruzado opcional entre shortcodes de la misma pagina (`enlazar="si|no"`, `grupo`)
+- Campo y tooltip parametrizables, validados contra una whitelist de metricas
+- Analisis descriptivo, cualitativo y cuantitativo derivados de los datos reales
+- Catalogo de shortcodes copiables en *SYSMAN Suite > Gastos* y *SYSMAN Suite > Ingresos*
+
 ### Base de Datos
 - 5 tablas optimizadas con indices compuestos
 - Migracion automatica con versionamiento (`gn_sisman_schema_version`)
@@ -234,8 +244,14 @@ sisman-suite/
 │   │   ├── RestController.php    # Endpoints REST del acordeon + exportacion
 │   │   ├── Repository.php        # Consultas SQL
 │   │   └── AccordionRenderer.php # HTML del acordeon
-│   └── DatosAbiertos/            # Modulo Datos Abiertos (v5.7.0)
-│       └── DatosAbiertosModule.php # Shortcodes de exportacion + descargas CSV/TXT
+│   ├── DatosAbiertos/            # Modulo Datos Abiertos (v5.7.0)
+│   │   └── DatosAbiertosModule.php # Shortcodes de exportacion + descargas CSV/TXT
+│   └── Presupuesto/              # Modulos Gastos e Ingresos (v5.11.0 / v5.12.0)
+│       ├── PresupuestoModule.php  # Bootstrap, shortcodes y menus de admin
+│       ├── Repository.php         # Consultas de gastos (dependencia > rubro > cadena)
+│       ├── IngresosRepository.php # Consultas de ingresos (recurso > cuenta)
+│       ├── RestController.php     # Endpoints REST de ambos modulos
+│       └── Analysis.php           # Motor de analisis automatico
 ├── templates/admin/
 │   ├── dashboard-page.php
 │   ├── import-page.php
@@ -246,19 +262,23 @@ sisman-suite/
 │   │   ├── ejecucion-list.php
 │   │   ├── ejecucion-edit.php
 │   │   └── ejecucion-view.php
-│   └── datos-abiertos/
-│       └── datos-abiertos.php
+│   ├── datos-abiertos/
+│   │   └── datos-abiertos.php
+│   └── presupuesto/
+│       └── catalogo.php
 ├── assets/
 │   ├── css/
 │   │   ├── admin.css
 │   │   ├── ejecucion.css
 │   │   ├── datos-abiertos.css
+│   │   ├── presupuesto.css
 │   │   └── frontend.css
 │   └── js/
 │       ├── admin-import.js
 │       ├── admin-charts.js
 │       ├── ejecucion.js
 │       ├── datos-abiertos.js
+│       ├── presupuesto.js
 │       └── frontend.js
 ├── tests/                  # Tests unitarios standalone (php tests/run-tests.php)
 ├── .github/workflows/      # CI, asistente @claude y revisión de seguridad
@@ -269,6 +289,33 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.12.0 — Gastos e Ingresos
+El módulo Presupuesto pasa a llamarse **Gastos** y se añade un módulo gemelo para **Ingresos**.
+
+**Shortcodes**
+
+| Gastos | Ingresos | Qué hace |
+|--------|----------|----------|
+| `[sysman_gastos_treemap]` | `[sysman_ingresos_treemap]` | Treemap por el campo elegido. Al hacer clic baja al detalle. |
+| `[sysman_gastos_lista]` | `[sysman_ingresos_lista]` | Lista con nº de rubros/cuentas y valor, con buscador. |
+| `[sysman_gastos_ejecucion]` | `[sysman_ingresos_ejecucion]` | Detalle: consolidado y, en gastos, modificaciones y cadena documental. |
+| `[sysman_gastos_explora]` | `[sysman_ingresos_explora]` | Maestro-detalle en dos columnas. |
+| `[sysman_gastos_analisis]` | `[sysman_ingresos_analisis]` | Descripción, análisis cualitativo o cuantitativo. |
+| `[sysman_gastos_selector]` | `[sysman_ingresos_selector]` | Desplegable que fija el filtro compartido de la página. |
+
+Los `[sysman_pre_*]` de la 5.11.0 siguen funcionando como alias de Gastos, así que las páginas ya publicadas no se rompen.
+
+- **Fix**: el botón «← Todas las dependencias» no volvía a la vista inicial. El componente limpiaba su estado interno *antes* de publicarlo al coordinador, de modo que el suscriptor recibía el valor que ya tenía y no repintaba. Ahora se publica primero y el estado se limpia al recibir el evento.
+- **Nuevo atributo `tooltip`**: lista de campos separados por coma que se muestran en el tooltip del gráfico, p. ej. `tooltip="compromisos,pagos"`. Se validan contra la whitelist de métricas y la métrica principal no se repite aunque se incluya.
+- **Lista más compacta**: el nombre y las cifras (nº de rubros · valor) van ahora en la misma línea, con el valor alineado a la derecha.
+- **Color institucional `#348AFB`** para los elementos resaltados y seleccionables (bordes, fondos, barras y anillos de foco). El *texto* de los ítems usa `#0B62D6`, el mismo azul oscurecido: `#348AFB` sobre blanco da 3,4:1 y no alcanza el 4,5:1 que exige WCAG AA en texto normal.
+- **Módulo Ingresos**: en ingresos no hay dependencias, así que la agrupación es **tipo de recurso → cuenta** por defecto, con `dimension="fuenterecurso"` como alternativa. Campos: apropiado, modificaciones, total presupuesto, recaudos anteriores/del mes/acumulados y por recaudar (`porcrecaudado` se excluye por ser un porcentaje por fila: sumarlo no significa nada; el % se recalcula sobre los totales). El detalle muestra KPIs, barra de avance del recaudo, composición del recaudo y clasificación, sin cadena documental (los ingresos no la tienen).
+- **Sin duplicar código**: el controlador REST, el motor de análisis y los componentes JS se parametrizaron por módulo en lugar de copiarse. Las rutas `dependencias`/`rubros`/`rubro` conservan su nombre y se añaden los alias genéricos `dimensiones`/`detalle`/`item`.
+- **Análisis por módulo**: el texto se adapta al lado presupuestal — gastos habla de comprometido/obligado/pagado; ingresos, de recaudado, recaudado en el mes y por recaudar. Corregida también la concordancia de género y el plural en español («los tres primeros rubros», «Todos los tipos de recurso»).
+- **Fix (CSS)**: el lienzo del treemap colapsaba a 0 px de alto y, con `overflow:hidden`, recortaba el gráfico entero.
+- **Admin**: dos catálogos de shortcodes copiables, *SYSMAN Suite → Gastos* y *SYSMAN Suite → Ingresos*.
+- **Pruebas**: 76 aserciones (antes 62). Los cinco cambios se verificaron además en navegador sobre el JS y las plantillas reales.
 
 ### 5.11.0 — Nuevo módulo Presupuesto
 Vistas presupuestales prediseñadas, publicables con shortcodes y enlazables entre sí.

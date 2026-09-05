@@ -144,11 +144,12 @@ class Repository {
      *
      * @return array<int, array{label:string, value:float, rubros:int}>
      */
-    public function dependencias( array $ctx, string $campo = 'apropiacionvigente', int $limite = 0 ): array {
+    public function dependencias( array $ctx, string $campo = 'apropiacionvigente', int $limite = 0, array $extra = [] ): array {
         global $wpdb;
 
         $campo     = self::validar_campo( $campo );
-        $cache_key = 'sysman_pre_deps_' . md5( wp_json_encode( [ $ctx, $campo, $limite ] ) );
+        $extra     = self::validar_extra( $extra );
+        $cache_key = 'sysman_pre_deps_' . md5( wp_json_encode( [ $ctx, $campo, $limite, $extra ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -157,9 +158,15 @@ class Repository {
         $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
         $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
 
+        $cols_extra = '';
+        foreach ( $extra as $c ) {
+            $cols_extra .= ", SUM(eg.`{$c}`) AS `{$c}`";
+        }
+
         $sql = "SELECT pp.nombredependencia AS label,
                        SUM(eg.`{$campo}`) AS value,
                        COUNT(DISTINCT pp.codigo) AS rubros
+                       {$cols_extra}
                 FROM `{$pp}` pp
                 INNER JOIN `{$eg}` eg
                     ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania
@@ -178,13 +185,34 @@ class Repository {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         $rows = $wpdb->get_results( $wpdb->prepare( $sql, $ctx['compania'], $ctx['anio'], $ctx['mes'] ), ARRAY_A ) ?: [];
 
-        $out = array_map( static fn( $r ) => [
-            'label'  => (string) $r['label'],
-            'value'  => (float) $r['value'],
-            'rubros' => (int) $r['rubros'],
-        ], $rows );
+        $out = array_map( static function ( $r ) use ( $extra ) {
+            $fila = [
+                'label'  => (string) $r['label'],
+                'value'  => (float) $r['value'],
+                'rubros' => (int) $r['rubros'],
+            ];
+            foreach ( $extra as $c ) {
+                $fila[ $c ] = (float) ( $r[ $c ] ?? 0 );
+            }
+            return $fila;
+        }, $rows );
 
         set_transient( $cache_key, $out, self::CACHE_TTL );
+        return $out;
+    }
+
+    /**
+     * Keep only whitelisted metric columns from a caller-supplied list.
+     * Used by the `tooltip` shortcode attribute.
+     */
+    public static function validar_extra( array $campos ): array {
+        $out = [];
+        foreach ( $campos as $c ) {
+            $c = sanitize_text_field( (string) $c );
+            if ( array_key_exists( $c, self::CAMPOS ) && ! in_array( $c, $out, true ) ) {
+                $out[] = $c;
+            }
+        }
         return $out;
     }
 
