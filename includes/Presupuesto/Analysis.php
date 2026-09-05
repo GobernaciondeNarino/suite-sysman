@@ -28,6 +28,17 @@ class Analysis {
     public static function generar( string $tipo, string $vista, array $ctx, array $datos, array $opciones = [] ): array {
         $tipo = in_array( $tipo, [ 'descripcion', 'cualitativo', 'cuantitativo' ], true ) ? $tipo : 'descripcion';
 
+        // La vista de avance analiza porcentajes de ejecución, no importes, así
+        // que tiene su propia redacción: hablar de "total" o de "concentración"
+        // no significa nada sobre una serie de porcentajes.
+        if ( 'avance' === $vista ) {
+            return match ( $tipo ) {
+                'cualitativo'  => self::avance_cualitativo( $ctx, $datos, $opciones ),
+                'cuantitativo' => self::avance_cuantitativo( $ctx, $datos, $opciones ),
+                default        => self::avance_descripcion( $ctx, $datos, $opciones ),
+            };
+        }
+
         return match ( $tipo ) {
             'cualitativo'  => self::cualitativo( $vista, $ctx, $datos, $opciones ),
             'cuantitativo' => self::cuantitativo( $vista, $ctx, $datos, $opciones ),
@@ -536,6 +547,252 @@ class Analysis {
 
         return [ 'titulo' => 'Análisis cuantitativo', 'parrafos' => [ self::parrafo( $partes ) ], 'metricas' => $metricas ];
     }
+    // ─── Avance de ejecución (porcentajes) ───────────────────────
+
+    /** Tramos en los que se agrupa el avance, para leerlo de un vistazo. */
+    private const TRAMOS = [
+        [ 0.75, 'por encima del 75%' ],
+        [ 0.50, 'entre el 50% y el 75%' ],
+        [ 0.25, 'entre el 25% y el 50%' ],
+        [ 0.00, 'por debajo del 25%' ],
+    ];
+
+    /**
+     * Cifras del avance: el ponderado (suma sobre suma) manda, porque promediar
+     * porcentajes daría el mismo peso a una dependencia de mil millones que a
+     * una de un millón.
+     */
+    private static function cifras_avance( array $filas ): array {
+        $con_base = array_values( array_filter(
+            $filas,
+            static fn( $f ) => (float) ( $f['base'] ?? 0 ) > 0 && null !== ( $f['porcentaje'] ?? null )
+        ) );
+
+        $n = count( $con_base );
+        if ( 0 === $n ) {
+            return [ 'n' => 0 ];
+        }
+
+        $base      = array_sum( array_map( static fn( $f ) => (float) $f['base'], $con_base ) );
+        $ejecutado = array_sum( array_map( static fn( $f ) => (float) $f['ejecutado'], $con_base ) );
+        $tasas     = array_map( static fn( $f ) => (float) $f['porcentaje'], $con_base );
+
+        // Orden por tasa para mediana, extremos y tramos.
+        $ordenadas = $tasas;
+        sort( $ordenadas );
+
+        $por_tasa = $con_base;
+        usort( $por_tasa, static fn( $a, $b ) => $b['porcentaje'] <=> $a['porcentaje'] );
+
+        $ponderado = $base > 0 ? $ejecutado / $base : 0.0;
+        $media     = array_sum( $tasas ) / $n;
+
+        $tramos = [];
+        foreach ( self::TRAMOS as [ $piso, $etiqueta ] ) {
+            $tramos[ $etiqueta ] = 0;
+        }
+        foreach ( $tasas as $t ) {
+            foreach ( self::TRAMOS as [ $piso, $etiqueta ] ) {
+                if ( $t >= $piso ) {
+                    $tramos[ $etiqueta ]++;
+                    break;
+                }
+            }
+        }
+
+        return [
+            'n'          => $n,
+            'base'       => $base,
+            'ejecutado'  => $ejecutado,
+            'pendiente'  => $base - $ejecutado,
+            'ponderado'  => $ponderado,
+            'media'      => $media,
+            'mediana'    => self::mediana( $ordenadas ),
+            'maximo'     => $por_tasa[0],
+            'minimo'     => $por_tasa[ $n - 1 ],
+            'desviacion' => self::desviacion( $ordenadas, $media ),
+            'sobre'      => count( array_filter( $tasas, static fn( $t ) => $t >= $ponderado ) ),
+            'rezagadas'  => count( array_filter( $tasas, static fn( $t ) => $t < 0.30 ) ),
+            'sin_iniciar' => count( array_filter( $tasas, static fn( $t ) => $t <= 0.0 ) ),
+            'tramos'     => $tramos,
+        ];
+    }
+
+    /** Vocabulario del avance: el ámbito manda sobre la vista. */
+    private static function vocabulario_avance( array $opciones ): array {
+        $vista = '' !== trim( (string) ( $opciones['valor'] ?? '' ) ) ? 'detalle' : 'dimensiones';
+        return self::vocabulario( $vista, $opciones );
+    }
+
+    private static function sin_avance( string $titulo ): array {
+        return [
+            'titulo'   => $titulo,
+            'parrafos' => [ 'No hay apropiación registrada en este periodo, así que no se puede calcular el porcentaje de ejecución.' ],
+            'metricas' => [],
+        ];
+    }
+
+    private static function avance_descripcion( array $ctx, array $datos, array $opciones ): array {
+        $v = self::vocabulario_avance( $opciones );
+        $c = self::cifras_avance( $datos['filas'] ?? [] );
+
+        if ( 0 === $c['n'] ) {
+            return self::sin_avance( 'Descripción' );
+        }
+
+        $valor  = self::nombre_legible( (string) ( $opciones['valor'] ?? '' ) );
+        $ambito = '' !== $valor ? $valor : self::entidad();
+        $plural = 1 === $c['n'] ? $v['singular'] : $v['plural'];
+
+        $partes = [ sprintf(
+            'A %s %s ha %s el %s de su %s: %s de %s, repartidos entre %s %s',
+            self::periodo( $ctx ),
+            $ambito,
+            mb_strtolower( $opciones['ejecutado_label'] ?? 'comprometido' ),
+            self::porcentaje( $c['ponderado'] ),
+            mb_strtolower( $opciones['base_label'] ?? 'apropiación vigente' ),
+            self::moneda( $c['ejecutado'] ),
+            self::moneda( $c['base'] ),
+            number_format_i18n( $c['n'] ),
+            $plural
+        ) ];
+
+        if ( $c['n'] > 1 ) {
+            $partes[] = sprintf(
+                '; %s de mayor avance es %s, con el %s, y %s de menor, %s, con el %s',
+                $v['femenino'] ? 'la' : 'el',
+                self::nombre_fila( $c['maximo'] ),
+                self::porcentaje( (float) $c['maximo']['porcentaje'] ),
+                $v['femenino'] ? 'la' : 'el',
+                self::nombre_fila( $c['minimo'] ),
+                self::porcentaje( (float) $c['minimo']['porcentaje'] )
+            );
+        }
+
+        return [ 'titulo' => 'Descripción', 'parrafos' => [ self::parrafo( $partes ) ], 'metricas' => [] ];
+    }
+
+    private static function avance_cualitativo( array $ctx, array $datos, array $opciones ): array {
+        $v = self::vocabulario_avance( $opciones );
+        $c = self::cifras_avance( $datos['filas'] ?? [] );
+
+        if ( 0 === $c['n'] ) {
+            return self::sin_avance( 'Análisis cualitativo' );
+        }
+
+        $ingresos = ! empty( $v['ingresos'] );
+        $plural   = 1 === $c['n'] ? $v['singular'] : $v['plural'];
+        $brecha   = (float) $c['maximo']['porcentaje'] - (float) $c['minimo']['porcentaje'];
+
+        $partes = [ sprintf(
+            'El avance %s: %s de %s %s superan el promedio ponderado (%s) y %s se %s',
+            $c['desviacion'] >= 0.20
+                ? ( $v['femenino'] ? 'es desigual entre unas y otras' : 'es desigual entre unos y otros' )
+                : 'es parejo',
+            number_format_i18n( $c['sobre'] ),
+            number_format_i18n( $c['n'] ),
+            $plural,
+            self::porcentaje( $c['ponderado'] ),
+            1 === $c['n'] - $c['sobre'] ? 'una' : number_format_i18n( $c['n'] - $c['sobre'] ),
+            1 === $c['n'] - $c['sobre'] ? 'queda por debajo' : 'quedan por debajo'
+        ) ];
+
+        if ( $c['n'] > 1 ) {
+            $partes[] = sprintf(
+                '; entre %s de mayor y %s de menor avance hay %s puntos de diferencia',
+                $v['femenino'] ? 'la' : 'el',
+                $v['femenino'] ? 'la' : 'el',
+                number_format_i18n( $brecha * 100, 1 )
+            );
+        }
+
+        if ( $c['rezagadas'] > 0 ) {
+            $partes[] = sprintf(
+                ', y %s %s no %s del 30%%%s',
+                number_format_i18n( $c['rezagadas'] ),
+                1 === $c['rezagadas'] ? $v['singular'] : $v['plural'],
+                1 === $c['rezagadas'] ? 'pasa' : 'pasan',
+                $c['sin_iniciar'] > 0
+                    ? sprintf(
+                        ' (%s de %s sin %s alguno)',
+                        number_format_i18n( $c['sin_iniciar'] ),
+                        $v['femenino'] ? 'ellas' : 'ellos',
+                        $ingresos ? 'recaudo' : 'compromiso'
+                    )
+                    : ''
+            );
+        }
+
+        $partes[] = sprintf(
+            '; queda %s sin %s, %s',
+            self::moneda( $c['pendiente'] ),
+            $ingresos ? 'recaudar' : 'comprometer',
+            $ingresos ? self::juicio_recaudo( $c['ponderado'] ) : self::juicio_ejecucion( $c['ponderado'] )
+        );
+
+        return [ 'titulo' => 'Análisis cualitativo', 'parrafos' => [ self::parrafo( $partes ) ], 'metricas' => [] ];
+    }
+
+    private static function avance_cuantitativo( array $ctx, array $datos, array $opciones ): array {
+        $v = self::vocabulario_avance( $opciones );
+        $c = self::cifras_avance( $datos['filas'] ?? [] );
+
+        if ( 0 === $c['n'] ) {
+            return self::sin_avance( 'Análisis cuantitativo' );
+        }
+
+        $plural = 1 === $c['n'] ? $v['singular'] : $v['plural'];
+
+        $metricas = [
+            [ 'label' => 'Registros', 'valor' => number_format_i18n( $c['n'] ), 'crudo' => $c['n'] ],
+            [ 'label' => '% Ponderado', 'valor' => self::porcentaje( $c['ponderado'] ), 'crudo' => $c['ponderado'] ],
+            [ 'label' => '% Promedio simple', 'valor' => self::porcentaje( $c['media'] ), 'crudo' => $c['media'] ],
+            [ 'label' => '% Mediana', 'valor' => self::porcentaje( $c['mediana'] ), 'crudo' => $c['mediana'] ],
+            [ 'label' => '% Máximo', 'valor' => self::porcentaje( (float) $c['maximo']['porcentaje'] ), 'crudo' => (float) $c['maximo']['porcentaje'] ],
+            [ 'label' => '% Mínimo', 'valor' => self::porcentaje( (float) $c['minimo']['porcentaje'] ), 'crudo' => (float) $c['minimo']['porcentaje'] ],
+            [ 'label' => 'Desviación (puntos)', 'valor' => number_format_i18n( $c['desviacion'] * 100, 1 ), 'crudo' => $c['desviacion'] ],
+            [ 'label' => 'Base', 'valor' => self::moneda( $c['base'] ), 'crudo' => $c['base'] ],
+            [ 'label' => 'Ejecutado', 'valor' => self::moneda( $c['ejecutado'] ), 'crudo' => $c['ejecutado'] ],
+            [ 'label' => 'Pendiente', 'valor' => self::moneda( $c['pendiente'] ), 'crudo' => $c['pendiente'] ],
+        ];
+        foreach ( $c['tramos'] as $etiqueta => $cuantas ) {
+            $metricas[] = [ 'label' => ucfirst( $etiqueta ), 'valor' => number_format_i18n( $cuantas ), 'crudo' => $cuantas ];
+        }
+
+        $partes = [ sprintf(
+            'En términos estadísticos, el avance ponderado es del %s y el promedio simple, del %s —la diferencia entre ambos indica que %s—, con una mediana del %s, un máximo del %s y un mínimo del %s',
+            self::porcentaje( $c['ponderado'] ),
+            self::porcentaje( $c['media'] ),
+            $c['ponderado'] > $c['media']
+                ? 'las de mayor presupuesto avanzan más rápido que el resto'
+                : 'el peso lo llevan las de menor presupuesto',
+            self::porcentaje( $c['mediana'] ),
+            self::porcentaje( (float) $c['maximo']['porcentaje'] ),
+            self::porcentaje( (float) $c['minimo']['porcentaje'] )
+        ) ];
+
+        $partes[] = sprintf(
+            '; la desviación estándar es de %s puntos porcentuales',
+            number_format_i18n( $c['desviacion'] * 100, 1 )
+        );
+
+        $tramos = [];
+        foreach ( $c['tramos'] as $etiqueta => $cuantas ) {
+            if ( $cuantas > 0 ) {
+                $tramos[] = number_format_i18n( $cuantas ) . ' ' . $etiqueta;
+            }
+        }
+        if ( ! empty( $tramos ) ) {
+            $partes[] = sprintf( '. Por tramos de avance: %s, sobre %s %s con apropiación registrada',
+                self::lista_y( $tramos ),
+                number_format_i18n( $c['n'] ),
+                $plural
+            );
+        }
+
+        return [ 'titulo' => 'Análisis cuantitativo', 'parrafos' => [ self::parrafo( $partes ) ], 'metricas' => $metricas ];
+    }
+
     // ─── Utilidades ──────────────────────────────────────────────
 
     private static function sumar( array $filas ): float {

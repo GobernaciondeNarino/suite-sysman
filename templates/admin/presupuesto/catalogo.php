@@ -84,6 +84,21 @@ $tarjetas = [
         ],
     ],
     [
+        'titulo'  => $ingresos
+            ? __( 'Avance del recaudo', 'sysman-suite' )
+            : __( 'Ejecución por dependencia (% de avance)', 'sysman-suite' ),
+        'desc'    => $ingresos
+            ? __( 'Gráfico del porcentaje recaudado sobre el presupuesto definitivo, con su propia descripción y sus análisis. El porcentaje global es ponderado —recaudo total sobre presupuesto total—, no el promedio de los porcentajes. Con tipo="barras" (por defecto), "columnas" o "lineas".', 'sysman-suite' )
+            : __( 'Gráfico del porcentaje ejecutado —compromisos sobre apropiación vigente— por dependencia, con su propia descripción y sus análisis cualitativo y cuantitativo. El porcentaje global es ponderado, no el promedio de los porcentajes. Con tipo="barras" (por defecto), "columnas" o "lineas"; con dependencia="…" baja a los rubros de esa dependencia.', 'sysman-suite' ),
+        'codigos' => array_values( array_filter( [
+            "[{$pre}_avance]",
+            "[{$pre}_avance tipo=\"lineas\"]",
+            $ingresos ? null : "[{$pre}_avance dependencia=\"{$ejemplo_val}\"]",
+            "[{$pre}_avance analisis=\"descripcion,cualitativo,cuantitativo\"]",
+            "[{$pre}_avance analisis=\"no\" limite=\"10\"]",
+        ] ) ),
+    ],
+    [
         'titulo'  => __( 'Análisis automático', 'sysman-suite' ),
         'desc'    => __( 'Texto generado a partir de los datos de la vista, en párrafos corridos y sin recuadros ni títulos: se lee como un texto más de la página, pensado para la ciudadanía. La descripción resume qué se muestra, el cualitativo interpreta concentración y niveles de ejecución, y el cuantitativo redacta los estadísticos. Si está enlazado y hay un valor elegido, el análisis pasa a su detalle.', 'sysman-suite' ),
         'codigos' => [
@@ -91,6 +106,7 @@ $tarjetas = [
             "[{$pre}_analisis tipo=\"cualitativo\"]",
             "[{$pre}_analisis tipo=\"cuantitativo\"]",
             "[{$pre}_analisis tipo=\"cualitativo\" valor=\"{$ejemplo_val}\"]",
+            "[{$pre}_analisis vista=\"avance\" tipo=\"cuantitativo\"]",
         ],
     ],
     [
@@ -109,6 +125,7 @@ $tarjetas = [
 
 $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución por " . $grupo_label . "\"]\n\n"
     . "[{$pre}_analisis tipo=\"descripcion\"]\n[{$pre}_analisis tipo=\"cualitativo\"]\n\n"
+    . "[{$pre}_avance titulo=\"" . ( $ingresos ? 'Avance del recaudo' : 'Ejecución por dependencia' ) . "\" analisis=\"descripcion,cualitativo\"]\n\n"
     . "[{$pre}_explora titulo=\"Detalle\"]\n\n[{$pre}_analisis tipo=\"cuantitativo\"]";
 ?>
 <div class="wrap sysman-admin-wrap">
@@ -212,6 +229,16 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
                             ) );
                             ?>
                         </td>
+                    </tr>
+                    <tr>
+                        <td><code>tipo</code></td>
+                        <td><code>barras</code></td>
+                        <td><?php esc_html_e( 'En el gráfico de avance: barras, columnas o lineas. En el análisis: descripcion, cualitativo o cuantitativo.', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>analisis</code></td>
+                        <td><code>descripcion</code></td>
+                        <td><?php esc_html_e( 'Textos que acompañan al gráfico de avance, separados por comas: descripcion, cualitativo, cuantitativo. Con "no" el gráfico va solo.', 'sysman-suite' ); ?></td>
                     </tr>
                     <tr>
                         <td><code>buscador</code></td>

@@ -186,6 +186,88 @@ class IngresosRepository {
     }
 
     /**
+     * Collection rate: how much of the budget is already collected.
+     *
+     * El gemelo del avance de gastos: sin valor agrupa por la dimensión, con
+     * valor baja a sus cuentas.
+     *
+     * @return array<int, array{label:string, codigo:string, base:float, ejecutado:float, porcentaje:float|null}>
+     */
+    public function avance(
+        array $ctx,
+        string $valor = '',
+        int $limite = 0,
+        string $dimension = 'tiporecurso',
+        string $numerador = 'recaudosacumulados',
+        string $denominador = 'totalpresupuesto'
+    ): array {
+        global $wpdb;
+
+        $dimension   = self::validar_dimension( $dimension );
+        $numerador   = self::validar_campo( $numerador );
+        $denominador = self::validar_campo( $denominador );
+
+        $cache_key = 'sysman_pre_ing_avance_' . md5( wp_json_encode( [ $ctx, $valor, $limite, $dimension, $numerador, $denominador ] ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        $tabla     = $this->tabla();
+        $por_cuenta = '' !== $valor;
+
+        $where  = "compania = %s AND anio = %d AND mes = %d AND movimiento = 'SI'";
+        $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+
+        if ( $por_cuenta ) {
+            $where   .= " AND `{$dimension}` = %s";
+            $params[] = $valor;
+            $etiqueta = 'nombre';
+            $codigo   = 'codigo';
+            $grupo    = 'codigo, nombre';
+        } else {
+            $where   .= " AND `{$dimension}` <> ''";
+            $etiqueta = "`{$dimension}`";
+            $codigo   = "''";
+            $grupo    = "`{$dimension}`";
+        }
+
+        $sql = "SELECT {$etiqueta} AS label,
+                       {$codigo} AS codigo,
+                       SUM(`{$denominador}`) AS base,
+                       SUM(`{$numerador}`)   AS ejecutado
+                FROM `{$tabla}`
+                WHERE {$where}
+                GROUP BY {$grupo}
+                HAVING base <> 0
+                ORDER BY base DESC";
+
+        if ( $limite > 0 ) {
+            $sql .= ' LIMIT ' . (int) $limite;
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+
+        $out = array_map( static function ( $r ) {
+            $base      = (float) $r['base'];
+            $ejecutado = (float) $r['ejecutado'];
+
+            return [
+                'label'      => (string) $r['label'],
+                'codigo'     => (string) $r['codigo'],
+                'base'       => $base,
+                'ejecutado'  => $ejecutado,
+                'porcentaje' => 0.0 !== $base ? $ejecutado / $base : null,
+                'value'      => 0.0 !== $base ? $ejecutado / $base : 0.0,
+            ];
+        }, $rows );
+
+        set_transient( $cache_key, $out, self::CACHE_TTL );
+        return $out;
+    }
+
+    /**
      * Income accounts inside one dimension value.
      */
     public function detalle( array $ctx, string $valor, string $campo = 'totalpresupuesto', string $dimension = 'tiporecurso' ): array {

@@ -23,7 +23,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PresupuestoModule {
 
     /** Component names, shared by both sides. */
-    private const VISTAS = [ 'treemap', 'lista', 'ejecucion', 'explora', 'analisis', 'selector' ];
+    private const VISTAS = [ 'treemap', 'lista', 'ejecucion', 'explora', 'avance', 'analisis', 'selector' ];
+
+    /** Formas del gráfico de avance, con los sinónimos que se aceptan. */
+    private const FORMAS_AVANCE = [
+        'barras'   => 'barras',
+        'barra'    => 'barras',
+        'bar'      => 'barras',
+        'columnas' => 'columnas',
+        'columna'  => 'columnas',
+        'lineas'   => 'lineas',
+        'líneas'   => 'lineas',
+        'linea'    => 'lineas',
+        'línea'    => 'lineas',
+        'line'     => 'lineas',
+    ];
+
+    /** Textos que puede llevar el card de avance debajo del gráfico. */
+    private const ANALISIS = [ 'descripcion', 'cualitativo', 'cuantitativo' ];
 
     private static ?self $instance = null;
 
@@ -158,7 +175,9 @@ class PresupuestoModule {
             'valor'       => '',
             'dependencia' => '',
             'vista'       => 'dimensiones',
-            'tipo'        => 'descripcion',
+            'tipo'        => '',
+            // Card de avance: qué textos van debajo del gráfico.
+            'analisis'    => 'descripcion',
             'etiqueta'    => '',
             'todas'       => '— Todas —',
         ];
@@ -193,8 +212,11 @@ class PresupuestoModule {
             'buscador'    => self::es_si( $a['buscador'] ),
             'altura'      => absint( $a['altura'] ) ?: $this->altura_por_defecto( $vista ),
             'colores'     => sanitize_text_field( $a['colores'] ),
-            'vista'       => in_array( $a['vista'], [ 'detalle', 'rubros' ], true ) ? 'detalle' : 'dimensiones',
-            'tipo'        => in_array( $tipo, [ 'descripcion', 'cualitativo', 'cuantitativo' ], true ) ? $tipo : 'descripcion',
+            'vista'       => $this->vista_analisis( $a['vista'] ),
+            'tipo'        => 'avance' === $vista
+                ? ( self::FORMAS_AVANCE[ $tipo ] ?? 'barras' )
+                : ( in_array( $tipo, self::ANALISIS, true ) ? $tipo : 'descripcion' ),
+            'analisis'    => $this->parsear_analisis( $a['analisis'] ),
             'etiqueta'    => sanitize_text_field( $a['etiqueta'] ) ?: $this->etiqueta_selector( $ingresos, $a['dimension'] ),
             'todas'       => sanitize_text_field( $a['todas'] ),
             'etiqueta_dimension' => $ingresos
@@ -208,7 +230,8 @@ class PresupuestoModule {
                 : __( 'Todas las dependencias', 'sysman-suite' ),
         ];
 
-        $this->enqueue_frontend( 'treemap' === $vista );
+        // El treemap y el avance dibujan con D3plus; el resto es HTML.
+        $this->enqueue_frontend( in_array( $vista, [ 'treemap', 'avance' ], true ) );
 
         return $this->contenedor( $vista, $config );
     }
@@ -226,9 +249,29 @@ class PresupuestoModule {
             : Repository::validar_extra( $campos );
     }
 
+    /** La vista del análisis: dimensiones, el detalle, o el avance. */
+    private function vista_analisis( string $vista ): string {
+        if ( 'avance' === $vista ) {
+            return 'avance';
+        }
+        return in_array( $vista, [ 'detalle', 'rubros' ], true ) ? 'detalle' : 'dimensiones';
+    }
+
+    /**
+     * Textos que acompañan al gráfico de avance. "no" (o vacío) los quita.
+     */
+    private function parsear_analisis( string $bruto ): array {
+        $pedidos = array_filter( array_map( 'trim', explode( ',', strtolower( $bruto ) ) ) );
+        if ( empty( $pedidos ) || in_array( 'no', $pedidos, true ) ) {
+            return [];
+        }
+        return array_values( array_intersect( self::ANALISIS, $pedidos ) );
+    }
+
     private function altura_por_defecto( string $vista ): int {
         return match ( $vista ) {
             'treemap'   => 520,
+            'avance'    => 460,
             'lista'     => 480,
             'ejecucion' => 620,
             'explora'   => 640,

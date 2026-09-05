@@ -49,6 +49,8 @@ class RestController {
             'detalle'      => [ 'get_detalle', 'pre_lectura', 120 ],
             'rubro'        => [ 'get_item', 'pre_detalle', 120 ],
             'item'         => [ 'get_item', 'pre_detalle', 120 ],
+            // Porcentaje de ejecución (gastos) o de recaudo (ingresos).
+            'avance'       => [ 'get_avance', 'pre_lectura', 120 ],
             'analisis'     => [ 'get_analisis', 'pre_analisis', 60 ],
         ];
 
@@ -56,7 +58,11 @@ class RestController {
             [ $callback, $bucket, $max ] = $cfg;
 
             $args = $this->args_base();
-            if ( in_array( $ruta, [ 'rubros', 'detalle' ], true ) ) {
+            if ( 'avance' === $ruta ) {
+                $args['limite']      = [ 'default' => 0, 'sanitize_callback' => 'absint' ];
+                $args['valor']       = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
+                $args['dependencia'] = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
+            } elseif ( in_array( $ruta, [ 'rubros', 'detalle' ], true ) ) {
                 $args['valor']       = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
                 $args['dependencia'] = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
             } elseif ( in_array( $ruta, [ 'rubro', 'item' ], true ) ) {
@@ -222,6 +228,50 @@ class RestController {
         ] );
     }
 
+    /**
+     * Execution (or collection) rate per dependencia, or per rubro when one
+     * dependencia is selected.
+     */
+    public function get_avance( \WP_REST_Request $r ): \WP_REST_Response {
+        $ctx      = $this->ctx( $r );
+        $valor    = $this->valor( $r );
+        $limite   = (int) $r->get_param( 'limite' );
+        $ingresos = $this->es_ingresos( $r );
+
+        $filas = $ingresos
+            ? IngresosRepository::instance()->avance( $ctx, $valor, $limite, $this->dimension( $r ) )
+            : Repository::instance()->avance( $ctx, $valor, $limite );
+
+        return new \WP_REST_Response( [
+            'meta'  => $this->meta( $r, $ctx, self::totales_avance( $filas ) + [
+                'valor'            => $valor,
+                'dependencia'      => $valor,
+                'base_label'       => $ingresos ? 'Total Presupuesto' : 'Apropiación Vigente',
+                'ejecutado_label'  => $ingresos ? 'Recaudos Acumulados' : 'Compromisos',
+                'porcentaje_label' => $ingresos ? '% Recaudado' : '% Ejecución',
+            ] ),
+            'data'  => $filas,
+            'total' => count( $filas ),
+        ] );
+    }
+
+    /**
+     * Aggregate rate: the ratio of the sums, not the average of the ratios.
+     *
+     * Promediar porcentajes daría el mismo peso a una dependencia de mil
+     * millones que a una de un millón.
+     */
+    private static function totales_avance( array $filas ): array {
+        $base      = array_sum( array_column( $filas, 'base' ) );
+        $ejecutado = array_sum( array_column( $filas, 'ejecutado' ) );
+
+        return [
+            'base'       => $base,
+            'ejecutado'  => $ejecutado,
+            'porcentaje' => $base > 0 ? $ejecutado / $base : null,
+        ];
+    }
+
     public function get_item( \WP_REST_Request $r ): \WP_REST_Response {
         $ctx    = $this->ctx( $r );
         $codigo = (string) $r->get_param( 'codigo' );
@@ -247,25 +297,38 @@ class RestController {
         $ingresos   = $this->es_ingresos( $r );
         $dimension  = $this->dimension( $r );
         $vista_attr = (string) $r->get_param( 'vista' );
-        $es_detalle = in_array( $vista_attr, [ 'rubros', 'detalle' ], true ) || '' !== $valor;
+        $es_avance  = 'avance' === $vista_attr;
+        $es_detalle = ! $es_avance && ( in_array( $vista_attr, [ 'rubros', 'detalle' ], true ) || '' !== $valor );
+
+        // La vista de avance analiza porcentajes, no importes: su serie es la
+        // del mismo endpoint que alimenta la gráfica.
+        $vista_pedida = $es_avance ? 'avance' : ( $es_detalle ? 'detalle' : 'dimensiones' );
 
         if ( $ingresos ) {
-            $repo  = IngresosRepository::instance();
-            $filas = $es_detalle
-                ? $repo->detalle( $ctx, $valor, $campo, $dimension )
-                : $repo->dimensiones( $ctx, $campo, 0, $dimension );
+            $repo = IngresosRepository::instance();
+            if ( $es_avance ) {
+                $filas = $repo->avance( $ctx, $valor, 0, $dimension );
+            } else {
+                $filas = $es_detalle
+                    ? $repo->detalle( $ctx, $valor, $campo, $dimension )
+                    : $repo->dimensiones( $ctx, $campo, 0, $dimension );
+            }
             $totales = $repo->totales( $ctx, $valor, $dimension );
         } else {
-            $repo  = Repository::instance();
-            $filas = $es_detalle
-                ? $repo->rubros( $ctx, $valor, $campo )
-                : $repo->dependencias( $ctx, $campo );
+            $repo = Repository::instance();
+            if ( $es_avance ) {
+                $filas = $repo->avance( $ctx, $valor );
+            } else {
+                $filas = $es_detalle
+                    ? $repo->rubros( $ctx, $valor, $campo )
+                    : $repo->dependencias( $ctx, $campo );
+            }
             $totales = $repo->totales( $ctx, $valor );
         }
 
         $analisis = Analysis::generar(
             (string) $r->get_param( 'tipo' ),
-            $es_detalle ? 'detalle' : 'dimensiones',
+            $vista_pedida,
             $ctx,
             [ 'filas' => $filas, 'totales' => $totales ],
             [
@@ -276,6 +339,9 @@ class RestController {
                 'dimension_label'    => $ingresos ? IngresosRepository::etiqueta_dimension( $dimension ) : 'dependencia',
                 'dimension_plural'   => $ingresos ? IngresosRepository::etiqueta_plural( $dimension ) : 'dependencias',
                 'dimension_femenino' => $ingresos ? IngresosRepository::es_femenino( $dimension ) : true,
+                'base_label'         => $ingresos ? 'presupuesto definitivo' : 'apropiación vigente',
+                'ejecutado_label'    => $ingresos ? 'recaudado' : 'comprometido',
+                'avance'             => $es_avance ? self::totales_avance( $filas ) : [],
             ]
         );
 

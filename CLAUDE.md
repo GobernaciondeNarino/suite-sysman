@@ -29,7 +29,10 @@ visualizar datos presupuestales desde el sistema SYSMAN.
   tipo o fuente de recurso → cuenta, `IngresosRepository`). Comparten
   `RestController` (REST `sysman-suite/v1/presupuesto`), `Analysis` y
   `assets/js/presupuesto.js`, parametrizados por `modulo`; el filtrado cruzado
-  entre shortcodes va por el atributo `enlazar`. `[sysman_pre_*]` es alias
+  entre shortcodes va por el atributo `enlazar`. La vista `avance` (% ejecutado
+  o recaudado) tiene su propia redacción en `Analysis`: sobre una serie de
+  porcentajes, «total» y «concentración» no significan nada, y el porcentaje
+  global es ponderado, nunca el promedio de los porcentajes. `[sysman_pre_*]` es alias
   heredado de Gastos: no romperlo.
 - `templates/` — vistas de admin y frontend. `assets/` — CSS/JS.
 
