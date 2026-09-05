@@ -462,38 +462,64 @@
         var clave = Coord.clave(cfg);
         var esIngresos = cfg.modulo === 'ingresos';
 
-        function cargar() {
-            if (!valor) {
-                pintarVacio(el, esIngresos
-                    ? 'Seleccione un ' + (cfg.etiqueta_dimension || 'tipo de recurso').toLowerCase() + ' para ver sus cuentas de ingreso.'
-                    : 'Seleccione una dependencia para ver su ejecución.');
-                return;
-            }
-            cargando(el);
+        /* Sin seleccion el panel arranca con la primera dimension (la de mayor
+           valor) en vez de quedarse en blanco. Se resuelve en local: no publica
+           nada al filtro compartido, asi que no arrastra a los demas
+           shortcodes de la pagina. */
+        function resolverValor() {
+            if (valor) { return Promise.resolve(valor); }
 
             var params = base(cfg);
-            params.valor = valor;
+            params.limite = 1;
+            return api('dimensiones', params).then(function (resp) {
+                var filas = resp.data || [];
+                return filas.length ? (filas[0].label || '') : '';
+            });
+        }
+
+        function cargar() {
+            cargando(el);
+            resolverValor().then(pintar).catch(function (e) { pintarError(el, e.message); });
+        }
+
+        function pintar(elegido) {
+            if (!elegido) {
+                pintarVacio(el, esIngresos
+                    ? 'No hay cuentas de ingreso con movimiento en este periodo.'
+                    : 'No hay dependencias con movimiento en este periodo.');
+                return;
+            }
+
+            var params = base(cfg);
+            params.valor = elegido;
 
             api('detalle', params).then(function (resp) {
                 var filas = resp.data || [];
                 var c = cuerpoDe(el);
                 if (!filas.length) {
-                    pintarVacio(el, '«' + valor + '» no tiene registros con movimiento en este periodo.');
+                    pintarVacio(el, '«' + elegido + '» no tiene registros con movimiento en este periodo.');
                     return;
                 }
 
-                c.innerHTML = '<p class="sysman-pre__resumen"><strong>' + esc(valor) + '</strong> · '
-                    + Fmt.entero(filas.length) + (esIngresos ? ' cuentas' : ' rubros') + '</p>'
+                c.innerHTML = '<p class="sysman-pre__resumen"><strong>' + esc(elegido) + '</strong> · '
+                    + Fmt.entero(filas.length) + ' '
+                    + (esIngresos
+                        ? (filas.length === 1 ? 'cuenta' : 'cuentas')
+                        : (filas.length === 1 ? 'rubro' : 'rubros')) + '</p>'
                     + '<ul class="sysman-pre__rubros" role="list">' + filas.map(function (f) {
                         var extra = (esIngresos && f.porcentaje_recaudado !== null && f.porcentaje_recaudado !== undefined)
                             ? '<span class="sysman-pre__rubro-pct">' + esc(Fmt.pct(f.porcentaje_recaudado)) + '</span>' : '';
+                        // Codigo y valor en la primera linea; el nombre debajo,
+                        // porque suele ser largo y empujaba la cifra fuera de vista.
                         return '<li class="sysman-pre__rubro" data-codigo="' + esc(f.codigo) + '" aria-expanded="false">'
                             + '<button type="button" class="sysman-pre__rubro-tog">'
+                            + '<span class="sysman-pre__rubro-linea">'
                             + '<span class="sysman-pre__rubro-flecha" aria-hidden="true">▶</span>'
                             + '<span class="sysman-pre__rubro-codigo">' + esc(f.codigo) + '</span>'
-                            + '<span class="sysman-pre__rubro-nombre">' + esc(f.nombre) + '</span>'
                             + extra
                             + '<span class="sysman-pre__rubro-valor">' + Fmt.moneda(f.value) + '</span>'
+                            + '</span>'
+                            + '<span class="sysman-pre__rubro-nombre">' + esc(f.nombre) + '</span>'
                             + '</button>'
                             + '<div class="sysman-pre__rubro-cuerpo" hidden></div></li>';
                     }).join('') + '</ul>';
@@ -570,21 +596,15 @@
 
             api('analisis', params).then(function (resp) {
                 var a = resp.data || {};
-                var html = '<div class="sysman-pre__analisis sysman-pre__analisis--' + esc(cfg.tipo) + '">'
-                    + '<h4 class="sysman-pre__analisis-titulo">' + esc(a.titulo || '') + '</h4>';
-
-                if (valor) {
-                    html += '<p class="sysman-pre__analisis-ambito">Ámbito: ' + esc(valor) + '</p>';
-                }
-                (a.parrafos || []).forEach(function (p) {
-                    html += '<p class="sysman-pre__analisis-parrafo">' + esc(p) + '</p>';
-                });
-                if ((a.metricas || []).length) {
-                    html += '<dl class="sysman-pre__metricas">' + a.metricas.map(function (m) {
-                        return '<div class="sysman-pre__metrica"><dt>' + esc(m.label) + '</dt><dd>' + esc(m.valor) + '</dd></div>';
-                    }).join('') + '</dl>';
-                }
-                cuerpoDe(el).innerHTML = html + '</div>';
+                // Prosa continua para la ciudadania: solo parrafos. Ni titulo,
+                // ni etiqueta de ambito, ni cuadro de metricas — el alcance y
+                // las cifras van dentro del propio texto (ver Analysis.php).
+                cuerpoDe(el).innerHTML = '<div class="sysman-pre__analisis sysman-pre__analisis--'
+                    + esc(cfg.tipo) + '">'
+                    + (a.parrafos || []).map(function (p) {
+                        return '<p class="sysman-pre__analisis-parrafo">' + esc(p) + '</p>';
+                    }).join('')
+                    + '</div>';
             }).catch(function (e) { pintarError(el, e.message); });
         }
 

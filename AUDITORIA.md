@@ -72,7 +72,14 @@
 - [x] **`porcrecaudado` excluido de las métricas agregables** de ingresos: es un porcentaje por fila y sumarlo no significa nada. El porcentaje se recalcula sobre los totales.
 - [x] **Rate-limiting** también en los endpoints públicos de los dos módulos nuevos (HTTP 429), y caché de agregados invalidada tras cada importación.
 
-### 3.4 Pendiente (requiere decisión o herramientas externas)
+### 3.4 Implementado en v5.13.0 (legibilidad del análisis)
+
+- [x] **El análisis se leía como una ficha técnica, no como un texto.** Título, etiqueta «Ámbito», recuadro con borde y cuadrícula de métricas competían con el contenido. Ahora son párrafos corridos con la tipografía del tema; las cifras del cuantitativo se redactan dentro del texto en lugar de listarse en cajas.
+- [x] **Concordancia de género y número de la dimensión de ingresos.** El plural se formaba añadiendo «s» («tipo de recursos») y el género estaba fijo en masculino («los tres primeros fuentes de recurso»). Ambos se resuelven ahora con constantes explícitas de `IngresosRepository`.
+- [x] **Nombre del rubro empujaba la cifra fuera de la vista.** Los nombres superan a menudo los 200 caracteres; código y valor van en la primera línea y el nombre debajo.
+- [x] **El panel de ejecución cargaba en blanco.** Sin selección mostraba «Seleccione una dependencia»; ahora arranca con la primera del listado, resolviéndola en local para no alterar el filtro compartido de la página.
+
+### 3.5 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.

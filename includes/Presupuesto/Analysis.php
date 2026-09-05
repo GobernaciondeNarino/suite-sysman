@@ -44,14 +44,20 @@ class Analysis {
         $es_detalle = 'detalle' === $vista;
 
         if ( $ingresos ) {
-            $grupo = mb_strtolower( $opciones['dimension_label'] ?? 'tipo de recurso' );
+            // El plural y el género llegan resueltos desde IngresosRepository:
+            // en español no basta con añadir "s" ("tipo de recurso" → "tipos de
+            // recurso") ni el género es fijo ("los tipos" / "las fuentes").
+            $grupo  = mb_strtolower( $opciones['dimension_label'] ?? 'tipo de recurso' );
+            $plural = mb_strtolower( $opciones['dimension_plural'] ?? $grupo . 's' );
+            $fem    = ! empty( $opciones['dimension_femenino'] );
+
             return [
                 'ingresos'   => true,
                 'es_detalle' => $es_detalle,
-                'plural'     => $es_detalle ? 'cuentas de ingreso' : $grupo . 's',
+                'plural'     => $es_detalle ? 'cuentas de ingreso' : $plural,
                 'singular'   => $es_detalle ? 'cuenta de ingreso' : $grupo,
-                'femenino'   => $es_detalle,   // "cuentas" es femenino; "tipos"/"fuentes" varía
-                'ambito'     => $es_detalle ? 'las cuentas' : 'los ' . $grupo . 's',
+                'femenino'   => $es_detalle ? true : $fem,   // "cuentas" siempre es femenino
+                'ambito'     => $es_detalle ? 'las cuentas' : ( $fem ? 'las ' : 'los ' ) . $plural,
             ];
         }
 
@@ -92,7 +98,7 @@ class Analysis {
 
         if ( $v['es_detalle'] ) {
             $parrafos[] = sprintf(
-                'La vista detalla %d %s de %s en %s, por un valor de %s en %s.',
+                'Esta vista detalla %d %s de %s en %s, por un valor de %s en %s.',
                 $n,
                 1 === $n ? $v['singular'] : $v['plural'],
                 '' !== $valor ? $valor : 'toda la entidad',
@@ -101,12 +107,12 @@ class Analysis {
                 $campo
             );
         } else {
+            // "el total de …, repartido entre …": la concordancia va con
+            // "el total", así que no depende del género de la métrica.
             $parrafos[] = sprintf(
-                '%s presenta %s de la entidad en %s, distribuid%s entre %d %s. El valor total asciende a %s.',
-                'La vista',
+                'Esta vista presenta las cifras de %s de la entidad en %s, repartidas entre %d %s. El total asciende a %s.',
                 $campo,
                 $periodo,
-                $v['femenino'] ? 'a' : 'o',
                 $n,
                 1 === $n ? $v['singular'] : $v['plural'],
                 self::moneda( $total )
@@ -129,6 +135,23 @@ class Analysis {
         return [ 'titulo' => 'Descripción', 'parrafos' => $parrafos, 'metricas' => [] ];
     }
 
+    /**
+     * Sitúa al lector en una sola frase: qué métrica, de quién y cuándo.
+     *
+     * Las vistas se publican como prosa continua —sin título ni etiqueta de
+     * ámbito— así que el alcance tiene que ir dentro del propio texto.
+     */
+    private static function contexto_prosa( array $ctx, array $opciones ): string {
+        $valor = trim( (string) ( $opciones['valor'] ?? '' ) );
+
+        return sprintf(
+            '%s de %s en %s',
+            mb_strtolower( $opciones['campo_label'] ?? 'el valor' ),
+            '' !== $valor ? $valor : 'la entidad',
+            self::periodo( $ctx )
+        );
+    }
+
     // ─── Análisis cualitativo ────────────────────────────────────
 
     private static function cualitativo( string $vista, array $ctx, array $datos, array $opciones ): array {
@@ -148,7 +171,12 @@ class Analysis {
         $valores = array_map( static fn( $f ) => (float) $f['value'], $filas );
         rsort( $valores );
 
-        $parrafos = [];
+        $parrafos = [ sprintf(
+            'Esta lectura interpreta cómo se reparten las cifras de %s entre %d %s.',
+            self::contexto_prosa( $ctx, $opciones ),
+            $n,
+            1 === $n ? $v['singular'] : $v['plural']
+        ) ];
         $primeros = $v['femenino'] ? 'las tres primeras' : 'los tres primeros';
 
         // Concentración (participación del top 3).
@@ -161,13 +189,13 @@ class Analysis {
         if ( $n >= 3 ) {
             $parrafos[] = $top3 >= self::UMBRAL_CONCENTRACION
                 ? sprintf(
-                    'El presupuesto está concentrado: %s %s (%s) reúnen %s del total. Una variación en cualquiera de %s mueve de forma apreciable la cifra global.',
+                    'El presupuesto está concentrado: %s %s (%s) reúnen el %s del total. Una variación en cualquiera de %s mueve de forma apreciable la cifra global.',
                     $primeros, $v['plural'], implode( ', ', $nombres_top ),
                     self::porcentaje( $top3 ),
                     $v['femenino'] ? 'ellas' : 'ellos'
                 )
                 : sprintf(
-                    'El presupuesto está repartido: %s %s concentran %s del total, de modo que ningun%s domina la cifra global.',
+                    'El presupuesto está repartido: %s %s concentran el %s del total, de modo que ningun%s domina la cifra global.',
                     $primeros, $v['plural'], self::porcentaje( $top3 ),
                     $v['femenino'] ? 'a' : 'o'
                 );
@@ -185,7 +213,7 @@ class Analysis {
         }
         if ( $n > 3 ) {
             $parrafos[] = sprintf(
-                '%d de %d %s (%s) explican el 80%% del valor; el resto aporta de forma marginal.',
+                '%d de %d %s (el %s) explican el 80%% del valor; el resto aporta de forma marginal.',
                 $pareto, $n, $v['plural'], self::porcentaje( $pareto / $n )
             );
         }
@@ -199,7 +227,7 @@ class Analysis {
                 $del_mes   = (float) ( $totales['recaudosmes'] ?? 0 ) / $presupuesto;
 
                 $parrafos[] = sprintf(
-                    'Frente al presupuesto definitivo de ingresos se ha recaudado %s de forma acumulada, de los cuales %s corresponde al mes analizado. %s',
+                    'Frente al presupuesto definitivo de ingresos se ha recaudado el %s de forma acumulada, del cual el %s corresponde al mes analizado. %s',
                     self::porcentaje( $recaudado ),
                     self::porcentaje( $del_mes ),
                     self::juicio_recaudo( $recaudado )
@@ -208,7 +236,7 @@ class Analysis {
                 $porrecaudar = (float) ( $totales['porrecaudar'] ?? 0 );
                 if ( $porrecaudar > 0 ) {
                     $parrafos[] = sprintf(
-                        'Queda por recaudar %s (%s del presupuesto definitivo).',
+                        'Queda por recaudar %s (el %s del presupuesto definitivo).',
                         self::moneda( $porrecaudar ),
                         self::porcentaje( $porrecaudar / $presupuesto )
                     );
@@ -222,7 +250,7 @@ class Analysis {
                 $pag  = (float) ( $totales['pagos'] ?? 0 ) / $apr;
 
                 $parrafos[] = sprintf(
-                    'Frente a la apropiación vigente, se ha comprometido %s, obligado %s y pagado %s. %s',
+                    'Frente a la apropiación vigente se ha comprometido el %s, obligado el %s y pagado el %s. %s',
                     self::porcentaje( $comp ), self::porcentaje( $obl ), self::porcentaje( $pag ),
                     self::juicio_ejecucion( $comp )
                 );
@@ -230,7 +258,7 @@ class Analysis {
                 $brecha = $comp - $pag;
                 if ( $brecha > 0.25 ) {
                     $parrafos[] = sprintf(
-                        'Hay una brecha de %s entre lo comprometido y lo pagado: recursos ya afectados por contratos que aún no se han desembolsado.',
+                        'Hay una brecha del %s entre lo comprometido y lo pagado: recursos ya afectados por contratos que aún no se han desembolsado.',
                         self::porcentaje( $brecha )
                     );
                 }
@@ -278,6 +306,20 @@ class Analysis {
 
     // ─── Análisis cuantitativo ───────────────────────────────────
 
+    /**
+     * Traduce el coeficiente de variación a una palabra que se entienda sin
+     * saber estadística.
+     */
+    private static function juicio_dispersion( float $cv ): string {
+        if ( $cv >= 1.0 ) {
+            return 'muy desigual';
+        }
+        if ( $cv >= 0.5 ) {
+            return 'moderada';
+        }
+        return 'baja';
+    }
+
     private static function cuantitativo( string $vista, array $ctx, array $datos, array $opciones ): array {
         $v     = self::vocabulario( $vista, $opciones );
         $filas = $datos['filas'] ?? [];
@@ -307,15 +349,20 @@ class Analysis {
             [ 'label' => 'Mínimo', 'valor' => self::moneda( $valores[0] ), 'crudo' => $valores[0] ],
         ];
 
-        if ( $n > 1 ) {
-            $desv = self::desviacion( $valores, $media );
+        $desv = $n > 1 ? self::desviacion( $valores, $media ) : null;
+        $cv   = ( null !== $desv && $media > 0 ) ? $desv / $media : null;
+
+        if ( null !== $desv ) {
             $metricas[] = [ 'label' => 'Desviación estándar', 'valor' => self::moneda( $desv ), 'crudo' => $desv ];
-            if ( $media > 0 ) {
-                $metricas[] = [ 'label' => 'Coef. de variación', 'valor' => number_format_i18n( $desv / $media, 2 ), 'crudo' => $desv / $media ];
+            if ( null !== $cv ) {
+                $metricas[] = [ 'label' => 'Coef. de variación', 'valor' => number_format_i18n( $cv, 2 ), 'crudo' => $cv ];
             }
         }
 
         $totales = $datos['totales'] ?? [];
+        // Los mismos porcentajes viajan como métrica (para quien consuma el
+        // REST) y como texto, porque la vista se publica en prosa continua.
+        $ratios = [];
 
         if ( $v['ingresos'] ) {
             $presupuesto = (float) ( $totales['totalpresupuesto'] ?? 0 );
@@ -325,11 +372,13 @@ class Analysis {
                     'recaudosmes'        => '% Recaudado en el mes',
                     'porrecaudar'        => '% Por recaudar',
                 ] as $campo => $label ) {
+                    $fraccion = (float) ( $totales[ $campo ] ?? 0 ) / $presupuesto;
                     $metricas[] = [
                         'label' => $label,
-                        'valor' => self::porcentaje( (float) ( $totales[ $campo ] ?? 0 ) / $presupuesto ),
-                        'crudo' => (float) ( $totales[ $campo ] ?? 0 ) / $presupuesto,
+                        'valor' => self::porcentaje( $fraccion ),
+                        'crudo' => $fraccion,
                     ];
+                    $ratios[ $campo ] = self::porcentaje( $fraccion );
                 }
             }
         } else {
@@ -340,23 +389,65 @@ class Analysis {
                     'obligacion'  => '% Obligado',
                     'pagos'       => '% Pagado',
                 ] as $campo => $label ) {
+                    $fraccion = (float) ( $totales[ $campo ] ?? 0 ) / $apr;
                     $metricas[] = [
                         'label' => $label,
-                        'valor' => self::porcentaje( (float) ( $totales[ $campo ] ?? 0 ) / $apr ),
-                        'crudo' => (float) ( $totales[ $campo ] ?? 0 ) / $apr,
+                        'valor' => self::porcentaje( $fraccion ),
+                        'crudo' => $fraccion,
                     ];
+                    $ratios[ $campo ] = self::porcentaje( $fraccion );
                 }
             }
         }
 
+        $plural = 1 === $n ? $v['singular'] : $v['plural'];
+
         $parrafos = [ sprintf(
-            'Estadísticas sobre %s en %s. La mediana (%s) frente al promedio (%s) indica una distribución %s.',
-            mb_strtolower( $opciones['campo_label'] ?? 'el valor' ),
-            self::periodo( $ctx ),
+            'Estas son las estadísticas de %s. La mediana (%s) frente al promedio (%s) indica una distribución %s.',
+            self::contexto_prosa( $ctx, $opciones ),
             self::moneda( $mediana ),
             self::moneda( $media ),
             $mediana < $media * 0.6 ? 'muy sesgada hacia unos pocos valores altos' : 'relativamente equilibrada'
         ) ];
+
+        $parrafos[] = sprintf(
+            'En conjunto son %s %s que suman %s, con un promedio de %s y una mediana de %s. El valor más alto llega a %s y el más bajo a %s.',
+            number_format_i18n( $n ),
+            $plural,
+            self::moneda( $total ),
+            self::moneda( $media ),
+            self::moneda( $mediana ),
+            self::moneda( end( $valores ) ),
+            self::moneda( $valores[0] )
+        );
+
+        if ( null !== $desv ) {
+            $parrafos[] = null !== $cv
+                ? sprintf(
+                    'La desviación estándar es de %s y el coeficiente de variación, de %s, lo que refleja una dispersión %s entre %s.',
+                    self::moneda( $desv ),
+                    number_format_i18n( $cv, 2 ),
+                    self::juicio_dispersion( $cv ),
+                    $plural
+                )
+                : sprintf( 'La desviación estándar es de %s.', self::moneda( $desv ) );
+        }
+
+        if ( $v['ingresos'] && isset( $ratios['recaudosacumulados'] ) ) {
+            $parrafos[] = sprintf(
+                'Del presupuesto total se ha recaudado el %s —el %s durante el mes— y queda por recaudar el %s.',
+                $ratios['recaudosacumulados'],
+                $ratios['recaudosmes'],
+                $ratios['porrecaudar']
+            );
+        } elseif ( isset( $ratios['compromisos'] ) ) {
+            $parrafos[] = sprintf(
+                'Del total apropiado se ha comprometido el %s, obligado el %s y pagado el %s.',
+                $ratios['compromisos'],
+                $ratios['obligacion'],
+                $ratios['pagos']
+            );
+        }
 
         return [ 'titulo' => 'Análisis cuantitativo', 'parrafos' => $parrafos, 'metricas' => $metricas ];
     }
