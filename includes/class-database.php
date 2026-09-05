@@ -357,6 +357,10 @@ class Database {
         }
 
         $wpdb->query( 'COMMIT' );
+
+        // Any import invalidates the Presupuesto module's cached aggregates.
+        \SysmanSuite\Presupuesto\Repository::limpiar_cache();
+
         $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros en {$table_name} ({$label})." );
         return $inserted;
     }

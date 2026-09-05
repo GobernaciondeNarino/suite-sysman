@@ -6,6 +6,8 @@
 
 define( 'ABSPATH', sys_get_temp_dir() . '/' );
 define( 'ARRAY_A', 'ARRAY_A' );
+define( 'MINUTE_IN_SECONDS', 60 );
+define( 'HOUR_IN_SECONDS', 3600 );
 
 // ─── Fake $wpdb ──────────────────────────────────────────────────
 class Fake_Wpdb {
@@ -73,6 +75,12 @@ function wp_unslash( $value ) {
 function current_time( $format ) {
     return date( $format );
 }
+function number_format_i18n( $number, $decimals = 0 ) {
+    return number_format( (float) $number, (int) $decimals, ',', '.' );
+}
+function esc_url_raw( $url ) { return $url; }
+function rest_url( $path = '' ) { return 'https://ejemplo.test/wp-json/' . ltrim( $path, '/' ); }
+function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }
 
 // ─── Fake Database with the plugin's table whitelist ─────────────
 // (Must be defined before class-visualizer.php references it; the real
@@ -101,3 +109,5 @@ class Database {
 require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';
+require_once dirname( __DIR__ ) . '/includes/Presupuesto/Repository.php';
+require_once dirname( __DIR__ ) . '/includes/Presupuesto/Analysis.php';
