@@ -270,6 +270,11 @@ sisman-suite/
 
 ## Changelog
 
+### 5.10.1
+- **Fix**: el panel "Datos a Graficar" mostraba los contadores en `0 REGISTROS / 0 SERIES / —` aunque nunca se hubiera consultado. La regla `.sysman-data-panel__summary { display: grid }` tiene la misma especificidad que el `[hidden] { display: none }` del navegador y, al ir después, lo anulaba
+- **Nuevo: diagnostico automatico de Vistas.** Cuando la Vista no devuelve registros, el panel ya no dice solo "0": explica cual de las condiciones del cruce falla — si Plan Presupuestal no tiene rubros con `movimiento = SI`, si Ejecucion de Gastos no tiene datos del periodo (o los tiene pero con otro valor de `movimiento`, listando cuales), si los codigos cruzan pero en años/meses distintos (mostrando los periodos disponibles en cada tabla), o si `pp.codigo` y `eg.codigocuenta` no coinciden en formato (con ejemplos de ambos)
+- **Robustez**: `loadDependencias()` ya no rompe la pantalla de configuracion si la respuesta REST no es una lista (por ejemplo ante un HTTP 429 del rate-limiting)
+
 ### 5.10.0
 - **Fix critico (Vistas)**: los graficos en modo "Vistas" no se podian crear. Los paneles "Tablas" y "Vistas" compartian el mismo campo `sysman_value_columns[]` y el codigo activaba/desactivaba el atributo `name` con jQuery para decidir cual enviaba. En un grafico nuevo el panel de Vistas se mostraba **sin ninguna columna Y** (la funcion que las carga solo se ejecutaba si el grafico ya estaba guardado como Vista), asi que al publicar no se enviaba fuente de datos alguna. Ahora cada panel tiene sus propios campos (`sysman_vista_value_columns[]`, `sysman_vista_aggregate`) y PHP guarda el conjunto que corresponde al modo activo
 - **Fix (Vistas)**: el panel de Vistas se rellena con las metricas por defecto (Apropiacion Vigente, Compromisos, Pagos) al abrir la pestaña, y las mantiene al alternar entre pestañas

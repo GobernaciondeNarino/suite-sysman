@@ -5,6 +5,7 @@
  */
 
 define( 'ABSPATH', sys_get_temp_dir() . '/' );
+define( 'ARRAY_A', 'ARRAY_A' );
 
 // ─── Fake $wpdb ──────────────────────────────────────────────────
 class Fake_Wpdb {

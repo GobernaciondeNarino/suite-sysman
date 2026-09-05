@@ -1566,6 +1566,12 @@
     width: 16px;
     height: 16px;
 }
+/* El display:grid/flex de estos bloques tiene la misma especificidad que la
+   regla [hidden]{display:none} del navegador y, al venir después, la ganaba:
+   los contadores se mostraban en 0 aunque el panel no se hubiera consultado. */
+.sysman-data-panel [hidden] {
+    display: none !important;
+}
 .sysman-data-panel__summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1649,4 +1655,33 @@
     line-height: 1.5;
     color: var(--sysman-gray-600, #6c757d);
     margin: 0;
+}
+.sysman-data-panel__diag {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #fcf3e3;
+    border-left: 3px solid #dba617;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #4a3a12;
+}
+.sysman-data-diag__title {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #8a6414;
+    margin-bottom: 6px;
+}
+.sysman-data-panel__diag ul {
+    margin: 0;
+    padding-left: 16px;
+    list-style: disc;
+}
+.sysman-data-panel__diag li {
+    margin: 0 0 4px;
+}
+.sysman-data-panel__diag li:last-child {
+    margin-bottom: 0;
 }
