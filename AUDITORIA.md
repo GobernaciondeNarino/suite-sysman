@@ -61,7 +61,18 @@
 - [x] **Contexto seguro.** D3plus v4 llama `crypto.randomUUID()`, que el navegador solo expone en HTTPS/localhost: en un sitio servido por HTTP plano la librería **no cargaba en absoluto**. Se añade un polyfill inyectado antes del bundle.
 - [x] **Locale `es_ES` → `es-ES`** (el valor anterior no coincide con la tabla de locales de la librería y caía al formato inglés).
 
-### 3.3 Pendiente (requiere decisión o herramientas externas)
+### 3.3 Implementado en v5.11.0 – v5.12.0 (módulos Gastos e Ingresos)
+
+- [x] **Importador incompleto.** La importación completa solo traía DIS y RES del auxiliar de cuentas: OBL y EGR nunca llegaban a la base de datos, así que la mitad de la cadena de ejecución no existía. Ahora se importan los cuatro tipos.
+- [x] **Botón «← Todas las dependencias» sin efecto.** El componente limpiaba su estado interno antes de publicarlo al coordinador de filtro cruzado; el suscriptor recibía el valor que ya tenía y descartaba el evento como redundante. Se publica primero y se limpia al recibir.
+- [x] **Lienzo del treemap recortado.** D3plus inserta su propio SVG en el contenedor, que colapsaba a 0 px de alto; con `overflow:hidden` el gráfico quedaba invisible pese a renderizarse correctamente.
+- [x] **Contraste del color de resalte.** `#348AFB` se usa en bordes, fondos, barras y anillos de foco, pero el texto usa `#0B62D6` (mismo azul oscurecido): sobre blanco `#348AFB` da 3,4:1 y WCAG AA exige 4,5:1 en texto normal.
+- [x] **Duplicación evitada al añadir Ingresos.** En vez de clonar el módulo, se parametrizaron por `modulo` el controlador REST, el motor de análisis y los componentes JS. Las rutas y atributos heredados (`dependencias`, `rubros`, `rubro`, `dependencia`, `[sysman_pre_*]`) se conservan como alias para no romper páginas publicadas.
+- [x] **Concordancia de género y plural en español.** Los textos generados producían «las tres primeras rubros» y «Todos los tipo de recursos». El plural y el género se resuelven ahora en PHP con constantes explícitas, no concatenando «s» en JS.
+- [x] **`porcrecaudado` excluido de las métricas agregables** de ingresos: es un porcentaje por fila y sumarlo no significa nada. El porcentaje se recalcula sobre los totales.
+- [x] **Rate-limiting** también en los endpoints públicos de los dos módulos nuevos (HTTP 429), y caché de agregados invalidada tras cada importación.
+
+### 3.4 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.

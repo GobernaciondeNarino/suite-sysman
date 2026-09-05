@@ -216,13 +216,14 @@ $datosPre = [
     'totales' => [ 'apropiacionvigente' => 10000.0, 'compromisos' => 7000.0, 'obligacion' => 5000.0, 'pagos' => 4000.0 ],
 ];
 
+$optsGas = [ 'campo' => 'apropiacionvigente', 'campo_label' => 'Apropiación Vigente', 'modulo' => 'gastos' ];
 foreach ( [ 'descripcion', 'cualitativo', 'cuantitativo' ] as $t ) {
-    $a = \SysmanSuite\Presupuesto\Analysis::generar( $t, 'dependencias', $ctxPre, $datosPre, [ 'campo' => 'apropiacionvigente' ] );
+    $a = \SysmanSuite\Presupuesto\Analysis::generar( $t, 'dimensiones', $ctxPre, $datosPre, $optsGas );
     check( "análisis {$t}: devuelve título", ! empty( $a['titulo'] ) );
     check( "análisis {$t}: devuelve al menos un párrafo", ! empty( $a['parrafos'] ) );
 }
 
-$cuant = \SysmanSuite\Presupuesto\Analysis::generar( 'cuantitativo', 'dependencias', $ctxPre, $datosPre, [] );
+$cuant = \SysmanSuite\Presupuesto\Analysis::generar( 'cuantitativo', 'dimensiones', $ctxPre, $datosPre, $optsGas );
 $labels = array_column( $cuant['metricas'], 'label' );
 check( 'cuantitativo: incluye el total', in_array( 'Total', $labels, true ) );
 check( 'cuantitativo: incluye el % comprometido', in_array( '% Comprometido', $labels, true ) );
@@ -230,12 +231,58 @@ $total = null;
 foreach ( $cuant['metricas'] as $m ) { if ( 'Total' === $m['label'] ) { $total = $m['crudo']; } }
 check( 'cuantitativo: el total suma las filas', abs( $total - 10000.0 ) < 0.01 );
 
-$vacio = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dependencias', $ctxPre, [ 'filas' => [] ], [] );
+$vacio = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dimensiones', $ctxPre, [ 'filas' => [] ], [] );
 check( 'análisis sin datos no revienta', ! empty( $vacio['parrafos'] ) );
 
 // Un tipo desconocido cae a descripción en lugar de fallar.
-$fallback = \SysmanSuite\Presupuesto\Analysis::generar( 'inventado', 'dependencias', $ctxPre, $datosPre, [] );
+$fallback = \SysmanSuite\Presupuesto\Analysis::generar( 'inventado', 'dimensiones', $ctxPre, $datosPre, [] );
 check( 'tipo de análisis desconocido cae a descripción', 'Descripción' === $fallback['titulo'] );
+
+// ─── Presupuesto: campos extra del atributo tooltip ──────────────
+$extra = \SysmanSuite\Presupuesto\Repository::validar_extra( [ 'compromisos', 'pagos', 'inventado', 'pagos', 'x; DROP TABLE y' ] );
+check( 'tooltip: conserva los campos válidos', [ 'compromisos', 'pagos' ] === $extra );
+check( 'tooltip: descarta lo no permitido y los duplicados', 2 === count( $extra ) );
+check( 'tooltip: lista vacía devuelve vacío', [] === \SysmanSuite\Presupuesto\Repository::validar_extra( [] ) );
+
+// ─── Ingresos: whitelist de campos y dimensiones ─────────────────
+$ing = '\SysmanSuite\Presupuesto\IngresosRepository';
+check( 'ingresos: campo válido se acepta', 'recaudosacumulados' === $ing::validar_campo( 'recaudosacumulados' ) );
+check( 'ingresos: campo inválido cae al valor por defecto', 'totalpresupuesto' === $ing::validar_campo( 'inventado' ) );
+check( 'ingresos: porcrecaudado NO es sumable', ! array_key_exists( 'porcrecaudado', $ing::CAMPOS ) );
+check( 'ingresos: dimensión válida se acepta', 'fuenterecurso' === $ing::validar_dimension( 'fuenterecurso' ) );
+check( 'ingresos: dimensión inválida cae a tiporecurso', 'tiporecurso' === $ing::validar_dimension( 'nombredependencia' ) );
+
+// ─── Ingresos: el análisis usa el vocabulario de recaudo ─────────
+$datosIng = [
+    'filas' => [
+        [ 'label' => 'Recursos propios', 'value' => 6000.0 ],
+        [ 'label' => 'SGP', 'value' => 3000.0 ],
+        [ 'label' => 'Regalías', 'value' => 1000.0 ],
+    ],
+    'totales' => [ 'totalpresupuesto' => 10000.0, 'recaudosacumulados' => 6500.0, 'recaudosmes' => 800.0, 'porrecaudar' => 3500.0 ],
+];
+$optsIng = [ 'campo' => 'totalpresupuesto', 'campo_label' => 'Total Presupuesto', 'modulo' => 'ingresos', 'dimension_label' => 'Tipo de recurso' ];
+
+$cualIng = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dimensiones', $ctxPre, $datosIng, $optsIng );
+$textoIng = implode( ' ', $cualIng['parrafos'] );
+check( 'ingresos: el cualitativo habla de recaudo', str_contains( $textoIng, 'recaudado' ) );
+check( 'ingresos: el cualitativo NO habla de compromisos', ! str_contains( $textoIng, 'comprometido' ) );
+
+$cuantIng = \SysmanSuite\Presupuesto\Analysis::generar( 'cuantitativo', 'dimensiones', $ctxPre, $datosIng, $optsIng );
+$labelsIng = array_column( $cuantIng['metricas'], 'label' );
+check( 'ingresos: el cuantitativo incluye % Recaudado', in_array( '% Recaudado', $labelsIng, true ) );
+check( 'ingresos: el cuantitativo NO incluye % Comprometido', ! in_array( '% Comprometido', $labelsIng, true ) );
+
+// El de gastos sigue hablando de ejecución.
+$cualGas = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dimensiones', $ctxPre, $datosPre, $optsGas );
+check( 'gastos: el cualitativo habla de compromisos',
+    str_contains( implode( ' ', $cualGas['parrafos'] ), 'comprometido' ) );
+
+// Concordancia de género en el detalle (rubros es masculino).
+$detGas = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'detalle', $ctxPre, $datosPre, $optsGas );
+$textoDet = implode( ' ', $detGas['parrafos'] );
+check( 'detalle de gastos: concordancia "los tres primeros rubros"',
+    ! str_contains( $textoDet, 'las tres primeras rubros' ) );
 
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";

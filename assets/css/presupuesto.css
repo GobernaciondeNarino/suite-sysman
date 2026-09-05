@@ -7,7 +7,13 @@
     --pre-primary: #1a5632;
     --pre-primary-light: #2d7a4a;
     --pre-primary-bg: rgba(26, 86, 50, 0.07);
-    --pre-accent: #0080c3;
+    /* Color de resaltado institucional para elementos seleccionables. */
+    --pre-resalte: #348AFB;
+    --pre-resalte-bg: rgba(52, 138, 251, 0.10);
+    /* Variante oscurecida del mismo azul para texto: #348AFB sobre blanco
+       queda en 3,4:1 y no alcanza el 4,5:1 que pide WCAG AA en texto normal. */
+    --pre-resalte-texto: #0B62D6;
+    --pre-accent: #348AFB;
     --pre-texto: #1d2327;
     --pre-suave: #5b636a;
     --pre-borde: #dcdfe3;
@@ -84,18 +90,23 @@
     min-height: 44px;
     padding: 0.5rem 0.9rem;
     margin-bottom: 0.5rem;
-    background: var(--pre-primary-bg);
-    border: 1px solid transparent;
+    background: var(--pre-resalte-bg);
+    border: 1px solid var(--pre-resalte);
     border-radius: var(--pre-radio);
-    color: var(--pre-primary);
+    color: var(--pre-resalte-texto);
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
 }
 
-.sysman-pre__breadcrumb:hover,
+.sysman-pre__breadcrumb:hover {
+    background: var(--pre-resalte);
+    color: #fff;
+}
+
 .sysman-pre__breadcrumb:focus-visible {
-    border-color: var(--pre-primary);
+    outline: 2px solid var(--pre-resalte);
+    outline-offset: 2px;
 }
 
 /* ── Buscador ────────────────────────────────────────────────── */
@@ -131,16 +142,15 @@
 .sysman-pre__item {
     position: relative;
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.35rem 1rem;
+    gap: 1rem;
     width: 100%;
     min-height: 44px;
     padding: 0.7rem 0.9rem 0.85rem;
     text-align: left;
     background: var(--pre-fondo);
-    border: 1px solid var(--pre-borde);
+    border: 1px solid var(--pre-resalte);
     border-radius: var(--pre-radio);
     cursor: pointer;
     font: inherit;
@@ -149,44 +159,35 @@
 }
 
 .sysman-pre__item:hover {
-    border-color: var(--pre-primary-light);
-    background: var(--pre-primary-bg);
+    background: var(--pre-resalte-bg);
 }
 
 .sysman-pre__item:focus-visible {
-    outline: 2px solid var(--pre-accent);
+    outline: 2px solid var(--pre-resalte);
     outline-offset: 1px;
 }
 
 .sysman-pre__item.is-activa {
-    border-color: var(--pre-primary);
-    border-left-width: 4px;
-    background: var(--pre-primary-bg);
+    border-width: 2px;
+    background: var(--pre-resalte-bg);
 }
 
 .sysman-pre__item-nombre {
-    flex: 1 1 55%;
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 600;
-    color: var(--pre-primary);
+    color: var(--pre-resalte-texto);
     line-height: 1.35;
 }
 
+/* Conteo y valor comparten linea con el nombre, alineados a la derecha. */
 .sysman-pre__item-cifras {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
+    flex: 0 0 auto;
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-.sysman-pre__item-rubros {
-    font-size: 0.8rem;
-    color: var(--pre-suave);
-}
-
-.sysman-pre__item-valor {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--pre-texto);
 }
 
 .sysman-pre__barra {
@@ -203,7 +204,7 @@
 .sysman-pre__barra > span {
     display: block;
     height: 100%;
-    background: var(--pre-primary-light);
+    background: var(--pre-resalte);
 }
 
 /* ── Maestro-detalle ─────────────────────────────────────────── */
@@ -658,4 +659,42 @@
     border-radius: 3px;
     font-size: 12px;
     cursor: help;
+}
+
+/* ── Ingresos: porcentaje recaudado ──────────────────────────── */
+.sysman-pre__rubro-pct {
+    flex: 0 0 auto;
+    min-width: 3.5rem;
+    text-align: right;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--pre-resalte-texto);
+    font-variant-numeric: tabular-nums;
+}
+
+.sysman-pre__progreso {
+    position: relative;
+    height: 26px;
+    margin: 0.2rem 0 1rem;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 13px;
+    overflow: hidden;
+}
+
+.sysman-pre__progreso-barra {
+    display: block;
+    height: 100%;
+    background: var(--pre-resalte);
+    border-radius: 13px 0 0 13px;
+}
+
+.sysman-pre__progreso-texto {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--pre-texto);
 }

@@ -110,4 +110,5 @@ require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Repository.php';
+require_once dirname( __DIR__ ) . '/includes/Presupuesto/IngresosRepository.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Analysis.php';
