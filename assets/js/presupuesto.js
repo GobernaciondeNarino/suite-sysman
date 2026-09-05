@@ -461,6 +461,8 @@
         var valor = cfg.valor || '';
         var clave = Coord.clave(cfg);
         var esIngresos = cfg.modulo === 'ingresos';
+        var filas = [];      // Filas cargadas del periodo, para filtrar en local.
+        var mostrado = '';   // Dimension que se esta mostrando ahora mismo.
 
         /* Sin seleccion el panel arranca con la primera dimension (la de mayor
            valor) en vez de quedarse en blanco. Se resuelve en local: no publica
@@ -472,18 +474,19 @@
             var params = base(cfg);
             params.limite = 1;
             return api('dimensiones', params).then(function (resp) {
-                var filas = resp.data || [];
-                return filas.length ? (filas[0].label || '') : '';
+                var primeras = resp.data || [];
+                return primeras.length ? (primeras[0].label || '') : '';
             });
         }
 
         function cargar() {
             cargando(el);
-            resolverValor().then(pintar).catch(function (e) { pintarError(el, e.message); });
+            resolverValor().then(pedir).catch(function (e) { pintarError(el, e.message); });
         }
 
-        function pintar(elegido) {
+        function pedir(elegido) {
             if (!elegido) {
+                filas = [];
                 pintarVacio(el, esIngresos
                     ? 'No hay cuentas de ingreso con movimiento en este periodo.'
                     : 'No hay dependencias con movimiento en este periodo.');
@@ -494,36 +497,69 @@
             params.valor = elegido;
 
             api('detalle', params).then(function (resp) {
-                var filas = resp.data || [];
-                var c = cuerpoDe(el);
+                filas = resp.data || [];
+                mostrado = elegido;
                 if (!filas.length) {
                     pintarVacio(el, '«' + elegido + '» no tiene registros con movimiento en este periodo.');
                     return;
                 }
-
-                c.innerHTML = '<p class="sysman-pre__resumen"><strong>' + esc(elegido) + '</strong> · '
-                    + Fmt.entero(filas.length) + ' '
-                    + (esIngresos
-                        ? (filas.length === 1 ? 'cuenta' : 'cuentas')
-                        : (filas.length === 1 ? 'rubro' : 'rubros')) + '</p>'
-                    + '<ul class="sysman-pre__rubros" role="list">' + filas.map(function (f) {
-                        var extra = (esIngresos && f.porcentaje_recaudado !== null && f.porcentaje_recaudado !== undefined)
-                            ? '<span class="sysman-pre__rubro-pct">' + esc(Fmt.pct(f.porcentaje_recaudado)) + '</span>' : '';
-                        // Codigo y valor en la primera linea; el nombre debajo,
-                        // porque suele ser largo y empujaba la cifra fuera de vista.
-                        return '<li class="sysman-pre__rubro" data-codigo="' + esc(f.codigo) + '" aria-expanded="false">'
-                            + '<button type="button" class="sysman-pre__rubro-tog">'
-                            + '<span class="sysman-pre__rubro-linea">'
-                            + '<span class="sysman-pre__rubro-flecha" aria-hidden="true">▶</span>'
-                            + '<span class="sysman-pre__rubro-codigo">' + esc(f.codigo) + '</span>'
-                            + extra
-                            + '<span class="sysman-pre__rubro-valor">' + Fmt.moneda(f.value) + '</span>'
-                            + '</span>'
-                            + '<span class="sysman-pre__rubro-nombre">' + esc(f.nombre) + '</span>'
-                            + '</button>'
-                            + '<div class="sysman-pre__rubro-cuerpo" hidden></div></li>';
-                    }).join('') + '</ul>';
+                pintar();
             }).catch(function (e) { pintarError(el, e.message); });
+        }
+
+        /* Repinta desde las filas ya cargadas: el buscador filtra en local,
+           sin volver a consultar el REST. */
+        function pintar() {
+            var c = cuerpoDe(el);
+            var campo = el.querySelector('[data-rol="buscar"]');
+            var texto = campo ? campo.value.trim().toLowerCase() : '';
+            var visibles = !texto ? filas : filas.filter(function (f) {
+                return ((f.codigo || '') + ' ' + (f.nombre || '')).toLowerCase().indexOf(texto) > -1;
+            });
+
+            var cuantos = esIngresos
+                ? (visibles.length === 1 ? 'cuenta' : 'cuentas')
+                : (visibles.length === 1 ? 'rubro' : 'rubros');
+
+            var resumen = '<p class="sysman-pre__resumen"><strong>' + esc(mostrado) + '</strong> · '
+                + Fmt.entero(visibles.length) + ' ' + cuantos
+                + (texto ? ' de ' + Fmt.entero(filas.length) : '') + '</p>';
+
+            if (!visibles.length) {
+                c.innerHTML = resumen + '<p class="sysman-pre__vacio">Ningún resultado coincide.</p>';
+                return;
+            }
+
+            c.innerHTML = resumen
+                + '<ul class="sysman-pre__rubros" role="list">' + visibles.map(function (f) {
+                    var extra = (esIngresos && f.porcentaje_recaudado !== null && f.porcentaje_recaudado !== undefined)
+                        ? '<span class="sysman-pre__rubro-pct">' + esc(Fmt.pct(f.porcentaje_recaudado)) + '</span>' : '';
+                    // Codigo y valor en la primera linea; el nombre debajo,
+                    // porque suele ser largo y empujaba la cifra fuera de vista.
+                    return '<li class="sysman-pre__rubro" data-codigo="' + esc(f.codigo) + '" aria-expanded="false">'
+                        + '<button type="button" class="sysman-pre__rubro-tog">'
+                        + '<span class="sysman-pre__rubro-linea">'
+                        + '<span class="sysman-pre__rubro-flecha" aria-hidden="true">▶</span>'
+                        + '<span class="sysman-pre__rubro-codigo">' + esc(f.codigo) + '</span>'
+                        + extra
+                        + '<span class="sysman-pre__rubro-valor">' + Fmt.moneda(f.value) + '</span>'
+                        + '</span>'
+                        + '<span class="sysman-pre__rubro-nombre">' + esc(f.nombre) + '</span>'
+                        + '</button>'
+                        + '<div class="sysman-pre__rubro-cuerpo" hidden></div></li>';
+                }).join('') + '</ul>';
+        }
+
+        if (cfg.buscador) {
+            var barra = document.createElement('div');
+            barra.className = 'sysman-pre__buscador';
+            var que = esIngresos ? 'cuenta o código' : 'rubro o código';
+            barra.innerHTML = '<input type="search" data-rol="buscar" placeholder="Buscar ' + que + '…"'
+                + ' aria-label="Buscar ' + que + '">';
+            el.insertBefore(barra, cuerpoDe(el));
+            barra.querySelector('input').addEventListener('input', function () {
+                if (filas.length) { pintar(); }
+            });
         }
 
         el.addEventListener('click', function (ev) {

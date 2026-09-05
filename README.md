@@ -291,6 +291,13 @@ sisman-suite/
 
 ## Changelog
 
+### 5.14.0 — Un solo párrafo y buscador en la ejecución
+- **Cada análisis es ahora un único párrafo**, con una redacción más amena y en tono institucional. Antes eran tres o cuatro frases sueltas; ahora la lectura fluye: *«La Gobernación de Nariño registra a septiembre de 2026 un total de $2.738.700.871.545 en apropiación vigente, distribuido entre 35 dependencias y considerando únicamente los registros con movimiento reportados en el sistema SYSMAN; la mayor asignación corresponde a Secretaria de Educacion, con $1.471.148.593.926 que equivalen al 53,7% del total.»*
+- **Los nombres dejan de gritar.** SYSMAN entrega «SECRETARIA DE EDUCACION» en mayúscula sostenida, que dentro de un párrafo se lee como un grito. Se convierten a capitalización normal respetando conectores (`de`, `y`, `del`…) y siglas del sector público (SGP, ICBF, IDSN, TIC…). No se inventan tildes: la fuente no las trae. Ajustable con los filtros `sysman_suite_nombre_legible` y `sysman_suite_entidad`.
+- **Detalles de redacción**: el mes va en minúscula dentro de la frase («a septiembre de 2026»), las enumeraciones cierran con «y» —y pasan a punto y coma cuando un nombre ya lleva «y» dentro—, y los nombres muy largos se recortan sin partir palabras.
+- **Buscador en la vista de ejecución.** `[sysman_gastos_ejecucion]` y `[sysman_ingresos_ejecucion]` traen un campo de búsqueda que filtra por código o por nombre. Filtra sobre las filas ya cargadas, sin volver a consultar el servidor, y el resumen indica cuántas coinciden («SECRETARIA DE EDUCACION · 12 rubros de 419»). Se desactiva con `buscador="no"`.
+- **Pruebas**: 106 aserciones (antes 88), con cobertura de la conversión de nombres y de la garantía de un solo párrafo por análisis. Verificado en navegador, incluido el filtrado por código y por nombre.
+
 ### 5.13.0 — Análisis en prosa y arranque con datos
 - **El análisis se publica como texto corrido.** `[sysman_gastos_analisis]` e `[sysman_ingresos_analisis]` ya no pintan título, etiqueta de ámbito, recuadro ni cuadrícula de métricas: solo párrafos, sin borde, sin fondo y sin márgenes propios, con la tipografía del tema. Se lee como un texto más de la página, que era el objetivo: que la ciudadanía entienda la información presentada.
 - **Las cifras del cuantitativo pasaron a los párrafos.** Antes vivían en un cuadro de métricas que ya no se dibuja; ahora el motor redacta el total, el promedio, la mediana, el máximo, el mínimo, la desviación estándar con su coeficiente de variación (traducido a «dispersión baja / moderada / muy desigual») y los porcentajes de ejecución o de recaudo. Las métricas siguen en la respuesta REST para quien construya sobre ella.
