@@ -133,21 +133,31 @@ $meses = [
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="3">
                         <div class="sysman-step-indicator">3</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Reservas', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Compromisos', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="4">
                         <div class="sysman-step-indicator">4</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Obligaciones', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="5">
                         <div class="sysman-step-indicator">5</div>
-                        <span class="sysman-step-label"><?php esc_html_e( 'Personal Nómina', 'sysman-suite' ); ?></span>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Egresos', 'sysman-suite' ); ?></span>
                     </div>
                     <div class="sysman-step-connector"></div>
                     <div class="sysman-step" data-step="6">
                         <div class="sysman-step-indicator">6</div>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Plan Presupuestal', 'sysman-suite' ); ?></span>
+                    </div>
+                    <div class="sysman-step-connector"></div>
+                    <div class="sysman-step" data-step="7">
+                        <div class="sysman-step-indicator">7</div>
+                        <span class="sysman-step-label"><?php esc_html_e( 'Personal Nómina', 'sysman-suite' ); ?></span>
+                    </div>
+                    <div class="sysman-step-connector"></div>
+                    <div class="sysman-step" data-step="8">
+                        <div class="sysman-step-indicator">8</div>
                         <span class="sysman-step-label"><?php esc_html_e( 'Ingresos', 'sysman-suite' ); ?></span>
                     </div>
                 </div>

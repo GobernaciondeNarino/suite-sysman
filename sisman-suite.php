@@ -3,7 +3,7 @@
  * Plugin Name: SYSMAN Suite
  * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
- * Version:     5.10.1
+ * Version:     5.11.0
  * Author:      Gobernación de Nariño
  * Author URI:  https://narino.gov.co
  * License:     GPL v2 or later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SYSMAN_SUITE_VERSION', '5.10.1' );
+define( 'SYSMAN_SUITE_VERSION', '5.11.0' );
 
 /** D3plus v4 bundle (@d3plus/core). Ships its own D3 modules. */
 define( 'SYSMAN_SUITE_D3PLUS_CDN', 'https://cdn.jsdelivr.net/npm/@d3plus/core@4.3.0/umd/d3plus-core.full.min.js' );
@@ -39,7 +39,7 @@ spl_autoload_register( function ( $class ) {
     $relative = substr( $class, strlen( $namespace ) );
 
     // Sub-namespace: SysmanSuite\Ejecucion\ClassName → includes/Ejecucion/ClassName.php
-    if ( str_starts_with( $relative, 'Ejecucion\\' ) || str_starts_with( $relative, 'DatosAbiertos\\' ) ) {
+    if ( str_contains( $relative, '\\' ) ) {
         $file = SYSMAN_SUITE_PATH . 'includes/' . str_replace( '\\', '/', $relative ) . '.php';
     } else {
         $file = SYSMAN_SUITE_PATH . 'includes/class-' . strtolower( str_replace( '_', '-', $relative ) ) . '.php';
@@ -81,6 +81,7 @@ final class Sysman_Suite {
 
         \SysmanSuite\Ejecucion\EjecucionModule::instance()->boot();
         \SysmanSuite\DatosAbiertos\DatosAbiertosModule::instance()->boot();
+        \SysmanSuite\Presupuesto\PresupuestoModule::instance()->boot();
 
         $this->register_hooks();
     }

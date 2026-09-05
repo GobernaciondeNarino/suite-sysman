@@ -270,6 +270,30 @@ sisman-suite/
 
 ## Changelog
 
+### 5.11.0 — Nuevo módulo Presupuesto
+Vistas presupuestales prediseñadas, publicables con shortcodes y enlazables entre sí.
+
+**Shortcodes** (catálogo copiable en *SYSMAN Suite → Presupuesto*):
+
+| Shortcode | Qué hace |
+|-----------|----------|
+| `[sysman_pre_treemap]` | Treemap de todas las dependencias por el campo elegido. Al hacer clic baja a los rubros de esa dependencia. |
+| `[sysman_pre_lista]` | Lista de dependencias con nº de rubros y valor, con buscador. |
+| `[sysman_pre_ejecucion]` | Ejecución de una dependencia por rubro: consolidado, modificaciones y cadena documental. |
+| `[sysman_pre_explora]` | Maestro-detalle: dependencias a la izquierda, su ejecución a la derecha. |
+| `[sysman_pre_analisis]` | Descripción, análisis cualitativo o cuantitativo generados de los datos. |
+| `[sysman_pre_selector]` | Desplegable que fija el filtro compartido de la página. |
+
+- **Filtrado cruzado opcional**: todos aceptan `enlazar="si|no"` (por defecto `si`). Los enlazados comparten el filtro de la página: al hacer clic en el treemap o la lista se actualizan el detalle, el análisis y el selector. Con `enlazar="no"` el elemento queda aislado. El atributo `grupo` permite tener dos conjuntos enlazados independientes en la misma página.
+- **Campo parametrizable**: `campo="apropiacionvigente"` (por defecto) y cualquiera de las 15 métricas de ejecución (compromisos, obligacion, pagos, saldodisponible, adicion, reduccion…), validadas contra una whitelist.
+- **Periodo automático**: si se omiten `anio`/`mes`, las vistas usan siempre el periodo más reciente con datos.
+- **Cadena de ejecución completa**: cada rubro despliega Disponibilidad (CDP) → Registro de compromiso (RP) → Obligación → Pago, anidados por `tipocpteafect`/`cmpteafectado` en una sola consulta. Los documentos cuyo comprobante padre está fuera del periodo se listan aparte en lugar de descartarse.
+- **Importador ampliado**: la importación completa ahora trae los 4 tipos del auxiliar (DIS, RES, **OBL** y **EGR**); antes solo DIS y RES, por lo que la mitad de la cadena no existía en la base de datos. La barra de progreso pasa de 6 a 8 pasos.
+- **Análisis automático**: la descripción resume qué se muestra; el cualitativo interpreta concentración (top 3 y Pareto 80%), niveles de ejecución y dispersión; el cuantitativo entrega total, promedio, mediana, máximo, mínimo, desviación, coeficiente de variación y los % comprometido/obligado/pagado. Cada frase se deriva de las cifras reales: si un ratio no se puede calcular, la frase se omite.
+- **REST**: `sysman-suite/v1/presupuesto/{periodos,dependencias,rubros,rubro,analisis}`, públicos y con rate-limiting por IP.
+- **Caché**: agregados cacheados 5 minutos e invalidados automáticamente tras cada importación.
+- **Pruebas**: 62 aserciones (antes 38), con cobertura del armado de la cadena documental (incluidos huérfanos y ciclos), la whitelist de campos y el motor de análisis. Verificado en navegador de punta a punta.
+
 ### 5.10.1
 - **Fix**: el panel "Datos a Graficar" mostraba los contadores en `0 REGISTROS / 0 SERIES / —` aunque nunca se hubiera consultado. La regla `.sysman-data-panel__summary { display: grid }` tiene la misma especificidad que el `[hidden] { display: none }` del navegador y, al ir después, lo anulaba
 - **Nuevo: diagnostico automatico de Vistas.** Cuando la Vista no devuelve registros, el panel ya no dice solo "0": explica cual de las condiciones del cruce falla — si Plan Presupuestal no tiene rubros con `movimiento = SI`, si Ejecucion de Gastos no tiene datos del periodo (o los tiene pero con otro valor de `movimiento`, listando cuales), si los codigos cruzan pero en años/meses distintos (mostrando los periodos disponibles en cada tabla), o si `pp.codigo` y `eg.codigocuenta` no coinciden en formato (con ejemplos de ambos)

@@ -149,6 +149,94 @@ check( 'nonce inválido: no guarda nada', [] === $GLOBALS['__test_meta'][103] );
 
 $_POST = [];
 
+// ─── Presupuesto: cadena documental DIS → RES → OBL → EGR ────────
+$repoPre = \SysmanSuite\Presupuesto\Repository::instance();
+
+function doc( $numero, $tipo, $afectaTipo = '', $afectaNum = '', $valor = 0 ): array {
+    return [
+        'numero' => $numero, 'tipocpte' => $tipo,
+        'tipocpteafect' => $afectaTipo, 'cmpteafectado' => $afectaNum,
+        'fecha' => '2026-05-10', 'tercero' => '900123', 'nombretercero' => 'CONSORCIO X',
+        'descripcion' => 'desc', 'nrodocumento' => 'CTO-1',
+        'valordebito' => $valor, 'valorcredito' => 0, 'saldoporejecutaresp' => 0,
+    ];
+}
+
+$filas = [
+    doc( 'D1', 'DIS', '', '', 1000 ),
+    doc( 'R1', 'RES', 'DIS', 'D1', 800 ),
+    doc( 'O1', 'OBL', 'RES', 'R1', 600 ),
+    doc( 'E1', 'EGR', 'OBL', 'O1', 500 ),
+    doc( 'R2', 'RES', 'DIS', 'D1', 150 ),
+    doc( 'D2', 'DIS', '', '', 2000 ),
+    doc( 'X9', 'OBL', 'RES', 'NO-EXISTE', 90 ),  // padre fuera del periodo
+];
+
+$cad = $repoPre->armar_cadena( $filas );
+
+check( 'cadena: dos disponibilidades raíz', 2 === count( $cad['documentos'] ) );
+check( 'cadena: la primera DIS tiene 2 compromisos', 2 === count( $cad['documentos'][0]['hijos'] ) );
+check( 'cadena: el compromiso R1 tiene su obligación',
+    1 === count( $cad['documentos'][0]['hijos'][0]['hijos'] ) );
+check( 'cadena: la obligación O1 tiene su egreso',
+    1 === count( $cad['documentos'][0]['hijos'][0]['hijos'][0]['hijos'] ) );
+check( 'cadena: el egreso es de tipo EGR',
+    'EGR' === $cad['documentos'][0]['hijos'][0]['hijos'][0]['hijos'][0]['tipo'] );
+check( 'cadena: la segunda DIS no tiene hijos', 0 === count( $cad['documentos'][1]['hijos'] ) );
+check( 'cadena: el documento sin padre queda como huérfano',
+    1 === count( $cad['huerfanos'] ) && 'X9' === $cad['huerfanos'][0]['numero'] );
+check( 'cadena: conteo por tipo correcto',
+    2 === $cad['conteo']['DIS'] && 2 === $cad['conteo']['RES']
+    && 2 === $cad['conteo']['OBL'] && 1 === $cad['conteo']['EGR'] );
+check( 'cadena: sin filas devuelve estructura vacía',
+    [] === $repoPre->armar_cadena( [] )['documentos'] );
+
+// Datos malformados (ciclo) no deben colgar la construcción.
+$ciclo = [ doc( 'A', 'DIS', 'DIS', 'A', 10 ) ];
+$res_ciclo = $repoPre->armar_cadena( $ciclo );
+check( 'cadena: un ciclo no provoca recursión infinita', 1 === count( $res_ciclo['documentos'] ) );
+
+// ─── Presupuesto: validación del campo métrico ───────────────────
+check( 'campo válido se acepta',
+    'compromisos' === \SysmanSuite\Presupuesto\Repository::validar_campo( 'compromisos' ) );
+check( 'campo inválido cae al valor por defecto',
+    'apropiacionvigente' === \SysmanSuite\Presupuesto\Repository::validar_campo( 'pagos; DROP TABLE x' ) );
+check( 'campo inexistente cae al valor por defecto',
+    'apropiacionvigente' === \SysmanSuite\Presupuesto\Repository::validar_campo( 'inventado' ) );
+
+// ─── Presupuesto: motor de análisis ──────────────────────────────
+$ctxPre = [ 'compania' => '001', 'anio' => 2026, 'mes' => 5 ];
+$datosPre = [
+    'filas' => [
+        [ 'label' => 'EDUCACION', 'value' => 5000.0 ],
+        [ 'label' => 'SALUD', 'value' => 3000.0 ],
+        [ 'label' => 'VIAS', 'value' => 1500.0 ],
+        [ 'label' => 'CULTURA', 'value' => 500.0 ],
+    ],
+    'totales' => [ 'apropiacionvigente' => 10000.0, 'compromisos' => 7000.0, 'obligacion' => 5000.0, 'pagos' => 4000.0 ],
+];
+
+foreach ( [ 'descripcion', 'cualitativo', 'cuantitativo' ] as $t ) {
+    $a = \SysmanSuite\Presupuesto\Analysis::generar( $t, 'dependencias', $ctxPre, $datosPre, [ 'campo' => 'apropiacionvigente' ] );
+    check( "análisis {$t}: devuelve título", ! empty( $a['titulo'] ) );
+    check( "análisis {$t}: devuelve al menos un párrafo", ! empty( $a['parrafos'] ) );
+}
+
+$cuant = \SysmanSuite\Presupuesto\Analysis::generar( 'cuantitativo', 'dependencias', $ctxPre, $datosPre, [] );
+$labels = array_column( $cuant['metricas'], 'label' );
+check( 'cuantitativo: incluye el total', in_array( 'Total', $labels, true ) );
+check( 'cuantitativo: incluye el % comprometido', in_array( '% Comprometido', $labels, true ) );
+$total = null;
+foreach ( $cuant['metricas'] as $m ) { if ( 'Total' === $m['label'] ) { $total = $m['crudo']; } }
+check( 'cuantitativo: el total suma las filas', abs( $total - 10000.0 ) < 0.01 );
+
+$vacio = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dependencias', $ctxPre, [ 'filas' => [] ], [] );
+check( 'análisis sin datos no revienta', ! empty( $vacio['parrafos'] ) );
+
+// Un tipo desconocido cae a descripción en lugar de fallar.
+$fallback = \SysmanSuite\Presupuesto\Analysis::generar( 'inventado', 'dependencias', $ctxPre, $datosPre, [] );
+check( 'tipo de análisis desconocido cae a descripción', 'Descripción' === $fallback['titulo'] );
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

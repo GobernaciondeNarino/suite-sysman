@@ -18,6 +18,9 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/Ejecucion/` — módulo de seguimiento de ejecución presupuestal
   (REST `gn-sisman/v1`, shortcode `[gn_ejecucion]`).
 - `includes/DatosAbiertos/` — exportes CSV/TXT/JSON de datos abiertos.
+- `includes/Presupuesto/` — módulo de vistas presupuestales prediseñadas
+  (shortcodes `[sysman_pre_*]`, REST `sysman-suite/v1/presupuesto`, motor de
+  análisis y filtrado cruzado entre shortcodes vía atributo `enlazar`).
 - `templates/` — vistas de admin y frontend. `assets/` — CSS/JS.
 
 ## Reglas del proyecto

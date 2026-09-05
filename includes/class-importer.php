@@ -13,6 +13,17 @@ class Importer {
     private Database $database;
     private Logger   $logger;
 
+    /**
+     * Document types of the budget execution chain, in order.
+     * numinforme=2 exposes each one through the tipo_cpte parameter.
+     */
+    public const CADENA_AUXILIAR = [
+        'DIS' => 'Disponibilidades (CDP)',
+        'RES' => 'Registros de compromiso (RP)',
+        'OBL' => 'Obligaciones',
+        'EGR' => 'Egresos (pagos)',
+    ];
+
     private const REPORT_LABELS = [
         'ejecucion' => 'Ejecución Presupuestal de Gastos',
         'auxiliar'   => 'Auxiliar Presupuestal por Cuentas',
@@ -252,22 +263,26 @@ class Importer {
     public function import_all( string $compania, int $anio, int $mes ): array {
         $results = [];
 
-        $this->update_status( 1, 6, 'Conectando con API SYSMAN...', 'ejecucion' );
+        $total = 8;
+
+        $this->update_status( 1, $total, 'Conectando con API SYSMAN...', 'ejecucion' );
         $results['ejecucion'] = $this->import_ejecucion( $compania, $anio, $mes );
 
-        $this->update_status( 2, 6, 'Importando Disponibilidades...', 'auxiliar' );
-        $results['auxiliar_dis'] = $this->import_auxiliar( $compania, $anio, $mes, 'DIS' );
+        // Full execution chain: CDP (DIS) -> RP (RES) -> Obligacion (OBL) -> Pago (EGR).
+        $paso = 2;
+        foreach ( self::CADENA_AUXILIAR as $tipo => $etiqueta ) {
+            $this->update_status( $paso, $total, "Importando {$etiqueta}...", 'auxiliar' );
+            $results[ 'auxiliar_' . strtolower( $tipo ) ] = $this->import_auxiliar( $compania, $anio, $mes, $tipo );
+            $paso++;
+        }
 
-        $this->update_status( 3, 6, 'Importando Reservas...', 'auxiliar' );
-        $results['auxiliar_res'] = $this->import_auxiliar( $compania, $anio, $mes, 'RES' );
-
-        $this->update_status( 4, 6, 'Conectando con API SYSMAN...', 'plan' );
+        $this->update_status( $paso++, $total, 'Conectando con API SYSMAN...', 'plan' );
         $results['plan'] = $this->import_plan( $compania, $anio, $mes );
 
-        $this->update_status( 5, 6, 'Conectando con API SYSMAN...', 'personal' );
+        $this->update_status( $paso++, $total, 'Conectando con API SYSMAN...', 'personal' );
         $results['personal'] = $this->import_personal( $compania, $anio );
 
-        $this->update_status( 6, 6, 'Conectando con API SYSMAN...', 'ingresos' );
+        $this->update_status( $paso, $total, 'Conectando con API SYSMAN...', 'ingresos' );
         $results['ingresos'] = $this->import_ingresos( $compania, $anio, $mes );
 
         delete_transient( 'sysman_import_status' );
