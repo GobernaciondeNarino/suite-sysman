@@ -325,6 +325,33 @@ $cuantIngProsa = implode( ' ', $cuantIng['parrafos'] );
 check( 'cuantitativo de ingresos: la prosa habla de recaudo', str_contains( $cuantIngProsa, 'recaudado' ) );
 check( 'cuantitativo de ingresos: NO habla de compromisos', ! str_contains( $cuantIngProsa, 'comprometido' ) );
 
+// ─── Redacción: un solo párrafo por análisis ─────────────────────
+$An = '\SysmanSuite\Presupuesto\Analysis';
+foreach ( [ 'descripcion', 'cualitativo', 'cuantitativo' ] as $t ) {
+    $unop = $An::generar( $t, 'dimensiones', $ctxPre, $datosPre, $optsGas );
+    check( "análisis {$t}: un solo párrafo", 1 === count( $unop['parrafos'] ) );
+    check( "análisis {$t}: termina en punto", str_ends_with( trim( $unop['parrafos'][0] ), '.' ) );
+    check( "análisis {$t}: no encadena punto y coma con punto",
+        ! str_contains( $unop['parrafos'][0], ';.' ) && ! str_contains( $unop['parrafos'][0], ',.' ) );
+}
+
+$desc = $An::generar( 'descripcion', 'dimensiones', $ctxPre, $datosPre, $optsGas );
+check( 'descripción: encabeza con la entidad', str_starts_with( $desc['parrafos'][0], 'La Gobernación de Nariño' ) );
+check( 'descripción: el mes va en minúscula dentro de la frase', str_contains( $desc['parrafos'][0], 'a mayo de 2026' ) );
+check( 'descripción: nombra la mayor asignación', str_contains( $desc['parrafos'][0], 'Educacion' ) );
+
+// ─── Nombres en mayúscula sostenida → forma legible ──────────────
+check( 'nombre: capitaliza y respeta conectores',
+    'Secretaria de Educacion' === $An::nombre_legible( 'SECRETARIA DE EDUCACION' ) );
+check( 'nombre: la "y" también es conector',
+    'Secretaria de Infraestructura y Minas' === $An::nombre_legible( 'SECRETARIA DE INFRAESTRUCTURA Y MINAS' ) );
+check( 'nombre: conserva las siglas conocidas',
+    'SGP-Educacion' === $An::nombre_legible( 'SGP-EDUCACION' ) );
+check( 'nombre: conserva siglas cortas', 'Fondo de TIC' === $An::nombre_legible( 'FONDO DE TIC' ) );
+check( 'nombre: no toca lo que ya viene en minúsculas',
+    'Recursos propios' === $An::nombre_legible( 'Recursos propios' ) );
+check( 'nombre: cadena vacía no revienta', '' === $An::nombre_legible( '' ) );
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

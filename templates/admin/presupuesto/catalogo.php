@@ -62,12 +62,13 @@ $tarjetas = [
             ? __( 'Detalle por cuenta', 'sysman-suite' )
             : __( 'Ejecución por rubro', 'sysman-suite' ),
         'desc'    => $ingresos
-            ? __( 'Cuentas del tipo o fuente elegida. Cada cuenta despliega su apropiado, modificaciones, presupuesto definitivo, la composición del recaudo y el porcentaje recaudado. Sin selección arranca con la primera del listado, para que no cargue en blanco.', 'sysman-suite' )
-            : __( 'Ejecución de una dependencia organizada por rubro. Cada rubro despliega su consolidado, sus modificaciones presupuestales y la cadena Disponibilidad → Compromiso → Obligación → Pago. Sin selección arranca con la primera dependencia, para que no cargue en blanco.', 'sysman-suite' ),
+            ? __( 'Cuentas del tipo o fuente elegida. Cada cuenta despliega su apropiado, modificaciones, presupuesto definitivo, la composición del recaudo y el porcentaje recaudado. Sin selección arranca con la primera del listado, para que no cargue en blanco, e incluye un buscador por código o nombre.', 'sysman-suite' )
+            : __( 'Ejecución de una dependencia organizada por rubro. Cada rubro despliega su consolidado, sus modificaciones presupuestales y la cadena Disponibilidad → Compromiso → Obligación → Pago. Sin selección arranca con la primera dependencia, para que no cargue en blanco, e incluye un buscador por código o nombre.', 'sysman-suite' ),
         'codigos' => [
             "[{$pre}_ejecucion]",
             "[{$pre}_ejecucion valor=\"{$ejemplo_val}\"]",
             "[{$pre}_ejecucion valor=\"{$ejemplo_val}\" enlazar=\"no\"]",
+            "[{$pre}_ejecucion buscador=\"no\"]",
         ],
     ],
     [
@@ -211,6 +212,11 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
                             ) );
                             ?>
                         </td>
+                    </tr>
+                    <tr>
+                        <td><code>buscador</code></td>
+                        <td><code>si</code></td>
+                        <td><?php esc_html_e( 'Campo de búsqueda en las vistas de lista y de ejecución. En la ejecución filtra por código o nombre sin volver a consultar el servidor. Con "no" se oculta.', 'sysman-suite' ); ?></td>
                     </tr>
                     <tr>
                         <td><code>grupo</code></td>

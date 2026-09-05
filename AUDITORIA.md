@@ -79,7 +79,13 @@
 - [x] **Nombre del rubro empujaba la cifra fuera de la vista.** Los nombres superan a menudo los 200 caracteres; código y valor van en la primera línea y el nombre debajo.
 - [x] **El panel de ejecución cargaba en blanco.** Sin selección mostraba «Seleccione una dependencia»; ahora arranca con la primera del listado, resolviéndola en local para no alterar el filtro compartido de la página.
 
-### 3.5 Pendiente (requiere decisión o herramientas externas)
+### 3.5 Implementado en v5.14.0 (redacción)
+
+- [x] **El análisis se leía como una lista de frases sueltas.** Cada tipo entrega ahora un único párrafo continuo, en tono institucional y con las cifras encadenadas dentro de la narración.
+- [x] **Nombres en mayúscula sostenida dentro del texto.** SYSMAN los entrega así; en un párrafo se leen como un grito. Se convierten a capitalización normal respetando conectores y siglas del sector público, sin inventar tildes que la fuente no trae.
+- [x] **Buscador en la vista de ejecución.** Con cientos de rubros por dependencia, encontrar uno exigía recorrer la lista entera. El filtro trabaja sobre las filas ya cargadas, sin peticiones adicionales.
+
+### 3.6 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
