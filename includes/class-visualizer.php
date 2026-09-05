@@ -158,6 +158,65 @@ class Visualizer {
             'side',
             'high'
         );
+
+        // Sits in the side column with low priority so it renders directly
+        // below the "Publicar" box.
+        add_meta_box(
+            'sysman_chart_data',
+            __( 'Datos a Graficar', 'sysman-suite' ),
+            [ $this, 'render_chart_data_panel' ],
+            'sysman_chart',
+            'side',
+            'low'
+        );
+    }
+
+    /**
+     * Render the "Datos a Graficar" side panel: a live summary of the rows the
+     * current configuration returns, so the editor can confirm the data before
+     * publishing.
+     */
+    public function render_chart_data_panel( \WP_Post $post ): void {
+        ?>
+        <div class="sysman-data-panel" id="sysman-data-panel">
+            <div class="sysman-data-panel__toolbar">
+                <button type="button" class="button button-secondary sysman-data-panel__refresh" id="sysman-refresh-data">
+                    <span class="dashicons dashicons-update" aria-hidden="true"></span>
+                    <?php esc_html_e( 'Consultar datos', 'sysman-suite' ); ?>
+                </button>
+            </div>
+
+            <div class="sysman-data-panel__summary" id="sysman-data-summary" hidden>
+                <div class="sysman-data-stat">
+                    <span class="sysman-data-stat__value" id="sysman-data-rows">0</span>
+                    <span class="sysman-data-stat__label"><?php esc_html_e( 'Registros', 'sysman-suite' ); ?></span>
+                </div>
+                <div class="sysman-data-stat">
+                    <span class="sysman-data-stat__value" id="sysman-data-series">0</span>
+                    <span class="sysman-data-stat__label"><?php esc_html_e( 'Series', 'sysman-suite' ); ?></span>
+                </div>
+                <div class="sysman-data-stat">
+                    <span class="sysman-data-stat__value" id="sysman-data-total">—</span>
+                    <span class="sysman-data-stat__label"><?php esc_html_e( 'Total', 'sysman-suite' ); ?></span>
+                </div>
+            </div>
+
+            <p class="sysman-data-panel__source" id="sysman-data-source" hidden></p>
+
+            <div class="sysman-data-panel__table-wrap" id="sysman-data-table-wrap" hidden>
+                <table class="sysman-data-panel__table">
+                    <thead id="sysman-data-thead"></thead>
+                    <tbody id="sysman-data-tbody"></tbody>
+                </table>
+            </div>
+
+            <p class="sysman-data-panel__more" id="sysman-data-more" hidden></p>
+
+            <p class="sysman-data-panel__msg" id="sysman-data-msg">
+                <?php esc_html_e( 'Configure la fuente de datos y pulse «Consultar datos» para ver aquí los registros que alimentarán la gráfica.', 'sysman-suite' ); ?>
+            </p>
+        </div>
+        <?php
     }
 
     /**
@@ -256,12 +315,28 @@ class Visualizer {
             }
         }
 
-        // Handle value_columns array (multiple Y columns)
-        if ( isset( $_POST['sysman_value_columns'] ) && is_array( $_POST['sysman_value_columns'] ) ) {
-            $value_columns = array_values( array_filter( array_map( 'sanitize_text_field', $_POST['sysman_value_columns'] ) ) );
+        // The Tablas and Vistas panels each submit their own fields. Persist the
+        // set belonging to the active mode into the canonical meta keys, so the
+        // query builders keep reading a single source of truth.
+        $is_vista       = 'vista' === sanitize_text_field( $_POST['sysman_data_source_mode'] ?? 'table' );
+        $columns_field  = $is_vista ? 'sysman_vista_value_columns' : 'sysman_value_columns';
+        $aggregate_field = $is_vista ? 'sysman_vista_aggregate' : 'sysman_aggregate';
+
+        if ( isset( $_POST[ $columns_field ] ) && is_array( $_POST[ $columns_field ] ) ) {
+            $value_columns = array_values( array_filter( array_map( 'sanitize_text_field', $_POST[ $columns_field ] ) ) );
             update_post_meta( $post_id, '_sysman_value_columns', $value_columns );
         } else {
             delete_post_meta( $post_id, '_sysman_value_columns' );
+        }
+
+        if ( isset( $_POST[ $aggregate_field ] ) ) {
+            update_post_meta( $post_id, '_sysman_aggregate', sanitize_text_field( $_POST[ $aggregate_field ] ) );
+        }
+
+        // A Vista never groups by a table column: clear leftovers from the
+        // Tablas panel so the saved config matches what the user sees.
+        if ( $is_vista ) {
+            delete_post_meta( $post_id, '_sysman_color_column' );
         }
 
         // Handle custom query. Only administrators may store SQL, and only
@@ -885,11 +960,7 @@ class Visualizer {
      * scripts print in the footer, so the late call still works).
      */
     public function enqueue_chart_assets(): void {
-        // D3.js and D3plus (URLs from settings)
-        $d3_url     = get_option( 'sysman_d3_cdn_url', 'https://d3js.org/d3.v5.min.js' );
-        $d3plus_url = get_option( 'sysman_d3plus_cdn_url', 'https://cdn.jsdelivr.net/npm/d3plus@2.0.2/build/d3plus.full.min.js' );
-        wp_enqueue_script( 'd3-v5', $d3_url, [], '5.16.0', true );
-        wp_enqueue_script( 'd3plus', $d3plus_url, [ 'd3-v5' ], '2.0.0', true );
+        self::enqueue_d3plus();
 
         wp_enqueue_style(
             'sysman-frontend',
@@ -901,9 +972,35 @@ class Visualizer {
         wp_enqueue_script(
             'sysman-frontend',
             SYSMAN_SUITE_URL . 'assets/js/frontend.js',
-            [ 'd3-v5', 'd3plus' ],
+            [ 'd3plus' ],
             SYSMAN_SUITE_VERSION,
             true
         );
+    }
+
+    /**
+     * Enqueue the D3plus v4 bundle (@d3plus/core).
+     *
+     * Since v4 the library ships its own D3 modules, so the separate D3 script
+     * the plugin used to load is no longer needed. v4 also calls
+     * crypto.randomUUID(), which browsers only expose in a secure context, so
+     * an inline polyfill runs first to keep plain-HTTP installs working.
+     */
+    public static function enqueue_d3plus(): void {
+        $url = get_option( 'sysman_d3plus_cdn_url', SYSMAN_SUITE_D3PLUS_CDN );
+
+        wp_register_script( 'd3plus', $url, [], SYSMAN_SUITE_D3PLUS_VERSION, true );
+
+        wp_add_inline_script(
+            'd3plus',
+            'if(!(window.crypto&&typeof window.crypto.randomUUID==="function")){'
+            . 'window.crypto=window.crypto||{};'
+            . 'window.crypto.randomUUID=function(){'
+            . 'return "10000000-1000-4000-8000-100000000000".replace(/[018]/g,function(c){'
+            . 'return (c^(Math.random()*16)>>(c/4)).toString(16);});};}',
+            'before'
+        );
+
+        wp_enqueue_script( 'd3plus' );
     }
 }

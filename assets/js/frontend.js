@@ -149,7 +149,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES');
+                            .height(height).locale('es-ES');
                         if (showTimeline) this.chart.time('label').timeline(true);
                         this.chart.render();
                         break;
@@ -161,7 +161,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(xConfig).xConfig(yConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -172,7 +172,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -183,7 +183,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -194,7 +194,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -205,7 +205,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -216,7 +216,7 @@
                             .select(target).color(colorFn)
                             .tooltipConfig(tooltipConfig).yConfig(yConfig).xConfig(xConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -225,7 +225,7 @@
                             .data(chartData).groupBy('group').value('value')
                             .select(target).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -234,7 +234,7 @@
                             .data(chartData).groupBy('group').value('value')
                             .select(target).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -243,7 +243,7 @@
                             .data(chartData).groupBy('group').sum('value')
                             .select(target).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -253,7 +253,7 @@
                             .metric('label').value('value')
                             .select(target).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(showLegend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                         break;
 
@@ -261,7 +261,7 @@
                         this.chart = new d3plus.BarChart()
                             .data(chartData).groupBy('group').x('label').y('value')
                             .select(target).color(colorFn)
-                            .height(height).locale('es_ES')
+                            .height(height).locale('es-ES')
                             .render();
                 }
             } catch (err) {

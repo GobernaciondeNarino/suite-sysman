@@ -36,9 +36,32 @@ function set_transient( $key, $value, $expiration = 0 ) {
     return true;
 }
 
+// ─── Post meta (in-memory) ───────────────────────────────────────
+$GLOBALS['__test_meta'] = [];
+function update_post_meta( $post_id, $key, $value ) {
+    $GLOBALS['__test_meta'][ $post_id ][ $key ] = $value;
+    return true;
+}
+function delete_post_meta( $post_id, $key ) {
+    unset( $GLOBALS['__test_meta'][ $post_id ][ $key ] );
+    return true;
+}
+function get_post_meta( $post_id, $key = '', $single = true ) {
+    return $GLOBALS['__test_meta'][ $post_id ][ $key ] ?? '';
+}
+function wp_verify_nonce( $nonce, $action = -1 ) {
+    return 'valid-nonce' === $nonce ? 1 : false;
+}
+
 // ─── Sanitizers ──────────────────────────────────────────────────
 function sanitize_text_field( $str ) {
     return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $str ) ) );
+}
+function sanitize_textarea_field( $str ) {
+    return trim( strip_tags( (string) $str ) );
+}
+function absint( $v ) {
+    return abs( (int) $v );
 }
 function sanitize_file_name( $name ) {
     return preg_replace( '/[^A-Za-z0-9._-]/', '-', (string) $name );

@@ -50,7 +50,18 @@
 - [x] **README.** Árbol del proyecto actualizado (tests, workflows, skill; log en uploads).
 - [x] **Exports públicos documentados.** El acceso sin nonce es intencional (datos abiertos); el abuso se mitiga con el rate-limiting anterior.
 
-### 3.2 Pendiente (requiere decisión o herramientas externas)
+### 3.2 Implementado en v5.10.0 (módulo de gráficos)
+
+- [x] **Modo "Vistas" no creaba gráficos.** Causa raíz: los paneles *Tablas* y *Vistas* compartían el campo `sysman_value_columns[]` y el JS quitaba/ponía el atributo `name` para elegir cuál enviaba. En un gráfico nuevo el panel de Vistas se abría **sin columnas Y** (`loadVistaValues()` solo corría si el gráfico ya estaba guardado como Vista), así que al publicar no viajaba ninguna fuente de datos. Reproducido en navegador y corregido dando campos propios a cada panel (`sysman_vista_value_columns[]`, `sysman_vista_aggregate`), con `save_meta()` eligiendo el conjunto según el modo activo.
+- [x] **Contaminación cruzada entre pestañas.** Agregar un filtro estando en Vistas volvía a llamar `loadColumns()`, que re-armaba el `name` del panel oculto de Tablas e inyectaba columnas ajenas. Eliminado al independizar los campos.
+- [x] **`select` de agregación de Vistas sin `name`.** Dependía por completo de un sincronizador JS; ahora envía `sysman_vista_aggregate`.
+- [x] **Panel "Datos a Graficar"** en la columna lateral bajo *Publicar*: registros, series, total, descripción de la fuente y tabla con los datos reales antes de publicar.
+- [x] **Migración D3plus v2 → v4** (`@d3plus/core@4.3.0`): el paquete `d3plus` está congelado en 2.1.3 y sin mantenimiento. API encadenable compatible, verificada método por método y renderizando los 11 tipos de gráfico.
+- [x] **D3 ya no se carga por separado** (v4 incluye sus módulos de D3): una petición menos y se elimina la opción `sysman_d3_cdn_url`.
+- [x] **Contexto seguro.** D3plus v4 llama `crypto.randomUUID()`, que el navegador solo expone en HTTPS/localhost: en un sitio servido por HTTP plano la librería **no cargaba en absoluto**. Se añade un polyfill inyectado antes del bundle.
+- [x] **Locale `es_ES` → `es-ES`** (el valor anterior no coincide con la tabla de locales de la librería y caía al formato inglés).
+
+### 3.3 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.

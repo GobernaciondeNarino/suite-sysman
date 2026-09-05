@@ -1,7 +1,7 @@
 /**
  * SYSMAN Suite - Admin Chart Configuration Manager
  * Gobernacion de Narino
- * v2.1.1 - Fix: event delegation for dynamic Y-value column buttons
+ * v3.0.0 - D3plus v4 (@d3plus/core), Vista panel fixes, "Datos a Graficar" panel
  */
 (function ($) {
     'use strict';
@@ -157,7 +157,10 @@
         },
 
         bindEvents() {
-            // Data source tab switching
+            // Data source tab switching.
+            // Each panel owns its own field names (sysman_value_columns[] vs
+            // sysman_vista_value_columns[]), so nothing needs to be renamed on
+            // the fly — PHP reads whichever set matches the active mode.
             $(document).on('click', '.sysman-source-tab', function () {
                 const tab = $(this).data('tab');
                 $('.sysman-source-tab').removeClass('active').attr('aria-selected', 'false');
@@ -166,17 +169,17 @@
                 $(`#sysman-panel-${tab}`).show();
                 $('#sysman_data_source_mode').val(tab);
 
-                // Toggle name attributes so only the active tab's selects submit
                 if (tab === 'vista') {
-                    $('#sysman-value-columns-list select').removeAttr('name');
-                    $('#sysman-vista-value-columns-list select').attr('name', 'sysman_value_columns[]');
                     $('#sysman_aggregate_vista').val($('#sysman_aggregate').val());
+                    // Make sure the Vista panel is never shown empty: without
+                    // this, a brand new chart had no Y columns to configure and
+                    // saved with no data source at all.
+                    ChartConfigManager.ensureVistaValues();
                     ChartConfigManager.loadDependencias();
                 } else {
-                    $('#sysman-vista-value-columns-list select').removeAttr('name');
-                    $('#sysman-value-columns-list select').attr('name', 'sysman_value_columns[]');
                     $('#sysman_aggregate').val($('#sysman_aggregate_vista').val());
                 }
+                ChartConfigManager.refreshDataPanel();
             });
 
             // Sync aggregate between tabs
@@ -230,6 +233,7 @@
 
             $('#sysman_chart_colors').on('input change', () => this.updateColorPreview());
             $(document).on('click', '#sysman-refresh-preview', () => this.refreshPreview());
+            $(document).on('click', '#sysman-refresh-data', () => this.refreshDataPanel());
 
             $(document).on('click', '.sysman-toggle-section', function () {
                 const body = $(this).closest('.sysman-collapsible').find('.sysman-collapsible-body');
@@ -293,41 +297,44 @@
         },
 
         /**
-         * Initialize Vista tab (load saved values, dependencias).
+         * Initialize the Vista tab. The Y-column list is always populated (from
+         * the saved config, or the default execution metrics) so the panel is
+         * ready the moment the user switches to it.
          */
         initVistaTab() {
-            const mode = $('#sysman_data_source_mode').val();
-
-            // Set correct name attributes based on active mode
-            if (mode === 'vista') {
-                $('#sysman-value-columns-list select').removeAttr('name');
+            this.loadVistaValues();
+            if ($('#sysman_data_source_mode').val() === 'vista') {
                 this.loadDependencias();
+            }
+        },
+
+        /**
+         * Populate the Vista Y-column list if it is empty.
+         */
+        ensureVistaValues() {
+            if ($('#sysman-vista-value-columns-list .sysman-value-col-row').length === 0) {
                 this.loadVistaValues();
-            } else {
-                // Ensure table mode selects have names (they do by default from addValueColumn)
             }
         },
 
         loadVistaValues() {
             let savedValues = [];
             try {
-                savedValues = JSON.parse($('#sysman-saved-value-columns').val() || '[]');
+                // Dedicated field: the table panel consumes (and clears)
+                // #sysman-saved-value-columns, so Vista keeps its own copy.
+                savedValues = JSON.parse($('#sysman-saved-vista-value-columns').val() || '[]');
             } catch (e) { /* ignore */ }
 
-            $('#sysman-vista-value-columns-list').empty();
-            if (savedValues.length > 0) {
-                savedValues.forEach(v => this.addVistaValueColumn(v));
-            } else {
-                this.addVistaValueColumn('apropiacionvigente');
-                this.addVistaValueColumn('compromisos');
-                this.addVistaValueColumn('pagos');
+            if (savedValues.length === 0) {
+                savedValues = ['apropiacionvigente', 'compromisos', 'pagos'];
             }
+
+            $('#sysman-vista-value-columns-list').empty();
+            savedValues.forEach(v => this.addVistaValueColumn(v));
         },
 
         addVistaValueColumn(selectedValue) {
             const index = $('#sysman-vista-value-columns-list .sysman-value-col-row').length;
-            const isVistaActive = $('#sysman_data_source_mode').val() === 'vista';
-            const nameAttr = isVistaActive ? ' name="sysman_value_columns[]"' : '';
             let options = '<option value="">-- Seleccionar columna --</option>';
             VISTA_COLUMNS.forEach(col => {
                 const label = this.formatColumnName(col);
@@ -338,7 +345,7 @@
             const html = `
                 <div class="sysman-value-col-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
                     <span class="sysman-vista-value-badge" style="background:var(--sysman-primary,#1a5632);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">Y${index + 1}</span>
-                    <select${nameAttr} class="sysman-vista-value-col-select" style="flex:1;max-width:500px;">
+                    <select name="sysman_vista_value_columns[]" class="sysman-vista-value-col-select" style="flex:1;max-width:500px;">
                         ${options}
                     </select>
                     <button type="button" class="button sysman-vista-remove-value-col" aria-label="Eliminar" style="padding:0 8px;color:#dc3232;">&times;</button>
@@ -583,15 +590,45 @@
             area.html('<div style="text-align:center;padding:80px 20px;"><span class="spinner is-active" style="float:none;"></span><p>Cargando datos...</p></div>');
             status.text('Cargando...');
 
-            const postData = {
+            $.ajax({
+                url: sysmanCharts.ajaxUrl,
+                type: 'POST',
+                data: this.collectRequestData(),
+                success: (response) => {
+                    if (!response.success || !response.data.data || response.data.data.length === 0) {
+                        const msg = (response.data && response.data.message) || 'No hay datos disponibles. Verifique que la tabla tenga registros.';
+                        area.html(`<p style="text-align:center;padding:60px 20px;color:#999;">${this.escapeHtml(msg)}</p>`);
+                        status.text('Sin datos');
+                        this.paintDataPanel(null, msg);
+                        return;
+                    }
+                    this.renderD3PlusPreview(area, response.data.data, response.data.meta);
+                    status.text(`${response.data.data.length} registros`);
+                    this.paintDataPanel(response.data, '');
+                },
+                error: () => {
+                    area.html('<p style="text-align:center;padding:60px 20px;color:#dc3232;">Error al cargar los datos de vista previa.</p>');
+                    status.text('Error');
+                    this.paintDataPanel(null, 'Error al consultar los datos.');
+                },
+            });
+        },
+
+        /**
+         * Build the AJAX payload describing the current configuration.
+         * Shared by the live preview and the "Datos a Graficar" panel.
+         */
+        collectRequestData() {
+            const mode = $('#sysman_data_source_mode').val() || 'table';
+            return {
                 action:            'sysman_preview_chart',
                 preview_nonce:     sysmanCharts.previewNonce,
                 data_source_mode:  mode,
-                custom_query:      customQuery,
+                custom_query:      ($('#sysman_custom_query').val() || '').trim(),
                 data_table:        $('#sysman_data_table').val() || '',
                 group_column:      $('#sysman_group_column').val() || '',
                 value_columns:     mode === 'vista' ? this.getVistaValueColumns() : this.getValueColumns(),
-                color_column:      $('#sysman_color_column').val() || '',
+                color_column:      mode === 'vista' ? '' : ($('#sysman_color_column').val() || ''),
                 aggregate:         (mode === 'vista' ? $('#sysman_aggregate_vista').val() : $('#sysman_aggregate').val()) || 'SUM',
                 chart_type:        this.getSelectedChartType(),
                 chart_height:      $('#sysman_chart_height').val() || 400,
@@ -605,25 +642,133 @@
                 vista_dependencia: $('#sysman_vista_dependencia').val() || '',
                 vista_compania:    $('#sysman_vista_compania').val() || '001',
             };
+        },
+
+        /**
+         * Human-readable description of the configured data source.
+         */
+        describeSource() {
+            const mode = $('#sysman_data_source_mode').val() || 'table';
+            if (($('#sysman_custom_query').val() || '').trim()) return 'Query personalizada';
+
+            const agg = (mode === 'vista' ? $('#sysman_aggregate_vista').val() : $('#sysman_aggregate').val()) || 'SUM';
+            const anio = parseInt($('#sysman_filter_anio').val(), 10) || 0;
+            const mes = parseInt($('#sysman_filter_mes').val(), 10) || 0;
+            const periodo = [anio ? 'año ' + anio : '', mes ? 'mes ' + mes : ''].filter(Boolean).join(', ');
+
+            let base;
+            if (mode === 'vista') {
+                const dep = $('#sysman_vista_dependencia').val() || 'todas las dependencias';
+                base = `Vista: Plan Presupuestal + Ejecución de Gastos · ${dep}`;
+            } else {
+                const tabla = $('#sysman_data_table option:selected').text() || 'sin tabla';
+                const grupo = $('#sysman_group_column option:selected').text() || 'sin agrupación';
+                base = `${tabla} · agrupado por ${grupo}`;
+            }
+            return base + ` · ${agg}` + (periodo ? ` · ${periodo}` : '');
+        },
+
+        /**
+         * Fetch and display the rows that will feed the chart.
+         */
+        refreshDataPanel() {
+            if ($('#sysman-data-panel').length === 0) return;
+
+            const mode = $('#sysman_data_source_mode').val() || 'table';
+            const customQuery = ($('#sysman_custom_query').val() || '').trim();
+            const values = mode === 'vista' ? this.getVistaValueColumns() : this.getValueColumns();
+
+            if (!customQuery) {
+                if (mode === 'table' && (!$('#sysman_data_table').val() || !$('#sysman_group_column').val() || values.length === 0)) {
+                    this.paintDataPanel(null, 'Seleccione tabla, columna de agrupación y al menos un valor Y.');
+                    return;
+                }
+                if (mode === 'vista' && values.length === 0) {
+                    this.paintDataPanel(null, 'Seleccione al menos una columna de valor para la Vista.');
+                    return;
+                }
+            }
+
+            $('#sysman-data-msg').prop('hidden', false).text('Consultando…');
+            $('#sysman-data-summary, #sysman-data-table-wrap, #sysman-data-source, #sysman-data-more').prop('hidden', true);
 
             $.ajax({
                 url: sysmanCharts.ajaxUrl,
                 type: 'POST',
-                data: postData,
+                data: this.collectRequestData(),
                 success: (response) => {
                     if (!response.success || !response.data.data || response.data.data.length === 0) {
-                        area.html('<p style="text-align:center;padding:60px 20px;color:#999;">No hay datos disponibles. Verifique que la tabla tenga registros.</p>');
-                        status.text('Sin datos');
+                        this.paintDataPanel(null, (response.data && response.data.message) || 'La consulta no devolvió registros.');
                         return;
                     }
-                    this.renderD3PlusPreview(area, response.data.data, response.data.meta);
-                    status.text(`${response.data.data.length} registros`);
+                    this.paintDataPanel(response.data, '');
                 },
-                error: () => {
-                    area.html('<p style="text-align:center;padding:60px 20px;color:#dc3232;">Error al cargar los datos de vista previa.</p>');
-                    status.text('Error');
-                },
+                error: () => this.paintDataPanel(null, 'Error al consultar los datos.'),
             });
+        },
+
+        /**
+         * Paint the "Datos a Graficar" panel from an AJAX payload.
+         * Pass payload = null with a message to show an empty/error state.
+         */
+        paintDataPanel(payload, message) {
+            const panel = $('#sysman-data-panel');
+            if (panel.length === 0) return;
+
+            const summary = $('#sysman-data-summary');
+            const wrap = $('#sysman-data-table-wrap');
+            const source = $('#sysman-data-source');
+            const more = $('#sysman-data-more');
+            const msg = $('#sysman-data-msg');
+
+            if (!payload) {
+                summary.prop('hidden', true);
+                wrap.prop('hidden', true);
+                source.prop('hidden', true);
+                more.prop('hidden', true);
+                msg.prop('hidden', false).text(message || 'Sin datos.');
+                return;
+            }
+
+            const rows = payload.data || [];
+            const hasGroups = rows.some(r => r.group && r.group !== r.label);
+            const series = new Set(rows.map(r => r.group || r.label));
+            const total = rows.reduce((acc, r) => acc + (parseFloat(r.value) || 0), 0);
+
+            $('#sysman-data-rows').text(rows.length.toLocaleString('es-CO'));
+            $('#sysman-data-series').text(hasGroups ? series.size : 1);
+            $('#sysman-data-total').text(NumberFormatter.format(total));
+
+            source.prop('hidden', false).text(this.describeSource());
+
+            const head = '<tr>' + (hasGroups ? '<th>Serie</th>' : '') + '<th>Etiqueta</th><th class="num">Valor</th></tr>';
+            $('#sysman-data-thead').html(head);
+
+            const LIMIT = 25;
+            const body = rows.slice(0, LIMIT).map(r => {
+                const cells = [];
+                if (hasGroups) cells.push(`<td>${this.escapeHtml(String(r.group || ''))}</td>`);
+                cells.push(`<td>${this.escapeHtml(String(r.label || ''))}</td>`);
+                cells.push(`<td class="num">${this.escapeHtml(NumberFormatter.format(parseFloat(r.value) || 0))}</td>`);
+                return '<tr>' + cells.join('') + '</tr>';
+            }).join('');
+            $('#sysman-data-tbody').html(body);
+
+            wrap.prop('hidden', false);
+            summary.prop('hidden', false);
+            msg.prop('hidden', true);
+
+            if (rows.length > LIMIT) {
+                more.prop('hidden', false).text(`Mostrando ${LIMIT} de ${rows.length.toLocaleString('es-CO')} registros.`);
+            } else {
+                more.prop('hidden', true);
+            }
+        },
+
+        escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, c => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+            ));
         },
 
         renderD3PlusPreview(container, data, meta) {
@@ -673,7 +818,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'horizontal_bar':
                         new d3plus.BarChart()
@@ -681,7 +826,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(xConfig).xConfig(yConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'stacked_bar':
                         new d3plus.BarChart()
@@ -689,7 +834,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'grouped_bar':
                         new d3plus.BarChart()
@@ -697,7 +842,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'line':
                         new d3plus.LinePlot()
@@ -705,7 +850,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'area':
                         new d3plus.AreaPlot()
@@ -713,7 +858,7 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'stacked_area':
                         new d3plus.StackedArea()
@@ -721,41 +866,41 @@
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .yConfig(yConfig).xConfig(xConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'pie':
                         new d3plus.Pie()
                             .data(chartData).groupBy('group').value('value')
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'donut':
                         new d3plus.Donut()
                             .data(chartData).groupBy('group').value('value')
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'treemap':
                         new d3plus.Treemap()
                             .data(chartData).groupBy('group').sum('value')
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     case 'radar':
                         new d3plus.Radar()
                             .data(chartData).groupBy('group').metric('label').value('value')
                             .select(selector).color(colorFn).tooltipConfig(tooltipConfig)
                             .legend(meta.show_legend || false).legendPosition('bottom')
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                         break;
                     default:
                         new d3plus.BarChart()
                             .data(chartData).groupBy('group').x('label').y('value')
                             .select(selector).color(colorFn)
-                            .height(height).locale('es_ES').render();
+                            .height(height).locale('es-ES').render();
                 }
             } catch (err) {
                 console.error('D3plus admin preview error:', err);

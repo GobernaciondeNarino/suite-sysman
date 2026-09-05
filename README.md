@@ -270,6 +270,19 @@ sisman-suite/
 
 ## Changelog
 
+### 5.10.0
+- **Fix critico (Vistas)**: los graficos en modo "Vistas" no se podian crear. Los paneles "Tablas" y "Vistas" compartian el mismo campo `sysman_value_columns[]` y el codigo activaba/desactivaba el atributo `name` con jQuery para decidir cual enviaba. En un grafico nuevo el panel de Vistas se mostraba **sin ninguna columna Y** (la funcion que las carga solo se ejecutaba si el grafico ya estaba guardado como Vista), asi que al publicar no se enviaba fuente de datos alguna. Ahora cada panel tiene sus propios campos (`sysman_vista_value_columns[]`, `sysman_vista_aggregate`) y PHP guarda el conjunto que corresponde al modo activo
+- **Fix (Vistas)**: el panel de Vistas se rellena con las metricas por defecto (Apropiacion Vigente, Compromisos, Pagos) al abrir la pestaña, y las mantiene al alternar entre pestañas
+- **Fix (Vistas)**: se elimina la contaminacion cruzada entre pestañas — agregar un filtro estando en Vistas reactivaba el panel oculto de Tablas e inyectaba columnas ajenas en la configuracion guardada
+- **Fix (Vistas)**: `<select>` de agregacion del panel Vistas no tenia atributo `name`; solo se guardaba por un sincronizador de JS
+- **Nuevo: panel "Datos a Graficar"** en la columna lateral, justo debajo de "Publicar": muestra registros, series, total y una tabla con los datos reales que alimentaran la grafica antes de publicar, con la descripcion de la fuente (tabla/vista, agrupacion, agregacion y periodo)
+- **D3plus v2 → v4**: se migra del paquete `d3plus` (congelado en 2.1.3) a `@d3plus/core` v4.3.0. La API encadenable que usa el plugin es compatible, verificada tipo por tipo
+- **D3plus v4**: ya no se carga D3 por separado — v4 incluye sus propios modulos de D3. La opcion `sysman_d3_cdn_url` se elimina y el campo desaparece de Configuracion
+- **D3plus v4**: la libreria usa `crypto.randomUUID()`, disponible solo en contexto seguro. En sitios servidos por HTTP plano la libreria no cargaba en absoluto; se inyecta un polyfill antes del bundle para que siga funcionando
+- **D3plus v4**: locale corregido a `es-ES` (el valor anterior `es_ES` no coincide con la tabla de locales de la libreria y caia al formato en ingles)
+- **Migracion automatica**: las instalaciones existentes que apunten a cualquier CDN de d3plus v1/v2 se actualizan solas a la URL de v4
+- **Pruebas**: 38 aserciones (antes 31), con cobertura de regresion para el guardado de Vistas frente a Tablas. Los 11 tipos de grafico se verificaron renderizando con el `frontend.js` real sobre D3plus v4
+
 ### 5.9.0
 Implementación del plan de mejora de `AUDITORIA.md` (v5.8.0):
 - **Seguridad**: Rate-limiting por IP en todos los endpoints públicos (REST `sysman-suite/v1/chart/*`, `gn-sisman/v1/*` y exports AJAX `nopriv`): 120 req/min para lectura, 30 req/min para exports pesados, 20 req/min para descargas de Datos Abiertos; devuelve HTTP 429. Los administradores no se limitan; ajustable con el filtro `sysman_suite_rate_limit`

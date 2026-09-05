@@ -96,6 +96,59 @@ check( 'csv: @ se neutraliza', "'@cmd" === $method->invoke( $module, '@cmd' ) );
 check( 'csv: texto normal intacto', 'Secretaría TIC' === $method->invoke( $module, 'Secretaría TIC' ) );
 check( 'csv: vacío intacto', '' === $method->invoke( $module, '' ) );
 
+// ─── save_meta: los paneles Tablas / Vistas no se pisan ──────────
+// Regresión de v5.10.0: en modo Vista el panel de Tablas (oculto) enviaba
+// sysman_value_columns y contaminaba —o vaciaba— la configuración guardada.
+function guardar( array $post, \SysmanSuite\Visualizer $viz, int $post_id ): array {
+    $GLOBALS['__test_meta'][ $post_id ] = [];
+    $GLOBALS['__test_user_can']         = true;
+    $_POST                              = array_merge( [ 'sysman_chart_nonce' => 'valid-nonce' ], $post );
+    $viz->save_meta( $post_id );
+    return $GLOBALS['__test_meta'][ $post_id ];
+}
+
+$meta = guardar( [
+    'sysman_data_source_mode'      => 'vista',
+    'sysman_vista_value_columns'   => [ 'apropiacionvigente', 'pagos' ],
+    'sysman_vista_aggregate'       => 'AVG',
+    'sysman_value_columns'         => [ '' ],          // panel Tablas oculto
+    'sysman_aggregate'             => 'SUM',
+    'sysman_color_column'          => 'destino',       // resto del panel Tablas
+    'sysman_vista_dependencia'     => 'SECRETARIA TIC',
+], $visualizer, 101 );
+
+check( 'vista: guarda las columnas del panel Vista',
+    [ 'apropiacionvigente', 'pagos' ] === ( $meta['_sysman_value_columns'] ?? null ) );
+check( 'vista: usa la agregación del panel Vista',
+    'AVG' === ( $meta['_sysman_aggregate'] ?? null ) );
+check( 'vista: descarta la columna de color del panel Tablas',
+    ! isset( $meta['_sysman_color_column'] ) );
+check( 'vista: conserva la dependencia',
+    'SECRETARIA TIC' === ( $meta['_sysman_vista_dependencia'] ?? null ) );
+
+$meta = guardar( [
+    'sysman_data_source_mode'    => 'table',
+    'sysman_data_table'          => 'wp_sysman_ejecucion_gastos',
+    'sysman_group_column'        => 'nombrerubro',
+    'sysman_value_columns'       => [ 'compromisos' ],
+    'sysman_aggregate'           => 'SUM',
+    'sysman_vista_value_columns' => [ 'apropiacionvigente', 'pagos' ], // panel Vista oculto
+    'sysman_vista_aggregate'     => 'AVG',
+], $visualizer, 102 );
+
+check( 'tabla: guarda las columnas del panel Tablas',
+    [ 'compromisos' ] === ( $meta['_sysman_value_columns'] ?? null ) );
+check( 'tabla: usa la agregación del panel Tablas',
+    'SUM' === ( $meta['_sysman_aggregate'] ?? null ) );
+
+// Un nonce inválido no debe escribir nada.
+$GLOBALS['__test_meta'][103] = [];
+$_POST = [ 'sysman_chart_nonce' => 'malo', 'sysman_data_source_mode' => 'vista' ];
+$visualizer->save_meta( 103 );
+check( 'nonce inválido: no guarda nada', [] === $GLOBALS['__test_meta'][103] );
+
+$_POST = [];
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );
