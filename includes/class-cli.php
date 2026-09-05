@@ -36,6 +36,10 @@ class Cli {
      * [--tipo_cpte=<tipo_cpte>]
      * : Document type for auxiliar report. Default: RES
      *
+     * [--limpiar]
+     * : Borra el periodo en las cinco tablas antes de importar. Úselo si
+     *   sospecha que los datos del periodo están duplicados.
+     *
      * ## EXAMPLES
      *
      *     wp sysman import --anio=2024 --mes=6
@@ -54,10 +58,22 @@ class Cli {
         $plugin   = \Sysman_Suite::instance();
         $importer = $plugin->importer;
 
+        // Mismo cerrojo que la importación manual y la programada: dos
+        // importaciones a la vez duplicarían el periodo.
+        if ( ! $importer->adquirir_bloqueo( 'wp-cli' ) ) {
+            \WP_CLI::error( 'Ya hay una importación en curso. Espere a que termine.' );
+        }
+
+        if ( ! empty( $assoc_args['limpiar'] ) ) {
+            $borradas = $importer->limpiar_periodo( $compania, $anio, $mes, $report );
+            \WP_CLI::log( 'Periodo limpiado: ' . wp_json_encode( $borradas ) );
+        }
+
         \WP_CLI::log( "Importando datos SYSMAN: Compañía={$compania}, Año={$anio}, Mes={$mes}, Informe={$report}" );
 
         $start = microtime( true );
 
+        try {
         switch ( $report ) {
             case 'ejecucion':
                 $result = $importer->import_ejecucion( $compania, $anio, $mes );
@@ -77,6 +93,10 @@ class Cli {
                     $this->print_result( ucfirst( $key ), $result );
                 }
                 break;
+        }
+
+        } finally {
+            $importer->liberar_bloqueo();
         }
 
         $elapsed = round( microtime( true ) - $start, 2 );

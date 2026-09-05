@@ -10,6 +10,11 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/class-database.php` — DDL/DML de las 5 tablas `sysman_*` (whitelist de
   tablas y columnas; toda consulta dinámica debe validarse aquí).
 - `includes/class-importer.php` — consumo de la API SYSMAN (AJAX, cron y WP-CLI).
+  Solo puede correr una importación a la vez (cerrojo `sysman_import_lock`):
+  dos a la vez duplican el periodo.
+- `includes/class-import-scope.php` — qué identifica un registro de cada informe
+  y qué filas se borran antes de insertar. Si tocas el ámbito del borrado o el
+  de la inserción, ambos deben seguir coincidiendo o los datos se duplican.
 - `includes/class-visualizer.php` — CPT `sysman_chart`, construcción segura de
   consultas para gráficos D3plus y shortcode `[sysman_chart]`.
 - `includes/class-rest-api.php` — REST `sysman-suite/v1` (registros, stats, charts).

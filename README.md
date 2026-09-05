@@ -20,6 +20,9 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Importacion individual o masiva (todos los informes a la vez)
 - Extraccion automatica del envelope SYSMAN (`codigo`, `mensaje`, `cuerpo`)
 - Insercion por lotes de 500 registros para rendimiento optimo
+- Una sola importacion a la vez (cerrojo): dos simultaneas duplicarian el periodo
+- Verificacion de integridad tras cada carga; si sobran filas, se revierte
+- Verificador de duplicados y limpieza del periodo desde la interfaz
 - Logs detallados de cada importacion
 
 ### Modulo Ejecucion (Nuevo en v4.0.0)
@@ -238,6 +241,7 @@ sisman-suite/
 │   ├── class-logger.php          # Sistema de logs
 │   ├── class-updater.php         # Actualizaciones desde GitHub
 │   ├── class-cli.php             # Comandos WP-CLI
+│   ├── class-import-scope.php    # Clave natural y ambito de borrado (v5.15.0)
 │   ├── Ejecucion/                # Modulo Ejecucion
 │   │   ├── Schema.php            # Migracion de tablas (v5.0.0)
 │   │   ├── EjecucionModule.php   # Bootstrap del modulo
@@ -290,6 +294,17 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.15.0 — Importación sin duplicados
+Reportado en producción: tras varias importaciones, las cifras de un periodo salían infladas. La solución de urgencia fue borrar el año a mano (`DELETE FROM ga_sysman_ejecucion_gastos WHERE anio = 2026`) y reimportar. Esta versión evita que vuelva a pasar y da herramientas para detectarlo.
+
+- **Cerrojo de importación.** Dos importaciones simultáneas —el cron mientras alguien importa a mano, o un doble clic— hacían su `DELETE` antes de que la otra insertara, y las filas de ambas acababan conviviendo en el mismo periodo. Ahora solo puede haber una importación a la vez: la segunda se rechaza con un mensaje claro y el cron se salta su turno. El cerrojo usa `add_option()`, que es atómico, y se recupera solo si un proceso muere a media importación.
+- **Verificación de integridad en cada carga.** Tras el `DELETE` + `INSERT`, el importador cuenta las filas del periodo: si hay más de las que acaba de insertar, otro proceso escribió en paralelo y la transacción **se revierte** en lugar de dejar cifras infladas. Si hay menos, se registra un aviso: parte de lo insertado cae fuera del ámbito que se borra al reimportar.
+- **«Verificar duplicados»** en *Importar Datos*: compara, tabla por tabla y periodo por periodo, cuántas filas hay frente a cuántos registros distintos representan, y marca en rojo los periodos con filas de más.
+- **«Limpiar el periodo antes de importar»**: borra el periodo completo antes de traer los datos — la misma operación que se hizo a mano, ahora desde la interfaz y para las cinco tablas. Solo limpia las tablas del informe seleccionado; si se limpia el auxiliar, se reimportan los cuatro tipos de comprobante (DIS, RES, OBL, EGR) para no dejar la cadena a medias. También en WP-CLI: `wp sysman import --limpiar`.
+- **Aviso corregido en la pantalla de importación**: decía que se eliminaban «todos los datos del año seleccionado» cuando en realidad solo se reemplaza el periodo (compañía, año y mes) que se está importando.
+- **Nueva clase `Import_Scope`**: una sola fuente de verdad para qué identifica un registro de cada informe y qué filas se borran antes de insertar. Antes esa correspondencia estaba repetida en cinco métodos y nada garantizaba que el borrado cubriera lo que se insertaba.
+- **Pruebas**: 115 aserciones (antes 106), con cobertura del ámbito de borrado —incluida la regla de que nómina es anual y no tiene mes— y de la coherencia entre la clave natural y el ámbito que se limpia.
 
 ### 5.14.0 — Un solo párrafo y buscador en la ejecución
 - **Cada análisis es ahora un único párrafo**, con una redacción más amena y en tono institucional. Antes eran tres o cuatro frases sueltas; ahora la lectura fluye: *«La Gobernación de Nariño registra a septiembre de 2026 un total de $2.738.700.871.545 en apropiación vigente, distribuido entre 35 dependencias y considerando únicamente los registros con movimiento reportados en el sistema SYSMAN; la mayor asignación corresponde a Secretaria de Educacion, con $1.471.148.593.926 que equivalen al 53,7% del total.»*

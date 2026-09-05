@@ -85,7 +85,14 @@
 - [x] **Nombres en mayúscula sostenida dentro del texto.** SYSMAN los entrega así; en un párrafo se leen como un grito. Se convierten a capitalización normal respetando conectores y siglas del sector público, sin inventar tildes que la fuente no trae.
 - [x] **Buscador en la vista de ejecución.** Con cientos de rubros por dependencia, encontrar uno exigía recorrer la lista entera. El filtro trabaja sobre las filas ya cargadas, sin peticiones adicionales.
 
-### 3.6 Pendiente (requiere decisión o herramientas externas)
+### 3.6 Implementado en v5.15.0 (integridad de la importación)
+
+- [x] **Duplicación de datos entre importaciones (reportado en producción).** Dos importaciones solapadas —cron y manual, o un doble envío— hacían cada una su `DELETE` antes de que la otra insertara, de modo que las filas de ambas convivían en el mismo periodo y las cifras salían infladas. Ahora hay un cerrojo atómico (`add_option`) que impide dos importaciones a la vez, con recuperación automática si un proceso muere a media carga.
+- [x] **Verificación posterior a cada carga.** Si tras el `DELETE` + `INSERT` el periodo tiene más filas de las insertadas, la transacción se revierte y se registra el motivo, en lugar de dejar datos duplicados silenciosamente.
+- [x] **Detección y limpieza desde la interfaz.** «Verificar duplicados» compara filas frente a registros distintos por tabla y periodo; «Limpiar el periodo antes de importar» reproduce, acotada al informe elegido, la limpieza que había que hacer a mano en SQL.
+- [x] **Ámbito de importación centralizado** en `Import_Scope`: qué identifica un registro y qué se borra antes de insertar dejan de estar repetidos en cinco métodos.
+
+### 3.7 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
@@ -94,6 +101,7 @@
 - [ ] **Homogeneizar JS** (jQuery en admin vs. vanilla en frontend) — refactor mayor, sin impacto funcional.
 - [ ] **Accesibilidad UI admin**: pasada de contraste/focus-visible con el skill `ui-ux-pro-max` sobre `admin.css` y los acordeones de Ejecución.
 - [ ] **Crear `assets/icon-128.png`** (ícono del plugin para el updater y la pantalla de plugins).
+- [ ] **Índice único por clave natural** en las cinco tablas, que haría imposible la duplicación por construcción. Requiere confirmar antes, con datos reales, que el origen no emite legítimamente dos filas con la misma clave (por ejemplo, un rubro con dos fuentes de financiación); un índice mal elegido descartaría datos válidos en silencio.
 - [ ] **Reintentos ante fallos de la API** en `import_all()` (backoff simple); con las transacciones de v5.9.0 un fallo ya no destruye datos, solo pospone la actualización.
 
 ## 4. Metodología

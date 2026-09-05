@@ -352,6 +352,42 @@ check( 'nombre: no toca lo que ya viene en minúsculas',
     'Recursos propios' === $An::nombre_legible( 'Recursos propios' ) );
 check( 'nombre: cadena vacía no revienta', '' === $An::nombre_legible( '' ) );
 
+// ─── Ámbito de importación: sin duplicados entre borrado e inserción ─
+$IS = '\\SysmanSuite\\Import_Scope';
+
+check( 'importación: cubre las cinco tablas', 5 === count( $IS::tablas() ) );
+check( 'importación: gastos se identifica por código de cuenta',
+    [ 'compania', 'anio', 'mes', 'codigocuenta' ] === $IS::clave_natural( 'sysman_ejecucion_gastos' ) );
+check( 'importación: tabla desconocida no tiene clave', [] === $IS::clave_natural( 'wp_posts' ) );
+
+// El borrado previo tiene que cubrir exactamente lo que se va a insertar: si
+// se queda corto, las filas viejas sobreviven y las cifras salen infladas.
+[ $where, $params ] = $IS::scope_borrado( 'sysman_ejecucion_gastos', '001', 2026, 9 );
+check( 'borrado: gastos se limpia por compañía, año y mes',
+    'compania = %s AND anio = %d AND mes = %d' === $where && [ '001', 2026, 9 ] === $params );
+
+[ $whereAnual ] = $IS::scope_borrado( 'sysman_ejecucion_gastos', '001', 2026, 0 );
+check( 'borrado: mes 0 limpia el año completo', 'compania = %s AND anio = %d' === $whereAnual );
+
+[ $whereNomina, $paramsNomina ] = $IS::scope_borrado( 'sysman_personal_nomina', '001', 2026, 9 );
+check( 'borrado: nómina no tiene mes, se limpia por año',
+    'compania = %s AND anio = %d' === $whereNomina && [ '001', 2026 ] === $paramsNomina );
+check( 'nómina: la clave natural no incluye mes', ! $IS::tiene_mes( 'sysman_personal_nomina' ) );
+check( 'gastos: la clave natural incluye mes', $IS::tiene_mes( 'sysman_ejecucion_gastos' ) );
+
+// Toda clave natural empieza por el ámbito que se borra: si no, el borrado y
+// la detección de duplicados hablarían de cosas distintas.
+$coherentes = true;
+foreach ( $IS::CLAVES_NATURALES as $tabla => $clave ) {
+    $esperado = $IS::tiene_mes( $tabla )
+        ? [ 'compania', 'anio', 'mes' ]
+        : [ 'compania', 'anio' ];
+    if ( array_slice( $clave, 0, count( $esperado ) ) !== $esperado ) {
+        $coherentes = false;
+    }
+}
+check( 'toda clave natural empieza por el ámbito del borrado', $coherentes );
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

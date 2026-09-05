@@ -107,9 +107,21 @@ $meses = [
                     </div>
                 </div>
 
+                <div class="sysman-form-row">
+                    <div class="sysman-form-group">
+                        <label for="sysman-limpiar">
+                            <input type="checkbox" id="sysman-limpiar" aria-describedby="limpiar-desc">
+                            <?php esc_html_e( 'Limpiar el periodo antes de importar', 'sysman-suite' ); ?>
+                        </label>
+                        <p id="limpiar-desc" class="description">
+                            <?php esc_html_e( 'Borra el periodo completo (año y mes seleccionados) en las cinco tablas antes de traer los datos. Úselo si sospecha que las cifras están duplicadas o infladas.', 'sysman-suite' ); ?>
+                        </p>
+                    </div>
+                </div>
+
                 <div class="sysman-import-notice">
                     <span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
-                    <?php esc_html_e( 'Al importar, se eliminarán todos los datos del año seleccionado y se reemplazarán con los nuevos datos de la API.', 'sysman-suite' ); ?>
+                    <?php esc_html_e( 'Cada importación reemplaza únicamente el periodo seleccionado (compañía, año y mes); los demás periodos no se tocan. No se puede importar dos veces a la vez: mientras una importación está en curso, las demás —incluida la programada— esperan su turno.', 'sysman-suite' ); ?>
                 </div>
 
                 <div class="sysman-form-actions">
@@ -177,6 +189,28 @@ $meses = [
                 <div id="sysman-import-results" class="sysman-results-container" style="display:none;" role="alert" aria-live="polite">
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Integridad de datos -->
+    <div class="sysman-card">
+        <div class="sysman-card-header">
+            <h2>
+                <span class="dashicons dashicons-shield" aria-hidden="true"></span>
+                <?php esc_html_e( 'Integridad de los datos', 'sysman-suite' ); ?>
+            </h2>
+        </div>
+        <div class="sysman-card-body">
+            <p class="description">
+                <?php esc_html_e( 'Compara, para cada tabla y periodo, cuántas filas hay frente a cuántos registros distintos representan. Si sobran filas, el periodo se importó dos veces y las cifras salen infladas: la solución es reimportar ese periodo con «Limpiar el periodo antes de importar».', 'sysman-suite' ); ?>
+            </p>
+            <p>
+                <button type="button" id="sysman-check-dupes" class="button">
+                    <span class="dashicons dashicons-search" aria-hidden="true"></span>
+                    <?php esc_html_e( 'Verificar duplicados', 'sysman-suite' ); ?>
+                </button>
+            </p>
+            <div id="sysman-dupes-result" aria-live="polite"></div>
         </div>
     </div>
 

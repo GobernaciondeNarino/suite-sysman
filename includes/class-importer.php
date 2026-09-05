@@ -38,6 +38,82 @@ class Importer {
 
         add_action( 'wp_ajax_sysman_start_import', [ $this, 'ajax_start_import' ] );
         add_action( 'wp_ajax_sysman_import_status', [ $this, 'ajax_import_status' ] );
+        add_action( 'wp_ajax_sysman_check_duplicates', [ $this, 'ajax_check_duplicates' ] );
+    }
+
+    /** Nombre de la opción que hace de cerrojo entre importaciones. */
+    private const LOCK_OPTION = 'sysman_import_lock';
+
+    /** Un cerrojo más viejo que esto se considera huérfano y se recupera. */
+    private const LOCK_TTL = 1800;
+
+    /**
+     * Take the import lock, so two imports can never overlap.
+     *
+     * Dos importaciones simultáneas (el cron mientras alguien importa a mano,
+     * o un doble clic) hacen su DELETE antes de que la otra inserte, y las
+     * filas de ambas acaban conviviendo: el periodo queda duplicado y las
+     * cifras salen infladas. `add_option()` es atómico —option_name es único—
+     * así que sirve de cerrojo sin condiciones de carrera.
+     */
+    public function adquirir_bloqueo( string $quien ): bool {
+        $ahora = time();
+
+        if ( add_option( self::LOCK_OPTION, [ 'quien' => $quien, 'desde' => $ahora ], '', false ) ) {
+            return true;
+        }
+
+        $actual = get_option( self::LOCK_OPTION );
+        $desde  = (int) ( $actual['desde'] ?? 0 );
+
+        // Un proceso que murió a media importación dejaría el cerrojo puesto
+        // para siempre: pasado el TTL se recupera.
+        if ( $ahora - $desde > self::LOCK_TTL ) {
+            $this->logger->log(
+                'Cerrojo de importación huérfano (' . ( $actual['quien'] ?? '?' ) . "), se recupera para {$quien}.",
+                'warning'
+            );
+            update_option( self::LOCK_OPTION, [ 'quien' => $quien, 'desde' => $ahora ], false );
+            return true;
+        }
+
+        $this->logger->log(
+            'Importación rechazada: ya hay otra en curso (' . ( $actual['quien'] ?? '?' ) . ').',
+            'warning'
+        );
+        return false;
+    }
+
+    public function liberar_bloqueo(): void {
+        delete_option( self::LOCK_OPTION );
+    }
+
+    /** Quién tiene el cerrojo ahora mismo, si alguien lo tiene. */
+    public function importacion_en_curso(): array {
+        $actual = get_option( self::LOCK_OPTION );
+        return is_array( $actual ) ? $actual : [];
+    }
+
+    /** Qué tablas limpia cada informe. */
+    private const TABLAS_POR_INFORME = [
+        'ejecucion' => [ 'sysman_ejecucion_gastos' ],
+        'auxiliar'  => [ 'sysman_auxiliar_cuentas' ],
+        'plan'      => [ 'sysman_plan_presupuestal' ],
+        'personal'  => [ 'sysman_personal_nomina' ],
+        'ingresos'  => [ 'sysman_ejecucion_ingresos' ],
+    ];
+
+    /**
+     * Wipe the period before importing it, so a re-import starts from zero.
+     *
+     * Solo se limpian las tablas del informe que se va a importar: borrar las
+     * cinco para reimportar una sola dejaría las demás vacías.
+     *
+     * @param string $informe 'all' o la clave de un informe concreto.
+     */
+    public function limpiar_periodo( string $compania, int $anio, int $mes = 0, string $informe = 'all' ): array {
+        $tablas = self::TABLAS_POR_INFORME[ $informe ] ?? [];
+        return $this->database->purge_period( $compania, $anio, $mes, $tablas );
     }
 
     /**
@@ -327,6 +403,19 @@ class Importer {
             wp_send_json_error( [ 'message' => 'Mes no válido.' ] );
         }
 
+        if ( ! $this->adquirir_bloqueo( 'admin:' . wp_get_current_user()->user_login ) ) {
+            wp_send_json_error( [
+                'message' => 'Ya hay una importación en curso. Espere a que termine para no duplicar los datos.',
+            ] );
+        }
+
+        // Limpieza previa opcional: borra el periodo completo en las cinco
+        // tablas antes de importar. Es la salida cuando ya hay duplicados.
+        $limpiar = ! empty( $_POST['limpiar'] ) && 'no' !== $_POST['limpiar'];
+        if ( $limpiar ) {
+            $this->limpiar_periodo( $compania, $anio, $mes, $report );
+        }
+
         // Log import start
         $this->logger->log( '======================================================', 'info' );
         $this->logger->log( 'INICIO DE IMPORTACIÓN', 'info' );
@@ -337,6 +426,9 @@ class Importer {
         $start_time = microtime( true );
         $error_count = 0;
 
+        $results = [];
+
+        try {
         switch ( $report ) {
             case 'ejecucion':
                 $this->update_status( 1, 1, 'Importando...', 'ejecucion' );
@@ -345,9 +437,17 @@ class Importer {
                 break;
             case 'auxiliar':
                 $tipo_cpte = sanitize_text_field( $_POST['tipo_cpte'] ?? 'RES' );
-                $this->update_status( 1, 1, 'Importando...', 'auxiliar' );
-                $results = [ 'auxiliar' => $this->import_auxiliar( $compania, $anio, $mes, $tipo_cpte ) ];
-                if ( ! $results['auxiliar']['success'] ) $error_count++;
+                // Al limpiar se borra el auxiliar completo del periodo, así que
+                // hay que traer los cuatro tipos o los otros tres quedarían vacíos.
+                $tipos = $limpiar ? array_keys( self::CADENA_AUXILIAR ) : [ $tipo_cpte ];
+                $paso_aux = 1;
+                foreach ( $tipos as $tipo ) {
+                    $this->update_status( $paso_aux, count( $tipos ), 'Importando...', 'auxiliar' );
+                    $clave = 1 === count( $tipos ) ? 'auxiliar' : 'auxiliar_' . strtolower( $tipo );
+                    $results[ $clave ] = $this->import_auxiliar( $compania, $anio, $mes, $tipo );
+                    if ( ! $results[ $clave ]['success'] ) $error_count++;
+                    $paso_aux++;
+                }
                 break;
             case 'plan':
                 $this->update_status( 1, 1, 'Importando...', 'plan' );
@@ -372,6 +472,14 @@ class Importer {
                 break;
         }
 
+        } catch ( \Throwable $e ) {
+            // Un fallo a media importación no puede dejar el cerrojo puesto.
+            $this->liberar_bloqueo();
+            delete_transient( 'sysman_import_status' );
+            $this->logger->log( 'Importación interrumpida: ' . $e->getMessage(), 'error' );
+            wp_send_json_error( [ 'message' => 'La importación falló: ' . $e->getMessage() ] );
+        }
+
         delete_transient( 'sysman_import_status' );
         $this->save_last_import( $compania, $anio, $mes, $results );
 
@@ -391,9 +499,29 @@ class Importer {
         $this->logger->log( "Errores: {$error_count}", $error_count > 0 ? 'warning' : 'info' );
         $this->logger->log( '======================================================', 'info' );
 
+        $this->liberar_bloqueo();
+
         wp_send_json_success( [
             'message' => 'Importación completada.',
             'results' => $results,
+        ] );
+    }
+
+    /**
+     * AJAX: integrity report — rows vs. distinct records per table and period.
+     */
+    public function ajax_check_duplicates(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        $anio = absint( $_POST['anio'] ?? 0 );
+
+        wp_send_json_success( [
+            'anio'     => $anio,
+            'periodos' => $this->database->duplicate_report( $anio ),
         ] );
     }
 
@@ -427,12 +555,23 @@ class Importer {
         $anio     = (int) get_option( 'sysman_api_anio', current_time( 'Y' ) );
         $mes      = (int) get_option( 'sysman_api_mes', current_time( 'n' ) );
 
+        // Si alguien está importando a mano, el cron se salta este turno: dos
+        // importaciones a la vez duplican el periodo.
+        if ( ! $this->adquirir_bloqueo( 'cron' ) ) {
+            return;
+        }
+
         $this->logger->log( '======================================================', 'info' );
         $this->logger->log( 'INICIO DE IMPORTACIÓN PROGRAMADA (CRON)', 'info' );
         $this->logger->log( '======================================================', 'info' );
 
         $start = microtime( true );
-        $results = $this->import_all( $compania, $anio, $mes );
+
+        try {
+            $this->import_all( $compania, $anio, $mes );
+        } finally {
+            $this->liberar_bloqueo();
+        }
 
         $elapsed = round( microtime( true ) - $start, 2 );
         $this->logger->log( '======================================================', 'info' );

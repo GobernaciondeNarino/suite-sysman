@@ -18,6 +18,7 @@
             $('#sysman-import-btn').on('click', () => this.startImport());
             $('#sysman-report').on('change', () => this.toggleReportOptions());
             $('#sysman-compania').on('change', () => this.toggleCustomCompania());
+            $('#sysman-check-dupes').on('click', () => this.checkDuplicates());
         },
 
         toggleReportOptions() {
@@ -40,6 +41,72 @@
                 return $('#sysman-compania-custom').val() || '001';
             }
             return val;
+        },
+
+        /* Informe de integridad: filas frente a registros distintos. Si sobran
+           filas, ese periodo se importó dos veces y las cifras salen infladas. */
+        checkDuplicates() {
+            const btn = $('#sysman-check-dupes');
+            const caja = $('#sysman-dupes-result');
+
+            btn.prop('disabled', true);
+            caja.html('<p>Verificando…</p>');
+
+            $.ajax({
+                url: sysmanAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sysman_check_duplicates',
+                    nonce: sysmanAdmin.nonce,
+                    anio: $('#sysman-anio').val(),
+                },
+                success: (response) => {
+                    if (!response.success) {
+                        caja.html('<div class="notice notice-error inline"><p>'
+                            + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
+                        return;
+                    }
+                    caja.html(this.renderDuplicates(response.data.periodos || []));
+                },
+                error: () => {
+                    caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>');
+                },
+                complete: () => btn.prop('disabled', false),
+            });
+        },
+
+        renderDuplicates(periodos) {
+            if (!periodos.length) {
+                return '<div class="notice notice-warning inline"><p>No hay datos importados para ese año.</p></div>';
+            }
+
+            const conExceso = periodos.filter((p) => p.exceso > 0);
+            const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const num = (n) => Number(n).toLocaleString('es-CO');
+
+            let html = conExceso.length
+                ? '<div class="notice notice-error inline"><p><strong>Se detectaron ' + conExceso.length
+                  + ' periodo(s) con filas de más.</strong> Reimporte cada uno marcando «Limpiar el periodo antes de importar».</p></div>'
+                : '<div class="notice notice-success inline"><p>Sin duplicados: cada fila representa un registro distinto.</p></div>';
+
+            html += '<table class="widefat striped" style="margin-top:12px;"><thead><tr>'
+                + '<th>Tabla</th><th>Compañía</th><th>Año</th><th>Mes</th>'
+                + '<th style="text-align:right;">Filas</th><th style="text-align:right;">Registros</th>'
+                + '<th style="text-align:right;">De más</th></tr></thead><tbody>';
+
+            periodos.forEach((p) => {
+                html += '<tr' + (p.exceso > 0 ? ' style="background:#fcf0f1;"' : '') + '>'
+                    + '<td><code>' + esc(p.tabla) + '</code></td>'
+                    + '<td>' + esc(p.compania) + '</td>'
+                    + '<td>' + esc(p.anio) + '</td>'
+                    + '<td>' + (p.mes > 0 ? esc(p.mes) : '—') + '</td>'
+                    + '<td style="text-align:right;">' + num(p.filas) + '</td>'
+                    + '<td style="text-align:right;">' + num(p.unicas) + '</td>'
+                    + '<td style="text-align:right;"><strong>' + (p.exceso > 0 ? num(p.exceso) : '0') + '</strong></td>'
+                    + '</tr>';
+            });
+
+            return html + '</tbody></table>';
         },
 
         startImport() {
@@ -69,6 +136,7 @@
                 mes: $('#sysman-mes').val(),
                 report: $('#sysman-report').val(),
                 tipo_cpte: $('#sysman-tipo-cpte').val(),
+                limpiar: $('#sysman-limpiar').is(':checked') ? 1 : 0,
             };
 
             // Start polling for status updates
