@@ -39,7 +39,8 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Seis componentes por modulo: `treemap`, `lista`, `ejecucion`, `explora`, `analisis`, `selector`
 - Filtrado cruzado opcional entre shortcodes de la misma pagina (`enlazar="si|no"`, `grupo`)
 - Campo y tooltip parametrizables, validados contra una whitelist de metricas
-- Analisis descriptivo, cualitativo y cuantitativo derivados de los datos reales
+- Analisis descriptivo, cualitativo y cuantitativo derivados de los datos reales,
+  publicados como parrafos corridos sin recuadros, legibles para la ciudadania
 - Catalogo de shortcodes copiables en *SYSMAN Suite > Gastos* y *SYSMAN Suite > Ingresos*
 
 ### Base de Datos
@@ -289,6 +290,15 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.13.0 — Análisis en prosa y arranque con datos
+- **El análisis se publica como texto corrido.** `[sysman_gastos_analisis]` e `[sysman_ingresos_analisis]` ya no pintan título, etiqueta de ámbito, recuadro ni cuadrícula de métricas: solo párrafos, sin borde, sin fondo y sin márgenes propios, con la tipografía del tema. Se lee como un texto más de la página, que era el objetivo: que la ciudadanía entienda la información presentada.
+- **Las cifras del cuantitativo pasaron a los párrafos.** Antes vivían en un cuadro de métricas que ya no se dibuja; ahora el motor redacta el total, el promedio, la mediana, el máximo, el mínimo, la desviación estándar con su coeficiente de variación (traducido a «dispersión baja / moderada / muy desigual») y los porcentajes de ejecución o de recaudo. Las métricas siguen en la respuesta REST para quien construya sobre ella.
+- **El alcance va dentro del texto.** Al quitar el título y la línea «Ámbito: X», cada análisis abre situando al lector: qué métrica, de qué dependencia o recurso y de qué periodo.
+- **Redacción**: artículo delante de los porcentajes («reúnen el 75,4 % del total»), plural y género correctos de la dimensión de ingresos («las tres primeras fuentes de recurso», «los tres primeros tipos de recurso») y fin del «el total de total presupuesto». El género de cada dimensión vive en `IngresosRepository::DIMENSIONES_FEMENINO`, no se adivina en el texto.
+- **Nombre del rubro en su propia línea.** El código y la cifra van arriba; el nombre, debajo. Los nombres de rubro superan a menudo los 200 caracteres y, en una sola fila, empujaban el valor fuera de la vista. Los códigos largos también cortan antes de desplazar la cifra.
+- **`[sysman_gastos_ejecucion]` y `[sysman_ingresos_ejecucion]` arrancan con datos.** Sin `valor`, el panel carga la primera dependencia (o el primer tipo/fuente de recurso) en vez de mostrar «Seleccione una dependencia». La selección automática es local: no toca el filtro compartido, así que no arrastra al treemap ni a las listas de la página.
+- **Pruebas**: 88 aserciones (antes 76), con cobertura de la prosa del cuantitativo y de la concordancia de género y número en ingresos. Verificado en navegador con las plantillas y el JS reales.
 
 ### 5.12.0 — Gastos e Ingresos
 El módulo Presupuesto pasa a llamarse **Gastos** y se añade un módulo gemelo para **Ingresos**.

@@ -62,8 +62,8 @@ $tarjetas = [
             ? __( 'Detalle por cuenta', 'sysman-suite' )
             : __( 'Ejecución por rubro', 'sysman-suite' ),
         'desc'    => $ingresos
-            ? __( 'Cuentas del tipo o fuente elegida. Cada cuenta despliega su apropiado, modificaciones, presupuesto definitivo, la composición del recaudo y el porcentaje recaudado.', 'sysman-suite' )
-            : __( 'Ejecución de una dependencia organizada por rubro. Cada rubro despliega su consolidado, sus modificaciones presupuestales y la cadena Disponibilidad → Compromiso → Obligación → Pago.', 'sysman-suite' ),
+            ? __( 'Cuentas del tipo o fuente elegida. Cada cuenta despliega su apropiado, modificaciones, presupuesto definitivo, la composición del recaudo y el porcentaje recaudado. Sin selección arranca con la primera del listado, para que no cargue en blanco.', 'sysman-suite' )
+            : __( 'Ejecución de una dependencia organizada por rubro. Cada rubro despliega su consolidado, sus modificaciones presupuestales y la cadena Disponibilidad → Compromiso → Obligación → Pago. Sin selección arranca con la primera dependencia, para que no cargue en blanco.', 'sysman-suite' ),
         'codigos' => [
             "[{$pre}_ejecucion]",
             "[{$pre}_ejecucion valor=\"{$ejemplo_val}\"]",
@@ -84,7 +84,7 @@ $tarjetas = [
     ],
     [
         'titulo'  => __( 'Análisis automático', 'sysman-suite' ),
-        'desc'    => __( 'Texto generado a partir de los datos de la vista. La descripción resume qué se muestra, el cualitativo interpreta concentración y niveles de ejecución, y el cuantitativo entrega los estadísticos. Si está enlazado y hay un valor elegido, el análisis pasa a su detalle.', 'sysman-suite' ),
+        'desc'    => __( 'Texto generado a partir de los datos de la vista, en párrafos corridos y sin recuadros ni títulos: se lee como un texto más de la página, pensado para la ciudadanía. La descripción resume qué se muestra, el cualitativo interpreta concentración y niveles de ejecución, y el cuantitativo redacta los estadísticos. Si está enlazado y hay un valor elegido, el análisis pasa a su detalle.', 'sysman-suite' ),
         'codigos' => [
             "[{$pre}_analisis tipo=\"descripcion\"]",
             "[{$pre}_analisis tipo=\"cualitativo\"]",

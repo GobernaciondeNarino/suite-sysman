@@ -51,6 +51,12 @@ class IngresosRepository {
         'fuenterecurso' => 'Todas las fuentes de recurso',
     ];
 
+    /** Género gramatical de cada dimensión, para la concordancia del análisis. */
+    public const DIMENSIONES_FEMENINO = [
+        'tiporecurso'   => false,   // "los tipos de recurso"
+        'fuenterecurso' => true,    // "las fuentes de recurso"
+    ];
+
     private const CACHE_TTL = 5 * MINUTE_IN_SECONDS;
 
     private static ?self $instance = null;
@@ -81,6 +87,10 @@ class IngresosRepository {
 
     public static function etiqueta_todas( string $dimension ): string {
         return self::DIMENSIONES_TODAS[ self::validar_dimension( $dimension ) ];
+    }
+
+    public static function es_femenino( string $dimension ): bool {
+        return self::DIMENSIONES_FEMENINO[ self::validar_dimension( $dimension ) ];
     }
 
     private function tabla(): string {

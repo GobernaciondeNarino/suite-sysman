@@ -269,11 +269,13 @@ class RestController {
             $ctx,
             [ 'filas' => $filas, 'totales' => $totales ],
             [
-                'campo'           => $campo,
-                'campo_label'     => $this->etiqueta_campo( $r, $campo ),
-                'valor'           => $valor,
-                'modulo'          => $ingresos ? 'ingresos' : 'gastos',
-                'dimension_label' => $ingresos ? IngresosRepository::etiqueta_dimension( $dimension ) : 'dependencia',
+                'campo'              => $campo,
+                'campo_label'        => $this->etiqueta_campo( $r, $campo ),
+                'valor'              => $valor,
+                'modulo'             => $ingresos ? 'ingresos' : 'gastos',
+                'dimension_label'    => $ingresos ? IngresosRepository::etiqueta_dimension( $dimension ) : 'dependencia',
+                'dimension_plural'   => $ingresos ? IngresosRepository::etiqueta_plural( $dimension ) : 'dependencias',
+                'dimension_femenino' => $ingresos ? IngresosRepository::es_femenino( $dimension ) : true,
             ]
         );
 

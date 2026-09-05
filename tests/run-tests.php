@@ -284,6 +284,47 @@ $textoDet = implode( ' ', $detGas['parrafos'] );
 check( 'detalle de gastos: concordancia "los tres primeros rubros"',
     ! str_contains( $textoDet, 'las tres primeras rubros' ) );
 
+// ─── Ingresos: concordancia de la dimensión en el análisis ───────
+check( 'ingresos: "tipo de recurso" es masculino', ! $ing::es_femenino( 'tiporecurso' ) );
+check( 'ingresos: "fuente de recurso" es femenino', $ing::es_femenino( 'fuenterecurso' ) );
+
+$optsFuente = [
+    'campo'              => 'totalpresupuesto',
+    'campo_label'        => 'Total Presupuesto',
+    'modulo'             => 'ingresos',
+    'dimension_label'    => $ing::etiqueta_dimension( 'fuenterecurso' ),
+    'dimension_plural'   => $ing::etiqueta_plural( 'fuenterecurso' ),
+    'dimension_femenino' => $ing::es_femenino( 'fuenterecurso' ),
+];
+$cualFuente = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dimensiones', $ctxPre, $datosIng, $optsFuente );
+$textoFuente = implode( ' ', $cualFuente['parrafos'] );
+check( 'ingresos: plural correcto "fuentes de recurso"', str_contains( $textoFuente, 'fuentes de recurso' ) );
+check( 'ingresos: no pluraliza añadiendo "s" al final', ! str_contains( $textoFuente, 'fuente de recursos' ) );
+check( 'ingresos: concordancia femenina "las tres primeras"', str_contains( $textoFuente, 'las tres primeras' ) );
+
+$optsTipo = array_merge( $optsFuente, [
+    'dimension_label'    => $ing::etiqueta_dimension( 'tiporecurso' ),
+    'dimension_plural'   => $ing::etiqueta_plural( 'tiporecurso' ),
+    'dimension_femenino' => $ing::es_femenino( 'tiporecurso' ),
+] );
+$cualTipo = \SysmanSuite\Presupuesto\Analysis::generar( 'cualitativo', 'dimensiones', $ctxPre, $datosIng, $optsTipo );
+$textoTipo = implode( ' ', $cualTipo['parrafos'] );
+check( 'ingresos: plural correcto "tipos de recurso"', str_contains( $textoTipo, 'tipos de recurso' ) );
+check( 'ingresos: concordancia masculina "los tres primeros"', str_contains( $textoTipo, 'los tres primeros' ) );
+
+// ─── El cuantitativo se lee como prosa, no como tabla ────────────
+// La vista de análisis ya no pinta el cuadro de métricas: todas las cifras
+// tienen que estar dentro de los párrafos.
+$textoCuant = implode( ' ', $cuant['parrafos'] );
+check( 'cuantitativo: la prosa incluye el total', str_contains( $textoCuant, \SysmanSuite\Presupuesto\Analysis::moneda( 10000.0 ) ) );
+check( 'cuantitativo: la prosa incluye los porcentajes de ejecución',
+    str_contains( $textoCuant, 'comprometido' ) && str_contains( $textoCuant, 'pagado' ) );
+check( 'cuantitativo: la prosa incluye la dispersión', str_contains( $textoCuant, 'desviación estándar' ) );
+
+$cuantIngProsa = implode( ' ', $cuantIng['parrafos'] );
+check( 'cuantitativo de ingresos: la prosa habla de recaudo', str_contains( $cuantIngProsa, 'recaudado' ) );
+check( 'cuantitativo de ingresos: NO habla de compromisos', ! str_contains( $cuantIngProsa, 'comprometido' ) );
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

@@ -259,10 +259,13 @@
     background: var(--pre-fondo);
 }
 
+/* Dos lineas: codigo y cifra arriba, nombre debajo. El nombre del rubro
+   suele ser muy largo y, en una sola fila, empujaba el valor fuera de vista. */
 .sysman-pre__rubro-tog {
     display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
     width: 100%;
     min-height: 44px;
     padding: 0.65rem 0.8rem;
@@ -272,6 +275,12 @@
     cursor: pointer;
     font: inherit;
     color: inherit;
+}
+
+.sysman-pre__rubro-linea {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
 }
 
 .sysman-pre__rubro-tog:hover {
@@ -294,19 +303,24 @@
 }
 
 .sysman-pre__rubro-codigo {
+    flex: 1;
+    min-width: 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.8rem;
     color: var(--pre-suave);
-    white-space: nowrap;
+    /* Hay codigos de mas de 60 caracteres: que corten antes de desplazar
+       la cifra, que es lo que el lector busca primero. */
+    overflow-wrap: anywhere;
 }
 
 .sysman-pre__rubro-nombre {
-    flex: 1;
+    padding-left: 1.3rem;
     font-weight: 600;
     line-height: 1.35;
 }
 
 .sysman-pre__rubro-valor {
+    margin-left: auto;
     font-weight: 700;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -471,68 +485,39 @@
 }
 
 /* ── Analisis ────────────────────────────────────────────────── */
+/* Prosa continua para la ciudadania: sin titulo, sin borde, sin fondo y
+   sin margenes propios. La tipografia la pone el tema, para que el texto
+   se lea como un parrafo mas de la pagina. */
+.sysman-pre--analisis {
+    margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.sysman-pre--analisis .sysman-pre__cargando,
+.sysman-pre--analisis .sysman-pre__vacio {
+    padding: 0;
+    background: none;
+    border: 0;
+}
+
 .sysman-pre__analisis {
-    padding: 1rem 1.1rem;
-    background: var(--pre-fondo);
-    border: 1px solid var(--pre-borde);
-    border-left: 4px solid var(--pre-primary);
-    border-radius: var(--pre-radio);
-}
-
-.sysman-pre__analisis--cualitativo { border-left-color: var(--pre-accent); }
-.sysman-pre__analisis--cuantitativo { border-left-color: #ff7300; }
-
-.sysman-pre__analisis-titulo {
-    margin: 0 0 0.5rem;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--pre-suave);
-}
-
-.sysman-pre__analisis-ambito {
-    margin: 0 0 0.6rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--pre-primary);
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
 }
 
 .sysman-pre__analisis-parrafo {
-    margin: 0 0 0.65rem;
-    font-size: 0.95rem;
-    line-height: 1.6;
+    margin: 0 0 1em;
+    font-size: inherit;
+    line-height: inherit;
 }
 
-.sysman-pre__analisis-parrafo:last-of-type {
+.sysman-pre__analisis-parrafo:last-child {
     margin-bottom: 0;
-}
-
-.sysman-pre__metricas {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 0.5rem;
-    margin: 0.9rem 0 0;
-}
-
-.sysman-pre__metrica {
-    padding: 0.55rem 0.6rem;
-    background: var(--pre-primary-bg);
-    border-radius: 6px;
-}
-
-.sysman-pre__metrica dt {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--pre-suave);
-}
-
-.sysman-pre__metrica dd {
-    margin: 0.15rem 0 0;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--pre-primary);
-    font-variant-numeric: tabular-nums;
 }
 
 /* ── Selector ────────────────────────────────────────────────── */
