@@ -371,6 +371,12 @@
                 headers: { 'X-WP-Nonce': sysmanCharts.restNonce },
                 data: { compania, anio, mes },
                 success: (deps) => {
+                    // A failed/throttled REST call can return something that is
+                    // not an array; never let that break the whole config screen.
+                    if (!Array.isArray(deps)) {
+                        console.error('Respuesta inesperada al cargar dependencias', deps);
+                        return;
+                    }
                     const sel = $('#sysman_vista_dependencia');
                     const current = sel.val() || savedDep;
                     sel.empty().append('<option value="">-- Todas las dependencias --</option>');
@@ -599,7 +605,7 @@
                         const msg = (response.data && response.data.message) || 'No hay datos disponibles. Verifique que la tabla tenga registros.';
                         area.html(`<p style="text-align:center;padding:60px 20px;color:#999;">${this.escapeHtml(msg)}</p>`);
                         status.text('Sin datos');
-                        this.paintDataPanel(null, msg);
+                        this.paintDataPanel(null, msg, (response.data && response.data.diagnostico) || []);
                         return;
                     }
                     this.renderD3PlusPreview(area, response.data.data, response.data.meta);
@@ -698,7 +704,8 @@
                 data: this.collectRequestData(),
                 success: (response) => {
                     if (!response.success || !response.data.data || response.data.data.length === 0) {
-                        this.paintDataPanel(null, (response.data && response.data.message) || 'La consulta no devolvió registros.');
+                        const d = response.data || {};
+                        this.paintDataPanel(null, d.message || 'La consulta no devolvió registros.', d.diagnostico || []);
                         return;
                     }
                     this.paintDataPanel(response.data, '');
@@ -711,7 +718,7 @@
          * Paint the "Datos a Graficar" panel from an AJAX payload.
          * Pass payload = null with a message to show an empty/error state.
          */
-        paintDataPanel(payload, message) {
+        paintDataPanel(payload, message, diagnostico) {
             const panel = $('#sysman-data-panel');
             if (panel.length === 0) return;
 
@@ -727,8 +734,10 @@
                 source.prop('hidden', true);
                 more.prop('hidden', true);
                 msg.prop('hidden', false).text(message || 'Sin datos.');
+                this.paintDiagnostico(diagnostico);
                 return;
             }
+            this.paintDiagnostico([]);
 
             const rows = payload.data || [];
             const hasGroups = rows.some(r => r.group && r.group !== r.label);
@@ -763,6 +772,24 @@
             } else {
                 more.prop('hidden', true);
             }
+        },
+
+        /**
+         * Render the backend's explanation of why a query returned no rows.
+         */
+        paintDiagnostico(notes) {
+            const box = $('#sysman-data-diag');
+            if (box.length === 0) return;
+
+            if (!notes || notes.length === 0) {
+                box.prop('hidden', true).empty();
+                return;
+            }
+
+            const items = notes.map(n => `<li>${this.escapeHtml(String(n))}</li>`).join('');
+            box.prop('hidden', false).html(
+                '<strong class="sysman-data-diag__title">Por qué no hay datos</strong><ul>' + items + '</ul>'
+            );
         },
 
         escapeHtml(str) {

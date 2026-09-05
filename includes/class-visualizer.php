@@ -212,6 +212,8 @@ class Visualizer {
 
             <p class="sysman-data-panel__more" id="sysman-data-more" hidden></p>
 
+            <div class="sysman-data-panel__diag" id="sysman-data-diag" hidden></div>
+
             <p class="sysman-data-panel__msg" id="sysman-data-msg">
                 <?php esc_html_e( 'Configure la fuente de datos y pulse «Consultar datos» para ver aquí los registros que alimentarán la gráfica.', 'sysman-suite' ); ?>
             </p>
@@ -909,6 +911,21 @@ class Visualizer {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         $results = $wpdb->get_results( $query, ARRAY_A ) ?: [];
 
+        // No rows: work out why instead of just reporting "0 registros".
+        $diagnostico = [];
+        if ( empty( $results ) ) {
+            if ( 'vista' === $data_source_mode ) {
+                $diagnostico = $this->diagnose_vista( [
+                    'dependencia' => sanitize_text_field( $_POST['vista_dependencia'] ?? '' ),
+                    'compania'    => sanitize_text_field( $_POST['vista_compania'] ?? '001' ),
+                    'anio'        => absint( $_POST['filter_anio'] ?? 0 ),
+                    'mes'         => absint( $_POST['filter_mes'] ?? 0 ),
+                ] );
+            } elseif ( $wpdb->last_error ) {
+                $diagnostico[] = 'Error SQL: ' . $wpdb->last_error;
+            }
+        }
+
         $meta = [
             'chart_type'   => sanitize_text_field( $_POST['chart_type'] ?? 'bar' ),
             'chart_height' => absint( $_POST['chart_height'] ?? 400 ),
@@ -918,7 +935,11 @@ class Visualizer {
             'x_axis_title' => sanitize_text_field( $_POST['x_axis_title'] ?? '' ),
         ];
 
-        wp_send_json_success( [ 'data' => $results, 'meta' => $meta ] );
+        wp_send_json_success( [
+            'data'        => $results,
+            'meta'        => $meta,
+            'diagnostico' => $diagnostico,
+        ] );
     }
 
     /**
@@ -938,6 +959,178 @@ class Visualizer {
             'aggregate'   => strtoupper( sanitize_text_field( $post['aggregate'] ?? 'SUM' ) ),
             'value_cols'  => array_map( 'sanitize_text_field', $raw_value_cols ),
         ] );
+    }
+
+    /**
+     * Explain why a Vista query returned no rows.
+     *
+     * The Vista is an INNER JOIN between plan_presupuestal and
+     * ejecucion_gastos on codigo/codigocuenta + compania + anio + mes, with
+     * movimiento = 'SI' required on both sides. Any one of those conditions
+     * can empty the result, so each is checked in turn and the first broken
+     * link is reported back to the editor.
+     *
+     * @param array $config Same shape compose_vista_query() receives.
+     * @return string[] Human-readable findings, most relevant first.
+     */
+    public function diagnose_vista( array $config ): array {
+        global $wpdb;
+
+        $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
+
+        $compania = $config['compania'] ?: '001';
+        $dep      = $config['dependencia'] ?? '';
+        $anio     = (int) ( $config['anio'] ?? 0 );
+        $mes      = (int) ( $config['mes'] ?? 0 );
+
+        $notes = [];
+
+        // Period filter shared by both sides of the JOIN.
+        $period_pp = '';
+        $period_eg = '';
+        $pp_args   = [ $compania ];
+        $eg_args   = [ $compania ];
+        if ( $anio > 0 ) {
+            $period_pp .= ' AND pp.anio = %d';
+            $period_eg .= ' AND anio = %d';
+            $pp_args[]  = $anio;
+            $eg_args[]  = $anio;
+        }
+        if ( $mes > 0 ) {
+            $period_pp .= ' AND pp.mes = %d';
+            $period_eg .= ' AND mes = %d';
+            $pp_args[]  = $mes;
+            $eg_args[]  = $mes;
+        }
+
+        $dep_clause = '';
+        $pp_dep_args = $pp_args;
+        if ( '' !== $dep ) {
+            $dep_clause    = ' AND pp.nombredependencia = %s';
+            $pp_dep_args[] = $dep;
+        }
+
+        // 1) Plan Presupuestal side.
+        $pp_rows = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$pp}` pp WHERE pp.compania = %s AND pp.movimiento = 'SI'{$period_pp}{$dep_clause}",
+            $pp_dep_args
+        ) );
+        if ( 0 === $pp_rows ) {
+            $notes[] = sprintf(
+                'Plan Presupuestal no tiene rubros con movimiento = SI para compañía %s%s%s. Revise el filtro o importe el informe "Plan Presupuestal".',
+                $compania,
+                '' !== $dep ? ', dependencia "' . $dep . '"' : '',
+                $this->describe_period( $anio, $mes )
+            );
+            return $notes;
+        }
+        $notes[] = sprintf( 'Plan Presupuestal: %s rubros con movimiento = SI.', number_format_i18n( $pp_rows ) );
+
+        // 2) Ejecución de Gastos side.
+        $eg_rows = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$eg}` WHERE compania = %s AND movimiento = 'SI'{$period_eg}",
+            $eg_args
+        ) );
+        if ( 0 === $eg_rows ) {
+            $eg_any = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$eg}` WHERE compania = %s{$period_eg}",
+                $eg_args
+            ) );
+            if ( $eg_any > 0 ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $valores = $wpdb->get_col( "SELECT DISTINCT movimiento FROM `{$eg}` LIMIT 10" );
+                $notes[] = sprintf(
+                    'Ejecución de Gastos tiene %s registros en ese periodo, pero ninguno con movimiento = SI (valores encontrados: %s). Vuelva a importar "Ejecución Presupuestal de Gastos".',
+                    number_format_i18n( $eg_any ),
+                    implode( ', ', array_map( fn( $v ) => '"' . $v . '"', $valores ) ) ?: 'ninguno'
+                );
+            } else {
+                $notes[] = sprintf(
+                    'Ejecución de Gastos no tiene registros para compañía %s%s. Importe el informe "Ejecución Presupuestal de Gastos" para ese periodo.',
+                    $compania,
+                    $this->describe_period( $anio, $mes )
+                );
+            }
+            return $notes;
+        }
+        $notes[] = sprintf( 'Ejecución de Gastos: %s registros con movimiento = SI.', number_format_i18n( $eg_rows ) );
+
+        // 3) Both sides have data: the JOIN itself is what fails.
+        $join_rows = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$pp}` pp INNER JOIN `{$eg}` eg
+             ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania AND pp.anio = eg.anio AND pp.mes = eg.mes
+             WHERE pp.compania = %s AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'{$period_pp}{$dep_clause}",
+            $pp_dep_args
+        ) );
+
+        if ( $join_rows > 0 ) {
+            $notes[] = sprintf( 'El cruce sí produce %s filas: revise las columnas de valor seleccionadas.', number_format_i18n( $join_rows ) );
+            return $notes;
+        }
+
+        // Is it the period, or the account codes?
+        $join_no_period = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$pp}` pp INNER JOIN `{$eg}` eg ON pp.codigo = eg.codigocuenta
+             WHERE pp.compania = %s AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'{$dep_clause}",
+            '' !== $dep ? [ $compania, $dep ] : [ $compania ]
+        ) );
+
+        if ( $join_no_period > 0 ) {
+            $periodos_pp = $wpdb->get_results( $wpdb->prepare(
+                "SELECT DISTINCT anio, mes FROM `{$pp}` WHERE compania = %s AND movimiento = 'SI' ORDER BY anio DESC, mes DESC LIMIT 6",
+                $compania
+            ), ARRAY_A );
+            $periodos_eg = $wpdb->get_results( $wpdb->prepare(
+                "SELECT DISTINCT anio, mes FROM `{$eg}` WHERE compania = %s AND movimiento = 'SI' ORDER BY anio DESC, mes DESC LIMIT 6",
+                $compania
+            ), ARRAY_A );
+            $notes[] = 'Los códigos sí cruzan, pero no para el mismo año/mes en ambas tablas.';
+            $notes[] = 'Periodos en Plan Presupuestal: ' . $this->format_periods( $periodos_pp );
+            $notes[] = 'Periodos en Ejecución de Gastos: ' . $this->format_periods( $periodos_eg );
+            $notes[] = 'Importe ambos informes para el mismo año y mes.';
+            return $notes;
+        }
+
+        $notes[] = 'Ningún código de Plan Presupuestal (pp.codigo) coincide con un código de cuenta de Ejecución de Gastos (eg.codigocuenta).';
+        $ej_pp = $wpdb->get_col( $wpdb->prepare( "SELECT codigo FROM `{$pp}` WHERE compania = %s AND movimiento = 'SI' AND codigo <> '' LIMIT 3", $compania ) );
+        $ej_eg = $wpdb->get_col( $wpdb->prepare( "SELECT codigocuenta FROM `{$eg}` WHERE compania = %s AND movimiento = 'SI' AND codigocuenta <> '' LIMIT 3", $compania ) );
+        if ( $ej_pp ) {
+            $notes[] = 'Ejemplos pp.codigo: ' . implode( ' · ', $ej_pp );
+        }
+        if ( $ej_eg ) {
+            $notes[] = 'Ejemplos eg.codigocuenta: ' . implode( ' · ', $ej_eg );
+        }
+        $notes[] = 'Si los formatos difieren, vuelva a importar ambos informes desde la misma vigencia de SYSMAN.';
+
+        return $notes;
+    }
+
+    /**
+     * "para 2026-06" / "para el año 2026" / "" depending on the filters used.
+     */
+    private function describe_period( int $anio, int $mes ): string {
+        if ( $anio > 0 && $mes > 0 ) {
+            return sprintf( ' en %d-%02d', $anio, $mes );
+        }
+        if ( $anio > 0 ) {
+            return ' en el año ' . $anio;
+        }
+        return '';
+    }
+
+    /**
+     * Render a list of anio/mes rows as "2026-06, 2026-05, …".
+     */
+    private function format_periods( array $rows ): string {
+        if ( empty( $rows ) ) {
+            return 'ninguno';
+        }
+        $out = [];
+        foreach ( $rows as $r ) {
+            $out[] = sprintf( '%d-%02d', (int) $r['anio'], (int) $r['mes'] );
+        }
+        return implode( ', ', $out );
     }
 
     /**
