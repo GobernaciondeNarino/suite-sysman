@@ -21,6 +21,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          # pdo_sqlite alimenta las pruebas de consultas del módulo Presupuesto.
+          extensions: pdo_sqlite, sqlite3
           coverage: none
 
       - name: PHP syntax lint

@@ -295,6 +295,15 @@ sisman-suite/
 
 ## Changelog
 
+### 5.17.0 — Ingresos decía «no hay datos» con la tabla llena
+Reportado en producción: el módulo de Ingresos mostraba «No hay registros de total presupuesto para septiembre de 2026» aunque la tabla tenía 1.212 filas de ese mes.
+
+- **Causa**: las vistas agrupan por `tiporecurso` y esa columna viene vacía en todos los registros del periodo. La consulta filtraba `tiporecurso <> ''`, así que descartaba **todas** las filas y la página quedaba en blanco. El periodo estaba bien resuelto —septiembre era el último mes con datos—; lo que fallaba era la agrupación.
+- **Las filas sin clasificar ya no se descartan**: se agrupan bajo «Sin clasificar» (y «Sin dependencia» en Gastos, donde existía el mismo filtro). Antes su presupuesto desaparecía de los totales sin avisar: el treemap y los análisis mostraban una cifra global menor que la real.
+- **Dimensión con respaldo automático**: si el tipo de recurso viene vacío en todo el periodo pero la fuente de recurso sí tiene valores, las vistas agrupan por fuente y lo dicen. La resolución ocurre al renderizar el shortcode, de modo que las etiquetas («Todas las fuentes de recurso», el selector, los análisis) hablan de la dimensión que realmente se está usando. Con `dimension="…"` se sigue pudiendo fijar a mano.
+- **Aviso en el catálogo de Ingresos** cuando ese respaldo entra en juego, para que no sorprenda que el desplegable diga «Fuente de recurso».
+- **Pruebas contra SQL real**: 149 aserciones (antes 134). Las nuevas levantan una base SQLite en memoria con la forma exacta de los datos del sitio —`tiporecurso` vacío, `fuenterecurso` con un código— y comprueban que la vista deja de estar vacía, que el total agregado coincide con la suma de la tabla y que se puede abrir el grupo sin clasificar. El CI instala `pdo_sqlite` para ejecutarlas.
+
 ### 5.16.0 — Gráfico de avance de ejecución
 Nueva vista `[sysman_gastos_avance]` (y su gemela `[sysman_ingresos_avance]`): el porcentaje ejecutado por dependencia, con su propia descripción y sus análisis.
 

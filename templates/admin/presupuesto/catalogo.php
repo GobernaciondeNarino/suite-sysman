@@ -22,8 +22,14 @@ $periodo = $ctx['anio'] > 0
     ? \SysmanSuite\Helpers::month_name( (int) $ctx['mes'] ) . ' ' . (int) $ctx['anio']
     : __( 'sin datos importados', 'sysman-suite' );
 
-$grupo_label  = $ingresos ? __( 'tipo de recurso', 'sysman-suite' ) : __( 'dependencia', 'sysman-suite' );
-$grupo_plural = $ingresos ? __( 'tipos de recurso', 'sysman-suite' ) : __( 'dependencias', 'sysman-suite' );
+// La dimensión que de verdad se va a usar: si el tipo de recurso viene vacío en
+// todo el periodo, las vistas agrupan por fuente y el catálogo debe decir eso.
+$dim_util = $ingresos && $ctx['anio'] > 0
+    ? IngresosRepository::instance()->dimension_util( $ctx, 'tiporecurso' )
+    : 'tiporecurso';
+
+$grupo_label  = $ingresos ? mb_strtolower( IngresosRepository::etiqueta_dimension( $dim_util ) ) : __( 'dependencia', 'sysman-suite' );
+$grupo_plural = $ingresos ? IngresosRepository::etiqueta_plural( $dim_util ) : __( 'dependencias', 'sysman-suite' );
 $hoja_plural  = $ingresos ? __( 'cuentas de ingreso', 'sysman-suite' ) : __( 'rubros', 'sysman-suite' );
 $campo_def    = $ingresos ? 'totalpresupuesto' : 'apropiacionvigente';
 $ejemplo_val  = $ingresos ? 'Recursos propios' : 'SECRETARIA DE HACIENDA';
@@ -155,6 +161,20 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
             </div>
         </div>
     </div>
+
+    <?php if ( $ingresos && 'tiporecurso' !== $dim_util ) : ?>
+    <div class="notice notice-info">
+        <p>
+            <?php
+            echo esc_html( sprintf(
+                /* translators: %s: nombre de la dimensión usada */
+                __( 'En este periodo el tipo de recurso viene vacío en todos los registros, así que las vistas agrupan por %s. Puede fijar otra con el atributo dimension="…".', 'sysman-suite' ),
+                IngresosRepository::etiqueta_dimension( $dim_util )
+            ) );
+            ?>
+        </p>
+    </div>
+    <?php endif; ?>
 
     <?php if ( $ctx['anio'] <= 0 ) : ?>
     <div class="notice notice-warning">
