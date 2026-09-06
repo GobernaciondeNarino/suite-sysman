@@ -46,7 +46,7 @@ $tarjetas = [
             "[{$pre}_treemap]",
             $ingresos ? "[{$pre}_treemap campo=\"recaudosacumulados\"]" : "[{$pre}_treemap campo=\"compromisos\"]",
             "[{$pre}_treemap tooltip=\"" . ( $ingresos ? 'apropiado,recaudosacumulados,porrecaudar' : 'apropiacionvigente,compromisos,pagos' ) . "\"]",
-            $ingresos ? "[{$pre}_treemap dimension=\"fuenterecurso\"]" : null,
+            $ingresos ? "[{$pre}_treemap dimension=\"rubro\"]" : null,
             "[{$pre}_treemap enlazar=\"no\"]",
         ] ) ),
     ],
@@ -60,6 +60,7 @@ $tarjetas = [
             "[{$pre}_lista]",
             "[{$pre}_lista campo=\"{$campo_def}\" limite=\"15\"]",
             $ingresos ? "[{$pre}_lista dimension=\"fuenterecurso\"]" : null,
+            $ingresos ? "[{$pre}_lista dimension=\"rubro\" longitud=\"13\"]" : null,
             "[{$pre}_lista buscador=\"no\"]",
         ] ) ),
     ],
@@ -168,7 +169,7 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
             <?php
             echo esc_html( sprintf(
                 /* translators: %s: nombre de la dimensión usada */
-                __( 'En este periodo el tipo de recurso viene vacío en todos los registros, así que las vistas agrupan por %s. Puede fijar otra con el atributo dimension="…".', 'sysman-suite' ),
+                __( 'En este periodo el tipo de recurso no sirve para agrupar (viene vacío o con un único valor en todos los registros), así que las vistas agrupan por %s. Puede fijar otra con el atributo dimension="tiporecurso|fuenterecurso|rubro".', 'sysman-suite' ),
                 IngresosRepository::etiqueta_dimension( $dim_util )
             ) );
             ?>
@@ -234,7 +235,12 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
                     <tr>
                         <td><code>dimension</code></td>
                         <td><code>tiporecurso</code></td>
-                        <td><?php esc_html_e( 'Cómo se agrupan los ingresos: tiporecurso o fuenterecurso.', 'sysman-suite' ); ?></td>
+                        <td><?php esc_html_e( 'Cómo se agrupan los ingresos: tiporecurso, fuenterecurso o rubro (el prefijo del código de cuenta). Si la pedida no agrupa nada en el periodo —viene vacía o tiene un solo valor— se usa la siguiente que sí sirva.', 'sysman-suite' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>longitud</code></td>
+                        <td><code>13</code></td>
+                        <td><?php esc_html_e( 'Caracteres del código de cuenta que forman un rubro, con dimension="rubro". Con 13 agrupa como «1.1.01.02.105»; con 9, como «1.1.01.02».', 'sysman-suite' ); ?></td>
                     </tr>
                     <?php endif; ?>
                     <tr>

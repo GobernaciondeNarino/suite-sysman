@@ -40,6 +40,7 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - **Gastos**: agrupa por dependencia y detalla por rubro, con la cadena DIS > RES > OBL > EGR
 - **Ingresos**: agrupa por tipo o fuente de recurso y detalla por cuenta, con avance del recaudo
 - Siete componentes por modulo: `treemap`, `lista`, `ejecucion`, `explora`, `avance`, `analisis`, `selector`
+- Ingresos se agrupa por tipo de recurso, fuente de recurso o rubro (prefijo del codigo de cuenta)
 - Filtrado cruzado opcional entre shortcodes de la misma pagina (`enlazar="si|no"`, `grupo`)
 - Campo y tooltip parametrizables, validados contra una whitelist de metricas
 - Analisis descriptivo, cualitativo y cuantitativo derivados de los datos reales,
@@ -294,6 +295,15 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.18.0 — Ingresos agrupados por rubro
+La 5.17.0 hizo que Ingresos volviera a mostrar datos, pero agrupados por `fuenterecurso`, que en el sitio guarda un comodín (`99999999999999999999`): un único bloque con el 100%. Esta versión añade la agrupación que el área financiera usa de verdad.
+
+- **Nueva dimensión `rubro`**: el prefijo del código de cuenta, 13 caracteres por defecto — «1.1.01.02.105» —, configurable con `longitud`. Con `longitud="9"` agrupa a «1.1.01.02»; el separador que queda suelto al recortar se elimina, así que «1.2.10.02-16-» se muestra como «1.2.10.02-16».
+- **Aplica a las tres vistas**: `[sysman_ingresos_lista dimension="rubro"]`, el treemap y el avance del recaudo agrupan igual, y **Detalle por cuenta** despliega las cuentas hijas de ese rubro que tienen movimiento.
+- **La lista muestra el concepto, no solo el código**: bajo cada rubro va el nombre representativo del grupo (el común a sus cuentas), porque un código de trece caracteres no le dice nada a quien lee. El treemap y el avance lo usan en el tooltip.
+- **Elección automática más exigente**: una dimensión solo se considera útil si tiene **más de un valor distinto** en el periodo. Antes bastaba con que no estuviera vacía, y por eso caía en la fuente comodín. Ahora el orden es tipo de recurso → fuente de recurso → rubro, y se queda con la primera que de verdad agrupe. `dimension="…"` la sigue fijando a mano.
+- **Pruebas**: 160 aserciones (antes 149), incluidas las de SQL real: el recorte a 13 y a 9 caracteres, el separador final, que el detalle liste solo las cuentas hijas del prefijo y que el total agregado siga coincidiendo con la tabla.
 
 ### 5.17.0 — Ingresos decía «no hay datos» con la tabla llena
 Reportado en producción: el módulo de Ingresos mostraba «No hay registros de total presupuesto para septiembre de 2026» aunque la tabla tenía 1.212 filas de ese mes.

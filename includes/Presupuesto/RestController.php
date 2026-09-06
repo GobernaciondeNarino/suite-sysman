@@ -35,6 +35,8 @@ class RestController {
             'dimension' => [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ],
             'campo'     => [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ],
             'tooltip'   => [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ],
+            // Caracteres del código de cuenta que forman un rubro de ingresos.
+            'longitud'  => [ 'default' => 0, 'sanitize_callback' => 'absint' ],
         ];
     }
 
@@ -144,6 +146,11 @@ class RestController {
         return '' !== $valor ? $valor : (string) $r->get_param( 'dependencia' );
     }
 
+    private function longitud( \WP_REST_Request $r ): int {
+        $pedida = (int) $r->get_param( 'longitud' );
+        return $pedida > 0 ? IngresosRepository::validar_longitud( $pedida ) : IngresosRepository::LONGITUD_RUBRO;
+    }
+
     private function dimension( \WP_REST_Request $r ): string {
         if ( ! $this->es_ingresos( $r ) ) {
             return 'dependencia';
@@ -191,7 +198,7 @@ class RestController {
         $limite  = (int) $r->get_param( 'limite' );
 
         $filas = $this->es_ingresos( $r )
-            ? IngresosRepository::instance()->dimensiones( $ctx, $campo, $limite, $this->dimension( $r ), $tooltip )
+            ? IngresosRepository::instance()->dimensiones( $ctx, $campo, $limite, $this->dimension( $r ), $tooltip, $this->longitud( $r ) )
             : Repository::instance()->dependencias( $ctx, $campo, $limite, $tooltip );
 
         return new \WP_REST_Response( [
@@ -213,7 +220,7 @@ class RestController {
         $valor = $this->valor( $r );
 
         $filas = $this->es_ingresos( $r )
-            ? IngresosRepository::instance()->detalle( $ctx, $valor, $campo, $this->dimension( $r ) )
+            ? IngresosRepository::instance()->detalle( $ctx, $valor, $campo, $this->dimension( $r ), $this->longitud( $r ) )
             : Repository::instance()->rubros( $ctx, $valor, $campo );
 
         return new \WP_REST_Response( [
@@ -239,7 +246,7 @@ class RestController {
         $ingresos = $this->es_ingresos( $r );
 
         $filas = $ingresos
-            ? IngresosRepository::instance()->avance( $ctx, $valor, $limite, $this->dimension( $r ) )
+            ? IngresosRepository::instance()->avance( $ctx, $valor, $limite, $this->dimension( $r ), 'recaudosacumulados', 'totalpresupuesto', $this->longitud( $r ) )
             : Repository::instance()->avance( $ctx, $valor, $limite );
 
         return new \WP_REST_Response( [
@@ -306,14 +313,15 @@ class RestController {
 
         if ( $ingresos ) {
             $repo = IngresosRepository::instance();
+            $longitud = $this->longitud( $r );
             if ( $es_avance ) {
-                $filas = $repo->avance( $ctx, $valor, 0, $dimension );
+                $filas = $repo->avance( $ctx, $valor, 0, $dimension, 'recaudosacumulados', 'totalpresupuesto', $longitud );
             } else {
                 $filas = $es_detalle
-                    ? $repo->detalle( $ctx, $valor, $campo, $dimension )
-                    : $repo->dimensiones( $ctx, $campo, 0, $dimension );
+                    ? $repo->detalle( $ctx, $valor, $campo, $dimension, $longitud )
+                    : $repo->dimensiones( $ctx, $campo, 0, $dimension, [], $longitud );
             }
-            $totales = $repo->totales( $ctx, $valor, $dimension );
+            $totales = $repo->totales( $ctx, $valor, $dimension, $longitud );
         } else {
             $repo = Repository::instance();
             if ( $es_avance ) {

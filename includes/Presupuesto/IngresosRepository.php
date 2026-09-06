@@ -30,11 +30,27 @@ class IngresosRepository {
         'porrecaudar'        => 'Por Recaudar',
     ];
 
-    /** Columns usable as the grouping dimension. */
+    /**
+     * Agrupaciones disponibles. `rubro` no es una columna: es el prefijo del
+     * código de cuenta (por defecto 13 caracteres, «1.1.01.02.105»), que es
+     * como el área financiera lee el presupuesto de ingresos cuando el tipo y
+     * la fuente de recurso no vienen diligenciados.
+     */
     public const DIMENSIONES = [
         'tiporecurso'   => 'Tipo de recurso',
         'fuenterecurso' => 'Fuente de recurso',
+        'rubro'         => 'Rubro',
     ];
+
+    /** Columna que respalda cada agrupación. */
+    private const DIMENSION_COLUMNA = [
+        'tiporecurso'   => 'tiporecurso',
+        'fuenterecurso' => 'fuenterecurso',
+        'rubro'         => 'cuenta',
+    ];
+
+    /** Caracteres del código de cuenta que identifican un rubro. */
+    public const LONGITUD_RUBRO = 13;
 
     /**
      * Plurals written out instead of appending an "s": "tipo de recurso"
@@ -43,18 +59,21 @@ class IngresosRepository {
     public const DIMENSIONES_PLURAL = [
         'tiporecurso'   => 'tipos de recurso',
         'fuenterecurso' => 'fuentes de recurso',
+        'rubro'         => 'rubros',
     ];
 
     /** "Todos los …" / "Todas las …" según el género de la dimensión. */
     public const DIMENSIONES_TODAS = [
         'tiporecurso'   => 'Todos los tipos de recurso',
         'fuenterecurso' => 'Todas las fuentes de recurso',
+        'rubro'         => 'Todos los rubros',
     ];
 
     /** Género gramatical de cada dimensión, para la concordancia del análisis. */
     public const DIMENSIONES_FEMENINO = [
         'tiporecurso'   => false,   // "los tipos de recurso"
         'fuenterecurso' => true,    // "las fuentes de recurso"
+        'rubro'         => false,   // "los rubros"
     ];
 
     /**
@@ -101,12 +120,34 @@ class IngresosRepository {
         return self::DIMENSIONES_FEMENINO[ self::validar_dimension( $dimension ) ];
     }
 
+    /** Longitud de rubro válida: entre 1 y el ancho de la columna `cuenta`. */
+    public static function validar_longitud( $longitud ): int {
+        $n = (int) $longitud;
+        return $n >= 1 && $n <= 50 ? $n : self::LONGITUD_RUBRO;
+    }
+
     /**
      * Expresión SQL de la dimensión, con las filas sin valor agrupadas bajo una
      * etiqueta en lugar de quedar fuera de la consulta.
+     *
+     * Para `rubro` recorta el código de cuenta y quita el separador que quede
+     * suelto al final, para que se lea «1.2.10.02-16» y no «1.2.10.02-16-».
+     * Se evita TRIM(TRAILING …) a propósito: no es portable entre motores.
      */
-    private function expr_dimension( string $dimension ): string {
-        return "COALESCE(NULLIF(TRIM(`{$dimension}`), ''), '" . self::SIN_CLASIFICAR . "')";
+    private function expr_dimension( string $dimension, int $longitud = self::LONGITUD_RUBRO ): string {
+        $columna = self::DIMENSION_COLUMNA[ self::validar_dimension( $dimension ) ];
+
+        if ( 'rubro' === $dimension ) {
+            $n     = self::validar_longitud( $longitud );
+            $corte = "SUBSTR(`{$columna}`, 1, {$n})";
+            $base  = "CASE WHEN {$corte} LIKE '%.' OR {$corte} LIKE '%-'
+                           THEN SUBSTR(`{$columna}`, 1, {$n} - 1)
+                           ELSE {$corte} END";
+        } else {
+            $base = "TRIM(`{$columna}`)";
+        }
+
+        return "COALESCE(NULLIF({$base}, ''), '" . self::SIN_CLASIFICAR . "')";
     }
 
     /**
@@ -116,11 +157,12 @@ class IngresosRepository {
      * la otra sí tiene valores, se usa la otra: mejor agrupar por fuente de
      * recurso que mostrar la página en blanco.
      */
-    public function dimension_util( array $ctx, string $preferida = 'tiporecurso' ): string {
+    public function dimension_util( array $ctx, string $preferida = 'tiporecurso', int $longitud = self::LONGITUD_RUBRO ): string {
         global $wpdb;
 
         $preferida = self::validar_dimension( $preferida );
-        $cache_key = 'sysman_pre_ing_dimutil_' . md5( wp_json_encode( [ $ctx, $preferida ] ) );
+        $longitud  = self::validar_longitud( $longitud );
+        $cache_key = 'sysman_pre_ing_dimutil_' . md5( wp_json_encode( [ $ctx, $preferida, $longitud ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_string( $cached ) && '' !== $cached ) {
             return $cached;
@@ -130,17 +172,23 @@ class IngresosRepository {
         $elegida = $preferida;
 
         foreach ( array_unique( array_merge( [ $preferida ], array_keys( self::DIMENSIONES ) ) ) as $dim ) {
+            $expr = $this->expr_dimension( $dim, $longitud );
+
+            // Se piden dos valores distintos, no uno: una columna con el mismo
+            // código en todas las filas —o toda vacía— no agrupa nada, y la
+            // vista quedaría con un único bloque que ocupa el 100%.
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-            $con_valor = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM `{$tabla}`
+            $distintos = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(DISTINCT {$expr}) FROM `{$tabla}`
                  WHERE compania = %s AND anio = %d AND mes = %d
-                   AND movimiento = 'SI' AND TRIM(`{$dim}`) <> ''",
+                   AND movimiento = 'SI'
+                   AND {$expr} <> '" . self::SIN_CLASIFICAR . "'",
                 $ctx['compania'],
                 $ctx['anio'],
                 $ctx['mes']
             ) );
 
-            if ( $con_valor > 0 ) {
+            if ( $distintos > 1 ) {
                 $elegida = $dim;
                 break;
             }
@@ -198,14 +246,15 @@ class IngresosRepository {
      *
      * @return array<int, array{label:string, value:float, rubros:int}>
      */
-    public function dimensiones( array $ctx, string $campo = 'totalpresupuesto', int $limite = 0, string $dimension = 'tiporecurso', array $extra = [] ): array {
+    public function dimensiones( array $ctx, string $campo = 'totalpresupuesto', int $limite = 0, string $dimension = 'tiporecurso', array $extra = [], int $longitud = self::LONGITUD_RUBRO ): array {
         global $wpdb;
 
         $campo     = self::validar_campo( $campo );
         $dimension = self::validar_dimension( $dimension );
+        $longitud  = self::validar_longitud( $longitud );
         $extra     = $this->validar_extra( $extra );
 
-        $cache_key = 'sysman_pre_ing_dim_' . md5( wp_json_encode( [ $ctx, $campo, $limite, $dimension, $extra ] ) );
+        $cache_key = 'sysman_pre_ing_dim_' . md5( wp_json_encode( [ $ctx, $campo, $limite, $dimension, $extra, $longitud ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -217,9 +266,13 @@ class IngresosRepository {
             $cols .= ", SUM(`{$c}`) AS `{$c}`";
         }
 
-        $expr = $this->expr_dimension( $dimension );
+        $expr = $this->expr_dimension( $dimension, $longitud );
 
+        // MIN(nombre) da un nombre representativo del grupo: las cuentas de un
+        // mismo rubro comparten el encabezado del concepto. Sin él, la lista de
+        // rubros serían solo códigos.
         $sql = "SELECT {$expr} AS label,
+                       MIN(nombre) AS nombre,
                        SUM(`{$campo}`) AS value,
                        COUNT(DISTINCT codigo) AS rubros,
                        SUM(totalpresupuesto) AS totalpresupuesto_base,
@@ -258,15 +311,17 @@ class IngresosRepository {
         int $limite = 0,
         string $dimension = 'tiporecurso',
         string $numerador = 'recaudosacumulados',
-        string $denominador = 'totalpresupuesto'
+        string $denominador = 'totalpresupuesto',
+        int $longitud = self::LONGITUD_RUBRO
     ): array {
         global $wpdb;
 
         $dimension   = self::validar_dimension( $dimension );
+        $longitud    = self::validar_longitud( $longitud );
         $numerador   = self::validar_campo( $numerador );
         $denominador = self::validar_campo( $denominador );
 
-        $cache_key = 'sysman_pre_ing_avance_' . md5( wp_json_encode( [ $ctx, $valor, $limite, $dimension, $numerador, $denominador ] ) );
+        $cache_key = 'sysman_pre_ing_avance_' . md5( wp_json_encode( [ $ctx, $valor, $limite, $dimension, $numerador, $denominador, $longitud ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -278,7 +333,7 @@ class IngresosRepository {
         $where  = "compania = %s AND anio = %d AND mes = %d AND movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
-        $expr = $this->expr_dimension( $dimension );
+        $expr = $this->expr_dimension( $dimension, $longitud );
 
         if ( $por_cuenta ) {
             $where   .= " AND {$expr} = %s";
@@ -292,7 +347,12 @@ class IngresosRepository {
             $grupo    = $expr;
         }
 
+        // El nombre representativo del grupo: útil cuando la etiqueta es un
+        // código de rubro y no dice nada por sí sola.
+        $nombre = $por_cuenta ? 'nombre' : 'MIN(nombre)';
+
         $sql = "SELECT {$etiqueta} AS label,
+                       {$nombre} AS nombre,
                        {$codigo} AS codigo,
                        SUM(`{$denominador}`) AS base,
                        SUM(`{$numerador}`)   AS ejecutado
@@ -315,6 +375,7 @@ class IngresosRepository {
 
             return [
                 'label'      => (string) $r['label'],
+                'nombre'     => (string) ( $r['nombre'] ?? '' ),
                 'codigo'     => (string) $r['codigo'],
                 'base'       => $base,
                 'ejecutado'  => $ejecutado,
@@ -330,13 +391,14 @@ class IngresosRepository {
     /**
      * Income accounts inside one dimension value.
      */
-    public function detalle( array $ctx, string $valor, string $campo = 'totalpresupuesto', string $dimension = 'tiporecurso' ): array {
+    public function detalle( array $ctx, string $valor, string $campo = 'totalpresupuesto', string $dimension = 'tiporecurso', int $longitud = self::LONGITUD_RUBRO ): array {
         global $wpdb;
 
         $campo     = self::validar_campo( $campo );
         $dimension = self::validar_dimension( $dimension );
+        $longitud  = self::validar_longitud( $longitud );
 
-        $cache_key = 'sysman_pre_ing_det_' . md5( wp_json_encode( [ $ctx, $valor, $campo, $dimension ] ) );
+        $cache_key = 'sysman_pre_ing_det_' . md5( wp_json_encode( [ $ctx, $valor, $campo, $dimension, $longitud ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -347,7 +409,7 @@ class IngresosRepository {
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $valor ) {
-            $where   .= ' AND ' . $this->expr_dimension( $dimension ) . ' = %s';
+            $where   .= ' AND ' . $this->expr_dimension( $dimension, $longitud ) . ' = %s';
             $params[] = $valor;
         }
 
@@ -443,17 +505,18 @@ class IngresosRepository {
     /**
      * Aggregated totals for the period (feeds the analysis engine).
      */
-    public function totales( array $ctx, string $valor = '', string $dimension = 'tiporecurso' ): array {
+    public function totales( array $ctx, string $valor = '', string $dimension = 'tiporecurso', int $longitud = self::LONGITUD_RUBRO ): array {
         global $wpdb;
 
         $dimension = self::validar_dimension( $dimension );
+        $longitud  = self::validar_longitud( $longitud );
         $tabla     = $this->tabla();
 
         $where  = "compania = %s AND anio = %d AND mes = %d AND movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $valor ) {
-            $where   .= ' AND ' . $this->expr_dimension( $dimension ) . ' = %s';
+            $where   .= ' AND ' . $this->expr_dimension( $dimension, $longitud ) . ' = %s';
             $params[] = $valor;
         }
 
@@ -497,6 +560,7 @@ class IngresosRepository {
 
         $fila = [
             'label'                => (string) $r['label'],
+            'nombre'               => (string) ( $r['nombre'] ?? '' ),
             'value'                => (float) $r['value'],
             'rubros'               => (int) $r['rubros'],
             'porcentaje_recaudado' => $total > 0 ? $recaudos / $total : null,

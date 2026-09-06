@@ -26,7 +26,8 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/Presupuesto/` — vistas presupuestales prediseñadas de los dos
   módulos gemelos: **Gastos** (`[sysman_gastos_*]`, dependencia → rubro →
   cadena DIS/RES/OBL/EGR, `Repository`) e **Ingresos** (`[sysman_ingresos_*]`,
-  tipo o fuente de recurso → cuenta, `IngresosRepository`). Comparten
+  tipo/fuente de recurso o rubro —prefijo del código de cuenta— → cuenta,
+  `IngresosRepository`). Comparten
   `RestController` (REST `sysman-suite/v1/presupuesto`), `Analysis` y
   `assets/js/presupuesto.js`, parametrizados por `modulo`; el filtrado cruzado
   entre shortcodes va por el atributo `enlazar`. La vista `avance` (% ejecutado

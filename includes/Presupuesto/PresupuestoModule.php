@@ -163,6 +163,8 @@ class PresupuestoModule {
             'compania'    => '001',
             'campo'       => $ingresos ? 'totalpresupuesto' : 'apropiacionvigente',
             'dimension'   => $ingresos ? 'tiporecurso' : 'dependencia',
+            // Ingresos: caracteres del código de cuenta que forman un rubro.
+            'longitud'    => '',
             'enlazar'     => 'si',
             'grupo'       => 'principal',
             'altura'      => '',
@@ -198,8 +200,9 @@ class PresupuestoModule {
         // del periodo (SYSMAN no siempre diligencia el tipo de recurso). Se
         // resuelve aquí, una sola vez, para que las etiquetas del shortcode y
         // las consultas hablen de la misma dimensión.
+        $longitud  = $ingresos ? IngresosRepository::validar_longitud( $a['longitud'] ?: IngresosRepository::LONGITUD_RUBRO ) : 0;
         $dimension = $ingresos
-            ? $repo->dimension_util( $ctx, IngresosRepository::validar_dimension( $a['dimension'] ) )
+            ? $repo->dimension_util( $ctx, IngresosRepository::validar_dimension( $a['dimension'] ), $longitud )
             : 'dependencia';
 
         $config = [
@@ -211,6 +214,7 @@ class PresupuestoModule {
                 ? IngresosRepository::validar_campo( $a['campo'] )
                 : Repository::validar_campo( $a['campo'] ),
             'dimension'   => $dimension,
+            'longitud'    => $longitud,
             'enlazar'     => self::es_si( $a['enlazar'] ),
             'grupo'       => sanitize_key( $a['grupo'] ?: 'principal' ),
             'limite'      => absint( $a['limite'] ),

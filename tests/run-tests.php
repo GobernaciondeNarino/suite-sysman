@@ -536,10 +536,14 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
          porrecaudar,porcrecaudado) VALUES (?,?,'001',?,?,?,'SI',?,?,0,0,?,0,0,?,?,0)"
     );
     foreach ( [
-        [ 2026, 9, '1.4.2.1.01-22', '', '99999999999999999999', 9000.0, 6000.0 ],
-        [ 2026, 9, '1.4.2.1.01-21', '', '99999999999999999999', 1000.0, 500.0 ],
-        [ 2026, 9, '1.1.01.02.100', '', '', 500.0, 400.0 ],           // sin fuente tampoco
+        // Septiembre con la forma del sitio: tipo de recurso vacío y una única
+        // fuente repetida (un código comodín que no agrupa nada).
+        [ 2026, 9, '1.1.01.02.105.01-16-1.2.3.4.01', '', '99999999999999999999', 9000.0, 6000.0 ],
+        [ 2026, 9, '1.1.01.02.105.02-16-1.2.3.4.02', '', '99999999999999999999', 1000.0, 500.0 ],
+        [ 2026, 9, '1.2.10.02-16-1.3.3.2.00', '', '', 500.0, 400.0 ],   // sin fuente tampoco
+        // Mayo sí trae tipo y fuente diligenciados, con más de un valor.
         [ 2026, 5, '1.1.01', 'Recursos propios', 'Tributarios', 100.0, 50.0 ],
+        [ 2026, 5, '1.1.02', 'SGP', 'Transferencias', 200.0, 80.0 ],
     ] as $f ) {
         $ingIns->execute( [ $f[0], $f[1], $f[2], $f[2], 'Cuenta ' . $f[2], $f[3], $f[4], $f[5], $f[6], $f[5] - $f[6] ] );
     }
@@ -549,9 +553,11 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     check( 'SQL ingresos: el contexto toma septiembre, el último con datos',
         2026 === $ctxIng['anio'] && 9 === $ctxIng['mes'] );
 
-    check( 'SQL ingresos: con el tipo de recurso vacío se agrupa por fuente',
-        'fuenterecurso' === $repoI->dimension_util( $ctxIng, 'tiporecurso' ) );
-    check( 'SQL ingresos: si el tipo sí viene, se respeta el pedido',
+    // Con el tipo vacío y una sola fuente repetida, agrupar por fuente dejaría
+    // un único bloque del 100%: se pasa al rubro (prefijo del código).
+    check( 'SQL ingresos: sin tipo ni fuente que agrupen, se usa el rubro',
+        'rubro' === $repoI->dimension_util( $ctxIng, 'tiporecurso' ) );
+    check( 'SQL ingresos: si el tipo sí agrupa, se respeta el pedido',
         'tiporecurso' === $repoI->dimension_util( [ 'compania' => '001', 'anio' => 2026, 'mes' => 5 ], 'tiporecurso' ) );
 
     $dimIng = $repoI->dimensiones( $ctxIng, 'totalpresupuesto', 0, 'fuenterecurso' );
@@ -565,6 +571,40 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
 
     $avI = $repoI->avance( $ctxIng, '', 0, 'fuenterecurso' );
     check( 'SQL ingresos: el avance de recaudo se calcula por fuente', count( $avI ) === count( $dimIng ) );
+
+    // ── Rubro: los 13 primeros caracteres del código de cuenta ──
+    $GLOBALS['__test_transients'] = [];
+    $rub = $repoI->dimensiones( $ctxIng, 'totalpresupuesto', 0, 'rubro', [], 13 );
+    $etiquetasRub = array_column( $rub, 'label' );
+    check( 'SQL rubro: agrupa por los 13 primeros caracteres del código',
+        in_array( '1.1.01.02.105', $etiquetasRub, true ) );
+    check( 'SQL rubro: recorta el separador que queda suelto al final',
+        in_array( '1.2.10.02-16', $etiquetasRub, true ) );
+    check( 'SQL rubro: dos cuentas del mismo rubro se suman en una fila', 2 === count( $rub ) );
+    check( 'SQL rubro: el total sigue siendo el de la tabla',
+        abs( array_sum( array_column( $rub, 'value' ) ) - 10500.0 ) < 0.01 );
+    check( 'SQL rubro: la fila lleva un nombre representativo, no solo el código',
+        '' !== ( $rub[0]['nombre'] ?? '' ) );
+
+    $hijas = $repoI->detalle( $ctxIng, '1.1.01.02.105', 'totalpresupuesto', 'rubro', 13 );
+    check( 'SQL rubro: el detalle lista las cuentas hijas del rubro', 2 === count( $hijas ) );
+    check( 'SQL rubro: las hijas son las del prefijo, no otras',
+        '1.1.01.02.105.01-16-1.2.3.4.01' === ( $hijas[0]['codigo'] ?? '' ) );
+
+    $GLOBALS['__test_transients'] = [];
+    $rub9 = $repoI->dimensiones( $ctxIng, 'totalpresupuesto', 0, 'rubro', [], 9 );
+    check( 'SQL rubro: la longitud es parametrizable', 2 === count( $rub9 )
+        && in_array( '1.1.01.02', array_column( $rub9, 'label' ), true ) );
+
+    check( 'SQL rubro: una longitud absurda cae al valor por defecto',
+        13 === \SysmanSuite\Presupuesto\IngresosRepository::validar_longitud( 0 )
+        && 13 === \SysmanSuite\Presupuesto\IngresosRepository::validar_longitud( 999 ) );
+
+    $GLOBALS['__test_transients'] = [];
+    $avRub = $repoI->avance( $ctxIng, '', 0, 'rubro', 'recaudosacumulados', 'totalpresupuesto', 13 );
+    check( 'SQL rubro: el avance también agrupa por rubro', 2 === count( $avRub ) );
+    check( 'SQL rubro: el avance dentro de un rubro baja a sus cuentas',
+        2 === count( $repoI->avance( $ctxIng, '1.1.01.02.105', 0, 'rubro', 'recaudosacumulados', 'totalpresupuesto', 13 ) ) );
 }
 
 // ─── Resumen ─────────────────────────────────────────────────────

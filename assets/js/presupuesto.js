@@ -99,6 +99,7 @@
         return {
             modulo: cfg.modulo || 'gastos',
             dimension: cfg.dimension || '',
+            longitud: cfg.longitud || 0,
             compania: cfg.compania,
             anio: cfg.anio,
             mes: cfg.mes,
@@ -149,7 +150,9 @@
                 }
 
                 var datos = filas.map(function (f) {
-                    var nombre = esDrill ? (f.nombre || f.codigo) : f.label;
+                    // Sin drill, la etiqueta manda; pero si el grupo es un codigo
+                    // de rubro con nombre, el tooltip muestra el nombre.
+                    var nombre = esDrill ? (f.nombre || f.codigo) : (f.nombre || f.label);
                     var d = {
                         etiqueta: esDrill ? (f.codigo + ' · ' + (f.nombre || '')) : f.label,
                         nombre: nombre,
@@ -274,11 +277,16 @@
                 var activa = f.label === seleccion ? ' is-activa' : '';
                 // Conteo y valor van en la misma linea del nombre, a la derecha.
                 var cifras = Fmt.entero(f.rubros) + ' · ' + Fmt.moneda(f.value);
+                // Cuando la etiqueta es un codigo de rubro, el nombre del
+                // concepto va debajo: el codigo solo no dice nada al lector.
+                var desc = (f.nombre && f.nombre !== f.label)
+                    ? '<span class="sysman-pre__item-desc">' + esc(f.nombre) + '</span>' : '';
                 return '<li><button type="button" class="sysman-pre__item' + activa + '" data-valor="' + esc(f.label) + '"'
                     + ' aria-pressed="' + (activa ? 'true' : 'false') + '"'
-                    + ' title="' + esc(f.label + ' — ' + Fmt.entero(f.rubros) + (esIngresos ? ' cuentas' : ' rubros')) + '">'
+                    + ' title="' + esc(f.label + (f.nombre ? ' — ' + f.nombre : '') + ' — ' + Fmt.entero(f.rubros) + (esIngresos ? ' cuentas' : ' rubros')) + '">'
                     + '<span class="sysman-pre__item-nombre">' + esc(f.label) + '</span>'
                     + '<span class="sysman-pre__item-cifras">' + esc(cifras) + '</span>'
+                    + desc
                     + '<span class="sysman-pre__barra"><span style="width:' + (pct * 100).toFixed(2) + '%"></span></span>'
                     + '</button></li>';
             }).join('') + '</ul>';
@@ -769,7 +777,9 @@
                 var datos = filas.map(function (f) {
                     return {
                         etiqueta: actual ? (f.codigo || f.label) : f.label,
-                        nombre: f.label,
+                        nombre: (f.nombre && f.nombre !== f.label)
+                            ? f.label + ' · ' + f.nombre
+                            : f.label,
                         grupo: meta.porcentaje_label || '% Ejecución',
                         pct: parseFloat(f.porcentaje) || 0,
                         base: parseFloat(f.base) || 0,
