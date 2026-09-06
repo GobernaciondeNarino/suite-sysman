@@ -107,6 +107,7 @@ class Database {
 ' );
 
 require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
+require_once dirname( __DIR__ ) . '/includes/class-import-scope.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Repository.php';

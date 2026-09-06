@@ -356,6 +356,40 @@ class Database {
             $inserted += count( $batch );
         }
 
+        // Verificación de integridad: tras el DELETE + INSERT, el ámbito tiene
+        // que contener exactamente las filas que acabamos de insertar. Si hay
+        // más, otro proceso escribió en paralelo (cron y importación manual a
+        // la vez, o un doble envío) y los datos quedarían duplicados: se
+        // revierte en lugar de dejar cifras infladas.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $en_ambito = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$table_name}` WHERE {$delete_sql}",
+            $delete_params
+        ) );
+
+        if ( $en_ambito > $inserted ) {
+            $wpdb->query( 'ROLLBACK' );
+            $this->logger->log(
+                "DUPLICACIÓN EVITADA en {$table_name} ({$label}): el periodo quedó con {$en_ambito} "
+                . "filas tras insertar {$inserted}. Otra importación escribió al mismo tiempo. "
+                . 'Se revierte; vuelva a importar cuando no haya otra importación en curso.',
+                'error'
+            );
+            return 0;
+        }
+
+        if ( $en_ambito < $inserted ) {
+            // No es duplicación —no sobra nada— pero sí una señal: parte de lo
+            // insertado no cae dentro del ámbito que se borra (por ejemplo, el
+            // auxiliar devolviendo un tipo de comprobante distinto al pedido),
+            // así que esas filas no se reemplazarían en la próxima importación.
+            $this->logger->log(
+                "Aviso en {$table_name} ({$label}): se insertaron {$inserted} filas pero solo {$en_ambito} "
+                . 'quedan dentro del ámbito que se borra al reimportar. Revise los datos devueltos por la API.',
+                'warning'
+            );
+        }
+
         $wpdb->query( 'COMMIT' );
 
         // Any import invalidates the Presupuesto module's cached aggregates.
@@ -363,6 +397,105 @@ class Database {
 
         $this->logger->log( "Insertados {$inserted}/" . count( $records ) . " registros en {$table_name} ({$label})." );
         return $inserted;
+    }
+
+    /**
+     * Duplicate report: for every table and period, how many rows there are and
+     * how many distinct records they actually represent.
+     *
+     * Only reports; no deletion. Un exceso puede ser duplicación real (una
+     * importación que se solapó) o, en el auxiliar, varias líneas legítimas del
+     * mismo comprobante — por eso la limpieza es reimportar el periodo.
+     *
+     * @return array<int, array{tabla:string, compania:string, anio:int, mes:int, filas:int, unicas:int, exceso:int}>
+     */
+    public function duplicate_report( int $anio = 0 ): array {
+        global $wpdb;
+
+        $informe = [];
+
+        foreach ( Import_Scope::CLAVES_NATURALES as $nombre => $claves ) {
+            $tabla = $wpdb->prefix . $nombre;
+            if ( ! $this->ensure_table_exists( $tabla ) ) {
+                continue;
+            }
+
+            $tiene_mes = Import_Scope::tiene_mes( $nombre );
+            $mes_col   = $tiene_mes ? 'mes' : '0 AS mes';
+            $grupo     = $tiene_mes ? 'compania, anio, mes' : 'compania, anio';
+            $llave     = '`' . implode( '`, `', $claves ) . '`';
+            $where     = $anio > 0 ? $wpdb->prepare( 'WHERE anio = %d', $anio ) : '';
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $filas = $wpdb->get_results(
+                "SELECT compania, anio, {$mes_col}, COUNT(*) AS filas,
+                        COUNT(DISTINCT CONCAT_WS('|~|', {$llave})) AS unicas
+                 FROM `{$tabla}` {$where}
+                 GROUP BY {$grupo}
+                 ORDER BY anio DESC, mes DESC
+                 LIMIT 200",
+                ARRAY_A
+            ) ?: [];
+
+            foreach ( $filas as $f ) {
+                $informe[] = [
+                    'tabla'    => $nombre,
+                    'compania' => (string) $f['compania'],
+                    'anio'     => (int) $f['anio'],
+                    'mes'      => (int) $f['mes'],
+                    'filas'    => (int) $f['filas'],
+                    'unicas'   => (int) $f['unicas'],
+                    'exceso'   => (int) $f['filas'] - (int) $f['unicas'],
+                ];
+            }
+        }
+
+        return $informe;
+    }
+
+    /**
+     * Wipe a period across the five tables, so the next import starts clean.
+     *
+     * Es la operación que resuelve una duplicación ya presente: en lugar de
+     * adivinar qué fila sobra, se borra el periodo completo y se reimporta.
+     *
+     * @param int   $mes    0 = el año entero.
+     * @param array $tablas  Nombres sin prefijo; vacío = las cinco tablas.
+     * @return array<string, int> Filas borradas por tabla.
+     */
+    public function purge_period( string $compania, int $anio, int $mes = 0, array $tablas = [] ): array {
+        global $wpdb;
+
+        $borradas = [];
+        $objetivo = empty( $tablas ) ? Import_Scope::tablas() : array_intersect( Import_Scope::tablas(), $tablas );
+
+        foreach ( $objetivo as $nombre ) {
+            $tabla = $wpdb->prefix . $nombre;
+            if ( ! $this->ensure_table_exists( $tabla ) ) {
+                continue;
+            }
+
+            [ $where, $params ] = Import_Scope::scope_borrado( $nombre, $compania, $anio, $mes );
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $n = $wpdb->query( $wpdb->prepare( "DELETE FROM `{$tabla}` WHERE {$where}", $params ) );
+            $borradas[ $nombre ] = max( 0, (int) $n );
+        }
+
+        $this->flush_dependencias_cache();
+        \SysmanSuite\Presupuesto\Repository::limpiar_cache();
+
+        $periodo = $mes > 0 ? "{$anio}-{$mes}" : "año {$anio}";
+        $this->logger->log(
+            "Limpieza previa del periodo ({$compania}, {$periodo}): "
+            . implode( ', ', array_map(
+                static fn( $t, $n ) => "{$t}={$n}",
+                array_keys( $borradas ),
+                $borradas
+            ) )
+        );
+
+        return $borradas;
     }
 
     /**

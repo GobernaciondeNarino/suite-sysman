@@ -202,6 +202,96 @@ class Repository {
     }
 
     /**
+     * Execution rate: how much of the appropriation is already committed.
+     *
+     * Sin dependencia agrupa por dependencia; con dependencia baja a sus rubros,
+     * que es el mismo salto que hace el resto del módulo.
+     *
+     * @param string $numerador   Métrica ejecutada (compromisos por defecto).
+     * @param string $denominador Métrica base (apropiación vigente por defecto).
+     * @return array<int, array{label:string, codigo:string, base:float, ejecutado:float, porcentaje:float|null}>
+     */
+    public function avance(
+        array $ctx,
+        string $dependencia = '',
+        int $limite = 0,
+        string $numerador = 'compromisos',
+        string $denominador = 'apropiacionvigente'
+    ): array {
+        global $wpdb;
+
+        $numerador   = self::validar_campo( $numerador );
+        $denominador = self::validar_campo( $denominador );
+
+        $cache_key = 'sysman_pre_avance_' . md5( wp_json_encode( [ $ctx, $dependencia, $limite, $numerador, $denominador ] ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        $pp = $wpdb->prefix . 'sysman_plan_presupuestal';
+        $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
+
+        $por_rubro = '' !== $dependencia;
+
+        $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
+                   AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
+        $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+
+        if ( $por_rubro ) {
+            $where   .= ' AND pp.nombredependencia = %s';
+            $params[] = $dependencia;
+            $etiqueta = 'pp.nombre';
+            $codigo   = 'pp.codigo';
+            $grupo    = 'pp.codigo, pp.nombre';
+        } else {
+            $where   .= " AND pp.nombredependencia <> ''";
+            $etiqueta = 'pp.nombredependencia';
+            $codigo   = "''";
+            $grupo    = 'pp.nombredependencia';
+        }
+
+        $sql = "SELECT {$etiqueta} AS label,
+                       {$codigo} AS codigo,
+                       SUM(eg.`{$denominador}`) AS base,
+                       SUM(eg.`{$numerador}`)   AS ejecutado
+                FROM `{$pp}` pp
+                INNER JOIN `{$eg}` eg
+                    ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania
+                   AND pp.anio = eg.anio AND pp.mes = eg.mes
+                WHERE {$where}
+                GROUP BY {$grupo}
+                HAVING base <> 0
+                ORDER BY base DESC";
+
+        if ( $limite > 0 ) {
+            $sql .= ' LIMIT ' . (int) $limite;
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+
+        $out = array_map( static function ( $r ) {
+            $base      = (float) $r['base'];
+            $ejecutado = (float) $r['ejecutado'];
+
+            return [
+                'label'      => (string) $r['label'],
+                'codigo'     => (string) $r['codigo'],
+                'base'       => $base,
+                'ejecutado'  => $ejecutado,
+                // Sin apropiación no hay porcentaje que calcular: null, no 0,
+                // para no inventar un avance del 0 % donde no hay presupuesto.
+                'porcentaje' => 0.0 !== $base ? $ejecutado / $base : null,
+                'value'      => 0.0 !== $base ? $ejecutado / $base : 0.0,
+            ];
+        }, $rows );
+
+        set_transient( $cache_key, $out, self::CACHE_TTL );
+        return $out;
+    }
+
+    /**
      * Keep only whitelisted metric columns from a caller-supplied list.
      * Used by the `tooltip` shortcode attribute.
      */

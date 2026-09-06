@@ -352,6 +352,106 @@ check( 'nombre: no toca lo que ya viene en minúsculas',
     'Recursos propios' === $An::nombre_legible( 'Recursos propios' ) );
 check( 'nombre: cadena vacía no revienta', '' === $An::nombre_legible( '' ) );
 
+// ─── Ámbito de importación: sin duplicados entre borrado e inserción ─
+$IS = '\\SysmanSuite\\Import_Scope';
+
+check( 'importación: cubre las cinco tablas', 5 === count( $IS::tablas() ) );
+check( 'importación: gastos se identifica por código de cuenta',
+    [ 'compania', 'anio', 'mes', 'codigocuenta' ] === $IS::clave_natural( 'sysman_ejecucion_gastos' ) );
+check( 'importación: tabla desconocida no tiene clave', [] === $IS::clave_natural( 'wp_posts' ) );
+
+// El borrado previo tiene que cubrir exactamente lo que se va a insertar: si
+// se queda corto, las filas viejas sobreviven y las cifras salen infladas.
+[ $where, $params ] = $IS::scope_borrado( 'sysman_ejecucion_gastos', '001', 2026, 9 );
+check( 'borrado: gastos se limpia por compañía, año y mes',
+    'compania = %s AND anio = %d AND mes = %d' === $where && [ '001', 2026, 9 ] === $params );
+
+[ $whereAnual ] = $IS::scope_borrado( 'sysman_ejecucion_gastos', '001', 2026, 0 );
+check( 'borrado: mes 0 limpia el año completo', 'compania = %s AND anio = %d' === $whereAnual );
+
+[ $whereNomina, $paramsNomina ] = $IS::scope_borrado( 'sysman_personal_nomina', '001', 2026, 9 );
+check( 'borrado: nómina no tiene mes, se limpia por año',
+    'compania = %s AND anio = %d' === $whereNomina && [ '001', 2026 ] === $paramsNomina );
+check( 'nómina: la clave natural no incluye mes', ! $IS::tiene_mes( 'sysman_personal_nomina' ) );
+check( 'gastos: la clave natural incluye mes', $IS::tiene_mes( 'sysman_ejecucion_gastos' ) );
+
+// Toda clave natural empieza por el ámbito que se borra: si no, el borrado y
+// la detección de duplicados hablarían de cosas distintas.
+$coherentes = true;
+foreach ( $IS::CLAVES_NATURALES as $tabla => $clave ) {
+    $esperado = $IS::tiene_mes( $tabla )
+        ? [ 'compania', 'anio', 'mes' ]
+        : [ 'compania', 'anio' ];
+    if ( array_slice( $clave, 0, count( $esperado ) ) !== $esperado ) {
+        $coherentes = false;
+    }
+}
+check( 'toda clave natural empieza por el ámbito del borrado', $coherentes );
+
+// ─── Vista de avance: porcentaje de ejecución ────────────────────
+$fila = static fn( $l, $b, $e ) => [
+    'label' => $l, 'codigo' => '', 'base' => (float) $b, 'ejecutado' => (float) $e,
+    'porcentaje' => $b > 0 ? $e / $b : null, 'value' => $b > 0 ? $e / $b : 0.0,
+];
+$datosAv = [ 'filas' => [
+    $fila( 'EDUCACION', 8000.0, 7200.0 ),   // 90%
+    $fila( 'SALUD', 1000.0, 200.0 ),        // 20%
+    $fila( 'VIAS', 1000.0, 0.0 ),           // 0%
+] ];
+$optsAv = [
+    'modulo' => 'gastos', 'campo_label' => 'Apropiación Vigente', 'valor' => '',
+    'base_label' => 'apropiación vigente', 'ejecutado_label' => 'comprometido',
+];
+
+foreach ( [ 'descripcion', 'cualitativo', 'cuantitativo' ] as $t ) {
+    $av = $An::generar( $t, 'avance', $ctxPre, $datosAv, $optsAv );
+    check( "avance {$t}: un solo párrafo", 1 === count( $av['parrafos'] ) );
+    check( "avance {$t}: termina en punto", str_ends_with( trim( $av['parrafos'][0] ), '.' ) );
+}
+
+// El ponderado (7.400 / 10.000 = 74 %) manda sobre el promedio simple de los
+// porcentajes (36,7 %): si no, una dependencia diminuta pesaría igual que una
+// de ocho mil millones.
+$avDesc = $An::generar( 'descripcion', 'avance', $ctxPre, $datosAv, $optsAv );
+check( 'avance: la descripción usa el porcentaje ponderado',
+    str_contains( $avDesc['parrafos'][0], '74,0%' ) );
+check( 'avance: la descripción no usa el promedio simple',
+    ! str_contains( $avDesc['parrafos'][0], '36,7%' ) );
+check( 'avance: nombra la de mayor y la de menor', str_contains( $avDesc['parrafos'][0], 'Educacion' ) );
+
+$avCuant = $An::generar( 'cuantitativo', 'avance', $ctxPre, $datosAv, $optsAv );
+$etq     = array_column( $avCuant['metricas'], 'label' );
+check( 'avance: separa ponderado de promedio simple',
+    in_array( '% Ponderado', $etq, true ) && in_array( '% Promedio simple', $etq, true ) );
+check( 'avance: reporta los tramos', in_array( 'Por encima del 75%', $etq, true ) );
+$crudos = array_column( $avCuant['metricas'], 'crudo', 'label' );
+check( 'avance: el ponderado se calcula sobre las sumas', abs( $crudos['% Ponderado'] - 0.74 ) < 0.0001 );
+check( 'avance: el pendiente es la base menos lo ejecutado', abs( $crudos['Pendiente'] - 2600.0 ) < 0.01 );
+
+$avCual = $An::generar( 'cualitativo', 'avance', $ctxPre, $datosAv, $optsAv );
+check( 'avance: el cualitativo cuenta las rezagadas',
+    str_contains( $avCual['parrafos'][0], 'no pasan del 30%' ) );
+check( 'avance: menciona las que no han empezado',
+    str_contains( $avCual['parrafos'][0], 'sin compromiso alguno' ) );
+
+// Sin apropiación no se inventa un 0 % de avance.
+$avVacio = $An::generar( 'descripcion', 'avance', $ctxPre, [ 'filas' => [ $fila( 'X', 0.0, 0.0 ) ] ], $optsAv );
+check( 'avance: sin base no se calcula porcentaje',
+    str_contains( $avVacio['parrafos'][0], 'No hay apropiación registrada' ) );
+
+// Ingresos habla de recaudo, no de compromisos.
+$optsAvIng = [
+    'modulo' => 'ingresos', 'campo_label' => 'Total Presupuesto', 'valor' => '',
+    'dimension_label' => 'Tipo de recurso', 'dimension_plural' => 'tipos de recurso',
+    'dimension_femenino' => false,
+    'base_label' => 'presupuesto definitivo', 'ejecutado_label' => 'recaudado',
+];
+$avIng = $An::generar( 'cualitativo', 'avance', $ctxPre, $datosAv, $optsAvIng );
+check( 'avance de ingresos: habla de recaudo', str_contains( $avIng['parrafos'][0], 'recaudar' ) );
+check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['parrafos'][0], 'comprometer' ) );
+check( 'avance de ingresos: concordancia masculina',
+    ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

@@ -626,7 +626,10 @@
             // Al enlazarse, el analisis sigue lo que el usuario esta mirando:
             // con un valor elegido pasa a analizar su detalle.
             var params = base(cfg);
-            params.vista = valor ? 'detalle' : cfg.vista;
+            // La vista de avance no cambia al elegir un valor: solo se acota.
+            params.vista = cfg.vista === 'avance'
+                ? 'avance'
+                : (valor ? 'detalle' : cfg.vista);
             params.tipo = cfg.tipo;
             params.valor = valor;
 
@@ -684,12 +687,217 @@
         }).catch(function (e) { pintarError(el, e.message); });
     }
 
+    /* ── Avance de ejecucion (% comprometido / recaudado) ─────── */
+    function initAvance(el, cfg) {
+        if (typeof d3plus === 'undefined' || !d3plus.BarChart || !d3plus.LinePlot) {
+            pintarError(el, 'No se pudo cargar la libreria de graficos (D3plus).');
+            return;
+        }
+
+        var actual = cfg.valor || '';
+        var clave = Coord.clave(cfg);
+        var esIngresos = cfg.modulo === 'ingresos';
+        var color = (cfg.colores || '').split(',')[0].trim();
+        if (!/^#[0-9a-fA-F]{3,8}$/.test(color)) { color = '#348AFB'; }
+
+        function render() {
+            cargando(el);
+            var params = base(cfg);
+            params.limite = cfg.limite || 0;
+            params.valor = actual;
+
+            api('avance', params).then(function (resp) {
+                var filas = (resp.data || []).filter(function (f) {
+                    return f.porcentaje !== null && f.porcentaje !== undefined;
+                });
+                var meta = resp.meta || {};
+
+                if (!filas.length) {
+                    pintarVacio(el, 'No hay apropiación registrada en este periodo, así que no se puede calcular el avance.');
+                    return;
+                }
+
+                var c = cuerpoDe(el);
+                c.innerHTML = '';
+
+                if (actual) {
+                    var volver = document.createElement('button');
+                    volver.type = 'button';
+                    volver.className = 'sysman-pre__breadcrumb';
+                    volver.textContent = etiquetaTodas(cfg) + ' · ' + actual;
+                    volver.addEventListener('click', function () {
+                        // Igual que el treemap: publicar primero, limpiar despues.
+                        if (cfg.enlazar) {
+                            Coord.fijar(clave, { valor: '' });
+                        } else {
+                            actual = '';
+                            render();
+                        }
+                    });
+                    c.appendChild(volver);
+                }
+
+                // Cifra global: el ponderado, no el promedio de porcentajes.
+                var resumen = document.createElement('p');
+                resumen.className = 'sysman-pre__resumen';
+                resumen.innerHTML = '<strong>' + esc(Fmt.pct(meta.porcentaje)) + '</strong> '
+                    + esc((meta.porcentaje_label || '% Ejecución').replace('%', '').trim().toLowerCase())
+                    + ' · ' + esc(Fmt.moneda(meta.ejecutado)) + ' de ' + esc(Fmt.moneda(meta.base))
+                    + ' · ' + Fmt.entero(filas.length) + ' '
+                    + esc(actual
+                        ? (esIngresos ? 'cuentas' : 'rubros')
+                        : (esIngresos ? (cfg.etiqueta_plural || 'tipos de recurso') : 'dependencias'));
+                c.appendChild(resumen);
+
+                var lienzo = document.createElement('div');
+                lienzo.className = 'sysman-pre__lienzo';
+                lienzo.style.height = (cfg.altura || 460) + 'px';
+                c.appendChild(lienzo);
+
+                var esLinea = 'lineas' === cfg.tipo;
+
+                // En barras el grafico se lee como un ranking, asi que manda el
+                // porcentaje. En lineas se respeta el orden que llega (por
+                // tamano del presupuesto): ordenar por avance dibujaria una
+                // pendiente decreciente que no significa nada.
+                if (!esLinea) {
+                    filas = filas.slice().sort(function (a, b) {
+                        return (parseFloat(a.porcentaje) || 0) - (parseFloat(b.porcentaje) || 0);
+                    });
+                }
+
+                var datos = filas.map(function (f) {
+                    return {
+                        etiqueta: actual ? (f.codigo || f.label) : f.label,
+                        nombre: f.label,
+                        grupo: meta.porcentaje_label || '% Ejecución',
+                        pct: parseFloat(f.porcentaje) || 0,
+                        base: parseFloat(f.base) || 0,
+                        ejecutado: parseFloat(f.ejecutado) || 0
+                    };
+                });
+
+                var tooltip = {
+                    title: function (d) { return d.nombre || d.etiqueta; },
+                    tbody: [
+                        [meta.porcentaje_label || '% Ejecución', function (d) { return Fmt.pct(d.pct); }],
+                        [meta.base_label || 'Base', function (d) { return Fmt.moneda(d.base); }],
+                        [meta.ejecutado_label || 'Ejecutado', function (d) { return Fmt.moneda(d.ejecutado); }]
+                    ]
+                };
+
+                // El eje va en porcentaje y siempre de 0 a 100: con el dominio
+                // ajustado al maximo, un 40% ocupaba toda la barra y el grafico
+                // exageraba el avance.
+                var ejeY = {
+                    title: meta.porcentaje_label || '% Ejecución',
+                    domain: [0, 1],
+                    tickFormat: function (d) { return Math.round(d * 100) + '%'; }
+                };
+
+                function dibujar() {
+                    var grafico = esLinea ? new d3plus.LinePlot() : new d3plus.BarChart();
+                    // D3plus mide el ancho del contenedor al renderizar; si aun
+                    // no esta maquetado cae a su ancho por defecto (300 px) y el
+                    // grafico sale diminuto. Se lo pasamos medido.
+                    var ancho = lienzo.clientWidth || c.clientWidth || el.clientWidth || 0;
+
+                    grafico
+                        .data(datos)
+                        .groupBy('grupo')
+                        .select(lienzo)
+                        .color(function () { return color; })
+                        .tooltipConfig(tooltip)
+                        .legend(false)
+                        .height(cfg.altura || 460)
+                        .locale('es-ES');
+
+                    if (ancho > 0) { grafico.width(ancho); }
+
+                    // La etiqueta por defecto repite el nombre de la serie en
+                    // cada barra; el dato util es el porcentaje.
+                    grafico.label(esLinea ? false : function (d) { return Fmt.pct(d.pct); });
+
+                    if ('columnas' === cfg.tipo || esLinea) {
+                        // Categorias en el eje horizontal.
+                        grafico.x('etiqueta').y('pct').discrete('x')
+                            .yConfig(ejeY).xConfig({ title: '' });
+                    } else {
+                        // Barras horizontales: los nombres de dependencia son largos
+                        // y en vertical se solapan o se recortan.
+                        grafico.x('pct').y('etiqueta').discrete('y')
+                            .xConfig(ejeY).yConfig({ title: '' });
+                    }
+
+                    grafico.on('click', function (d) {
+                        if (actual) { return; }
+                        var destino = d.nombre || d.etiqueta;
+                        if (cfg.enlazar) {
+                            Coord.fijar(clave, { valor: destino });
+                        } else {
+                            actual = destino;
+                            render();
+                        }
+                    });
+
+                    grafico.render();
+                }
+
+                // Un frame de margen para que el contenedor tenga ancho real.
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(dibujar);
+                } else {
+                    dibujar();
+                }
+
+                // Al cambiar el ancho de la ventana el SVG conserva el ancho
+                // con el que se dibujo: se repinta, con un respiro.
+                if (!el.dataset.avanceResize) {
+                    el.dataset.avanceResize = '1';
+                    var temporizador = null;
+                    window.addEventListener('resize', function () {
+                        clearTimeout(temporizador);
+                        temporizador = setTimeout(render, 250);
+                    });
+                }
+
+                // Textos que acompañan al grafico, en el mismo orden pedido.
+                (cfg.analisis || []).forEach(function (tipo) {
+                    var caja = document.createElement('div');
+                    caja.className = 'sysman-pre__analisis sysman-pre__analisis--' + tipo;
+                    caja.innerHTML = '<p class="sysman-pre__analisis-parrafo">Preparando análisis…</p>';
+                    c.appendChild(caja);
+
+                    var p = base(cfg);
+                    p.vista = 'avance';
+                    p.tipo = tipo;
+                    p.valor = actual;
+
+                    api('analisis', p).then(function (r) {
+                        var a = (r && r.data) || {};
+                        caja.innerHTML = (a.parrafos || []).map(function (t) {
+                            return '<p class="sysman-pre__analisis-parrafo">' + esc(t) + '</p>';
+                        }).join('');
+                    }).catch(function () { caja.remove(); });
+                });
+            }).catch(function (e) { pintarError(el, e.message); });
+        }
+
+        if (cfg.enlazar) {
+            Coord.suscribir(clave, function (estado) {
+                if (estado.valor !== actual) { actual = estado.valor; render(); }
+            });
+        }
+        render();
+    }
+
     /* ── Arranque ─────────────────────────────────────────────── */
     var INIT = {
         treemap: initTreemap,
         lista: initLista,
         ejecucion: initEjecucion,
         explora: initExplora,
+        avance: initAvance,
         analisis: initAnalisis,
         selector: initSelector
     };

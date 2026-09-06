@@ -484,6 +484,30 @@
     line-height: 1.4;
 }
 
+/* ── Avance de ejecucion ─────────────────────────────────────── */
+/* El grafico y los textos comparten tarjeta: el analisis va debajo, con aire
+   suficiente para que no se lea como un pie de grafico. */
+.sysman-pre--avance .sysman-pre__resumen {
+    margin: 0 0 0.4rem;
+}
+
+.sysman-pre--avance .sysman-pre__analisis {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--pre-borde);
+}
+
+.sysman-pre--avance .sysman-pre__analisis + .sysman-pre__analisis {
+    border-top: 0;
+    padding-top: 0;
+    margin-top: 0.6rem;
+}
+
+.sysman-pre--avance .sysman-pre__analisis-parrafo {
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
 /* ── Analisis ────────────────────────────────────────────────── */
 /* Prosa continua para la ciudadania: sin titulo, sin borde, sin fondo y
    sin margenes propios. La tipografia la pone el tema, para que el texto

@@ -10,6 +10,11 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/class-database.php` — DDL/DML de las 5 tablas `sysman_*` (whitelist de
   tablas y columnas; toda consulta dinámica debe validarse aquí).
 - `includes/class-importer.php` — consumo de la API SYSMAN (AJAX, cron y WP-CLI).
+  Solo puede correr una importación a la vez (cerrojo `sysman_import_lock`):
+  dos a la vez duplican el periodo.
+- `includes/class-import-scope.php` — qué identifica un registro de cada informe
+  y qué filas se borran antes de insertar. Si tocas el ámbito del borrado o el
+  de la inserción, ambos deben seguir coincidiendo o los datos se duplican.
 - `includes/class-visualizer.php` — CPT `sysman_chart`, construcción segura de
   consultas para gráficos D3plus y shortcode `[sysman_chart]`.
 - `includes/class-rest-api.php` — REST `sysman-suite/v1` (registros, stats, charts).
@@ -24,7 +29,10 @@ visualizar datos presupuestales desde el sistema SYSMAN.
   tipo o fuente de recurso → cuenta, `IngresosRepository`). Comparten
   `RestController` (REST `sysman-suite/v1/presupuesto`), `Analysis` y
   `assets/js/presupuesto.js`, parametrizados por `modulo`; el filtrado cruzado
-  entre shortcodes va por el atributo `enlazar`. `[sysman_pre_*]` es alias
+  entre shortcodes va por el atributo `enlazar`. La vista `avance` (% ejecutado
+  o recaudado) tiene su propia redacción en `Analysis`: sobre una serie de
+  porcentajes, «total» y «concentración» no significan nada, y el porcentaje
+  global es ponderado, nunca el promedio de los porcentajes. `[sysman_pre_*]` es alias
   heredado de Gastos: no romperlo.
 - `templates/` — vistas de admin y frontend. `assets/` — CSS/JS.
 

@@ -20,6 +20,9 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Importacion individual o masiva (todos los informes a la vez)
 - Extraccion automatica del envelope SYSMAN (`codigo`, `mensaje`, `cuerpo`)
 - Insercion por lotes de 500 registros para rendimiento optimo
+- Una sola importacion a la vez (cerrojo): dos simultaneas duplicarian el periodo
+- Verificacion de integridad tras cada carga; si sobran filas, se revierte
+- Verificador de duplicados y limpieza del periodo desde la interfaz
 - Logs detallados de cada importacion
 
 ### Modulo Ejecucion (Nuevo en v4.0.0)
@@ -36,7 +39,7 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Vistas presupuestales prediseñadas y publicables con shortcodes, sin configurar nada
 - **Gastos**: agrupa por dependencia y detalla por rubro, con la cadena DIS > RES > OBL > EGR
 - **Ingresos**: agrupa por tipo o fuente de recurso y detalla por cuenta, con avance del recaudo
-- Seis componentes por modulo: `treemap`, `lista`, `ejecucion`, `explora`, `analisis`, `selector`
+- Siete componentes por modulo: `treemap`, `lista`, `ejecucion`, `explora`, `avance`, `analisis`, `selector`
 - Filtrado cruzado opcional entre shortcodes de la misma pagina (`enlazar="si|no"`, `grupo`)
 - Campo y tooltip parametrizables, validados contra una whitelist de metricas
 - Analisis descriptivo, cualitativo y cuantitativo derivados de los datos reales,
@@ -238,6 +241,7 @@ sisman-suite/
 │   ├── class-logger.php          # Sistema de logs
 │   ├── class-updater.php         # Actualizaciones desde GitHub
 │   ├── class-cli.php             # Comandos WP-CLI
+│   ├── class-import-scope.php    # Clave natural y ambito de borrado (v5.15.0)
 │   ├── Ejecucion/                # Modulo Ejecucion
 │   │   ├── Schema.php            # Migracion de tablas (v5.0.0)
 │   │   ├── EjecucionModule.php   # Bootstrap del modulo
@@ -291,6 +295,29 @@ sisman-suite/
 
 ## Changelog
 
+### 5.16.0 — Gráfico de avance de ejecución
+Nueva vista `[sysman_gastos_avance]` (y su gemela `[sysman_ingresos_avance]`): el porcentaje ejecutado por dependencia, con su propia descripción y sus análisis.
+
+- **Qué mide**: en Gastos, `compromisos` sobre `apropiacionvigente`; en Ingresos, `recaudosacumulados` sobre `totalpresupuesto`. Sin filtro agrupa por dependencia (o por tipo/fuente de recurso); con `dependencia="…"` baja a los rubros de esa dependencia, igual que el resto del módulo.
+- **Forma parametrizable** con `tipo`: `barras` (por defecto, horizontales porque los nombres de dependencia son largos), `columnas` o `lineas`. En barras el gráfico se ordena como un ranking de avance; en líneas se respeta el orden por tamaño del presupuesto, porque ordenar por avance dibujaría una pendiente decreciente que no significa nada.
+- **Eje fijo de 0 a 100%**: con el dominio ajustado al máximo, un 40% ocupaba toda la barra y el gráfico exageraba el avance. Cada barra lleva su porcentaje escrito.
+- **Análisis propios, no los de la vista de importes**: hablar de «total» o de «concentración» no dice nada sobre una serie de porcentajes. La descripción sitúa el avance global y nombra la de mayor y la de menor; el cualitativo cuenta cuántas superan el promedio, la brecha entre extremos, cuántas no pasan del 30% y cuántas no han empezado; el cuantitativo separa el **ponderado** del promedio simple —una diferencia que dice si el peso lo llevan las grandes o las pequeñas—, con mediana, extremos, desviación en puntos y el reparto por tramos.
+- **El porcentaje global es ponderado** (suma sobre suma), no el promedio de los porcentajes: promediar daría el mismo peso a una dependencia de mil millones que a una de un millón.
+- **Textos integrados o sueltos**: el atributo `analisis="descripcion,cualitativo,cuantitativo"` los pone debajo del gráfico (`analisis="no"` lo deja solo), y `[sysman_gastos_analisis vista="avance" tipo="…"]` los coloca donde se quiera.
+- **Sin apropiación no se inventa un 0%**: las filas sin base quedan fuera del cálculo en lugar de contarse como avance nulo.
+- **Pruebas**: 134 aserciones (antes 115). Verificado en navegador con D3plus v4 real, en las tres formas y con filtro por dependencia.
+
+### 5.15.0 — Importación sin duplicados
+Reportado en producción: tras varias importaciones, las cifras de un periodo salían infladas. La solución de urgencia fue borrar el año a mano (`DELETE FROM ga_sysman_ejecucion_gastos WHERE anio = 2026`) y reimportar. Esta versión evita que vuelva a pasar y da herramientas para detectarlo.
+
+- **Cerrojo de importación.** Dos importaciones simultáneas —el cron mientras alguien importa a mano, o un doble clic— hacían su `DELETE` antes de que la otra insertara, y las filas de ambas acababan conviviendo en el mismo periodo. Ahora solo puede haber una importación a la vez: la segunda se rechaza con un mensaje claro y el cron se salta su turno. El cerrojo usa `add_option()`, que es atómico, y se recupera solo si un proceso muere a media importación.
+- **Verificación de integridad en cada carga.** Tras el `DELETE` + `INSERT`, el importador cuenta las filas del periodo: si hay más de las que acaba de insertar, otro proceso escribió en paralelo y la transacción **se revierte** en lugar de dejar cifras infladas. Si hay menos, se registra un aviso: parte de lo insertado cae fuera del ámbito que se borra al reimportar.
+- **«Verificar duplicados»** en *Importar Datos*: compara, tabla por tabla y periodo por periodo, cuántas filas hay frente a cuántos registros distintos representan, y marca en rojo los periodos con filas de más.
+- **«Limpiar el periodo antes de importar»**: borra el periodo completo antes de traer los datos — la misma operación que se hizo a mano, ahora desde la interfaz y para las cinco tablas. Solo limpia las tablas del informe seleccionado; si se limpia el auxiliar, se reimportan los cuatro tipos de comprobante (DIS, RES, OBL, EGR) para no dejar la cadena a medias. También en WP-CLI: `wp sysman import --limpiar`.
+- **Aviso corregido en la pantalla de importación**: decía que se eliminaban «todos los datos del año seleccionado» cuando en realidad solo se reemplaza el periodo (compañía, año y mes) que se está importando.
+- **Nueva clase `Import_Scope`**: una sola fuente de verdad para qué identifica un registro de cada informe y qué filas se borran antes de insertar. Antes esa correspondencia estaba repetida en cinco métodos y nada garantizaba que el borrado cubriera lo que se insertaba.
+- **Pruebas**: 115 aserciones (antes 106), con cobertura del ámbito de borrado —incluida la regla de que nómina es anual y no tiene mes— y de la coherencia entre la clave natural y el ámbito que se limpia.
+
 ### 5.14.0 — Un solo párrafo y buscador en la ejecución
 - **Cada análisis es ahora un único párrafo**, con una redacción más amena y en tono institucional. Antes eran tres o cuatro frases sueltas; ahora la lectura fluye: *«La Gobernación de Nariño registra a septiembre de 2026 un total de $2.738.700.871.545 en apropiación vigente, distribuido entre 35 dependencias y considerando únicamente los registros con movimiento reportados en el sistema SYSMAN; la mayor asignación corresponde a Secretaria de Educacion, con $1.471.148.593.926 que equivalen al 53,7% del total.»*
 - **Los nombres dejan de gritar.** SYSMAN entrega «SECRETARIA DE EDUCACION» en mayúscula sostenida, que dentro de un párrafo se lee como un grito. Se convierten a capitalización normal respetando conectores (`de`, `y`, `del`…) y siglas del sector público (SGP, ICBF, IDSN, TIC…). No se inventan tildes: la fuente no las trae. Ajustable con los filtros `sysman_suite_nombre_legible` y `sysman_suite_entidad`.
@@ -318,6 +345,7 @@ El módulo Presupuesto pasa a llamarse **Gastos** y se añade un módulo gemelo 
 | `[sysman_gastos_lista]` | `[sysman_ingresos_lista]` | Lista con nº de rubros/cuentas y valor, con buscador. |
 | `[sysman_gastos_ejecucion]` | `[sysman_ingresos_ejecucion]` | Detalle: consolidado y, en gastos, modificaciones y cadena documental. |
 | `[sysman_gastos_explora]` | `[sysman_ingresos_explora]` | Maestro-detalle en dos columnas. |
+| `[sysman_gastos_avance]` | `[sysman_ingresos_avance]` | Porcentaje de ejecución (o de recaudo) en barras, columnas o líneas. |
 | `[sysman_gastos_analisis]` | `[sysman_ingresos_analisis]` | Descripción, análisis cualitativo o cuantitativo. |
 | `[sysman_gastos_selector]` | `[sysman_ingresos_selector]` | Desplegable que fija el filtro compartido de la página. |
 
