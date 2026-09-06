@@ -57,6 +57,14 @@ class IngresosRepository {
         'fuenterecurso' => true,    // "las fuentes de recurso"
     ];
 
+    /**
+     * Etiqueta para las filas cuya dimensión viene vacía.
+     *
+     * SYSMAN no siempre diligencia el tipo de recurso; si esas filas se
+     * descartaran, la vista diría "no hay datos" teniendo la tabla llena.
+     */
+    public const SIN_CLASIFICAR = 'Sin clasificar';
+
     private const CACHE_TTL = 5 * MINUTE_IN_SECONDS;
 
     private static ?self $instance = null;
@@ -91,6 +99,55 @@ class IngresosRepository {
 
     public static function es_femenino( string $dimension ): bool {
         return self::DIMENSIONES_FEMENINO[ self::validar_dimension( $dimension ) ];
+    }
+
+    /**
+     * Expresión SQL de la dimensión, con las filas sin valor agrupadas bajo una
+     * etiqueta en lugar de quedar fuera de la consulta.
+     */
+    private function expr_dimension( string $dimension ): string {
+        return "COALESCE(NULLIF(TRIM(`{$dimension}`), ''), '" . self::SIN_CLASIFICAR . "')";
+    }
+
+    /**
+     * La dimensión que de verdad sirve para agrupar en este periodo.
+     *
+     * Si la pedida está vacía en todas las filas —pasa con `tiporecurso`— pero
+     * la otra sí tiene valores, se usa la otra: mejor agrupar por fuente de
+     * recurso que mostrar la página en blanco.
+     */
+    public function dimension_util( array $ctx, string $preferida = 'tiporecurso' ): string {
+        global $wpdb;
+
+        $preferida = self::validar_dimension( $preferida );
+        $cache_key = 'sysman_pre_ing_dimutil_' . md5( wp_json_encode( [ $ctx, $preferida ] ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_string( $cached ) && '' !== $cached ) {
+            return $cached;
+        }
+
+        $tabla   = $this->tabla();
+        $elegida = $preferida;
+
+        foreach ( array_unique( array_merge( [ $preferida ], array_keys( self::DIMENSIONES ) ) ) as $dim ) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $con_valor = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$tabla}`
+                 WHERE compania = %s AND anio = %d AND mes = %d
+                   AND movimiento = 'SI' AND TRIM(`{$dim}`) <> ''",
+                $ctx['compania'],
+                $ctx['anio'],
+                $ctx['mes']
+            ) );
+
+            if ( $con_valor > 0 ) {
+                $elegida = $dim;
+                break;
+            }
+        }
+
+        set_transient( $cache_key, $elegida, self::CACHE_TTL );
+        return $elegida;
     }
 
     private function tabla(): string {
@@ -160,7 +217,9 @@ class IngresosRepository {
             $cols .= ", SUM(`{$c}`) AS `{$c}`";
         }
 
-        $sql = "SELECT `{$dimension}` AS label,
+        $expr = $this->expr_dimension( $dimension );
+
+        $sql = "SELECT {$expr} AS label,
                        SUM(`{$campo}`) AS value,
                        COUNT(DISTINCT codigo) AS rubros,
                        SUM(totalpresupuesto) AS totalpresupuesto_base,
@@ -168,8 +227,8 @@ class IngresosRepository {
                        {$cols}
                 FROM `{$tabla}`
                 WHERE compania = %s AND anio = %d AND mes = %d
-                  AND movimiento = 'SI' AND `{$dimension}` <> ''
-                GROUP BY `{$dimension}`
+                  AND movimiento = 'SI'
+                GROUP BY {$expr}
                 HAVING value <> 0
                 ORDER BY value DESC";
 
@@ -219,17 +278,18 @@ class IngresosRepository {
         $where  = "compania = %s AND anio = %d AND mes = %d AND movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
+        $expr = $this->expr_dimension( $dimension );
+
         if ( $por_cuenta ) {
-            $where   .= " AND `{$dimension}` = %s";
+            $where   .= " AND {$expr} = %s";
             $params[] = $valor;
             $etiqueta = 'nombre';
             $codigo   = 'codigo';
             $grupo    = 'codigo, nombre';
         } else {
-            $where   .= " AND `{$dimension}` <> ''";
-            $etiqueta = "`{$dimension}`";
+            $etiqueta = $expr;
             $codigo   = "''";
-            $grupo    = "`{$dimension}`";
+            $grupo    = $expr;
         }
 
         $sql = "SELECT {$etiqueta} AS label,
@@ -287,7 +347,7 @@ class IngresosRepository {
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $valor ) {
-            $where   .= " AND `{$dimension}` = %s";
+            $where   .= ' AND ' . $this->expr_dimension( $dimension ) . ' = %s';
             $params[] = $valor;
         }
 
@@ -393,7 +453,7 @@ class IngresosRepository {
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $valor ) {
-            $where   .= " AND `{$dimension}` = %s";
+            $where   .= ' AND ' . $this->expr_dimension( $dimension ) . ' = %s';
             $params[] = $valor;
         }
 

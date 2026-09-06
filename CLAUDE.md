@@ -36,6 +36,10 @@ visualizar datos presupuestales desde el sistema SYSMAN.
   heredado de Gastos: no romperlo.
 - `templates/` — vistas de admin y frontend. `assets/` — CSS/JS.
 
+Ningún agregado del módulo Presupuesto debe filtrar por «dimensión no vacía»:
+esas filas se agrupan bajo «Sin clasificar» / «Sin dependencia». Descartarlas
+saca su presupuesto de los totales sin que nadie lo note.
+
 ## Reglas del proyecto
 
 - PHP ≥ 8.1, WordPress ≥ 6.0. Sigue los estándares de código de WordPress

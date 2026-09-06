@@ -163,7 +163,9 @@ class Repository {
             $cols_extra .= ", SUM(eg.`{$c}`) AS `{$c}`";
         }
 
-        $sql = "SELECT pp.nombredependencia AS label,
+        $expr = $this->expr_dependencia();
+
+        $sql = "SELECT {$expr} AS label,
                        SUM(eg.`{$campo}`) AS value,
                        COUNT(DISTINCT pp.codigo) AS rubros
                        {$cols_extra}
@@ -173,8 +175,7 @@ class Repository {
                    AND pp.anio = eg.anio AND pp.mes = eg.mes
                 WHERE pp.compania = %s AND pp.anio = %d AND pp.mes = %d
                   AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'
-                  AND pp.nombredependencia <> ''
-                GROUP BY pp.nombredependencia
+                GROUP BY {$expr}
                 HAVING value <> 0
                 ORDER BY value DESC";
 
@@ -238,17 +239,18 @@ class Repository {
                    AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
+        $expr = $this->expr_dependencia();
+
         if ( $por_rubro ) {
-            $where   .= ' AND pp.nombredependencia = %s';
+            $where   .= " AND {$expr} = %s";
             $params[] = $dependencia;
             $etiqueta = 'pp.nombre';
             $codigo   = 'pp.codigo';
             $grupo    = 'pp.codigo, pp.nombre';
         } else {
-            $where   .= " AND pp.nombredependencia <> ''";
-            $etiqueta = 'pp.nombredependencia';
+            $etiqueta = $expr;
             $codigo   = "''";
-            $grupo    = 'pp.nombredependencia';
+            $grupo    = $expr;
         }
 
         $sql = "SELECT {$etiqueta} AS label,
@@ -292,6 +294,18 @@ class Repository {
     }
 
     /**
+     * Etiqueta de las filas del Plan Presupuestal sin dependencia asignada.
+     *
+     * Descartarlas dejaba su presupuesto fuera de los totales sin avisar.
+     */
+    public const SIN_DEPENDENCIA = 'Sin dependencia';
+
+    /** Expresión SQL de la dependencia, con las filas sin asignar agrupadas. */
+    private function expr_dependencia(): string {
+        return "COALESCE(NULLIF(TRIM(pp.nombredependencia), ''), '" . self::SIN_DEPENDENCIA . "')";
+    }
+
+    /**
      * Keep only whitelisted metric columns from a caller-supplied list.
      * Used by the `tooltip` shortcode attribute.
      */
@@ -327,7 +341,7 @@ class Repository {
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $dependencia ) {
-            $where   .= ' AND pp.nombredependencia = %s';
+            $where   .= ' AND ' . $this->expr_dependencia() . ' = %s';
             $params[] = $dependencia;
         }
 
@@ -385,7 +399,7 @@ class Repository {
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
 
         if ( '' !== $dependencia ) {
-            $where   .= ' AND pp.nombredependencia = %s';
+            $where   .= ' AND ' . $this->expr_dependencia() . ' = %s';
             $params[] = $dependencia;
         }
 

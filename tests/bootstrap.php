@@ -78,6 +78,9 @@ function current_time( $format ) {
 function number_format_i18n( $number, $decimals = 0 ) {
     return number_format( (float) $number, (int) $decimals, ',', '.' );
 }
+function wp_json_encode( $data, $flags = 0 ) {
+    return json_encode( $data, $flags );
+}
 function esc_url_raw( $url ) { return $url; }
 function rest_url( $path = '' ) { return 'https://ejemplo.test/wp-json/' . ltrim( $path, '/' ); }
 function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }

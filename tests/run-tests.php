@@ -452,6 +452,121 @@ check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['pa
 check( 'avance de ingresos: concordancia masculina',
     ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
 
+// ─── Consultas reales contra SQLite ──────────────────────────────
+// El resto de la batería no toca la base de datos. Estas comprueban lo que
+// solo se ve ejecutando el SQL: que ninguna fila se quede fuera de los
+// agregados cuando la dependencia o el tipo de recurso vienen vacíos, que fue
+// el motivo de que el módulo de Ingresos apareciera "sin datos" con la tabla
+// llena.
+if ( ! extension_loaded( 'pdo_sqlite' ) ) {
+    echo "  (omitidas las pruebas de SQL: falta pdo_sqlite)\n";
+} else {
+    require __DIR__ . '/sqlite-wpdb.php';
+
+    $sqlite = new Sysman_Sqlite_Wpdb();
+    $GLOBALS['wpdb'] = $sqlite;
+    $GLOBALS['__test_transients'] = [];
+
+    $sqlite->pdo->exec(
+        'CREATE TABLE wp_sysman_plan_presupuestal (id INTEGER PRIMARY KEY, compania TEXT, anio INT, mes INT,
+         codigo TEXT, nombre TEXT, destino TEXT, naturaleza TEXT, movimiento TEXT, codigobpin TEXT,
+         nombredependencia TEXT)'
+    );
+    $sqlite->pdo->exec(
+        'CREATE TABLE wp_sysman_ejecucion_gastos (id INTEGER PRIMARY KEY, compania TEXT, anio INT, mes INT,
+         codigocuenta TEXT, movimiento TEXT, apropiacionvigente REAL, compromisos REAL, obligacion REAL,
+         pagos REAL, disponibilidades REAL, saldodisponible REAL, adicion REAL, reduccion REAL, credito REAL,
+         contracredito REAL, aplazamiento REAL, desplazamiento REAL, apropiacioninicial REAL,
+         disponibilidadesabiertas REAL, obligacionesporpagar REAL)'
+    );
+    $sqlite->pdo->exec(
+        'CREATE TABLE wp_sysman_ejecucion_ingresos (id INTEGER PRIMARY KEY, anio INT, mes INT, compania TEXT,
+         cuenta TEXT, codigo TEXT, nombre TEXT, movimiento TEXT, tiporecurso TEXT, fuenterecurso TEXT,
+         apropiado REAL, modificaciones REAL, totalpresupuesto REAL, recaudosanteriores REAL, recaudosmes REAL,
+         recaudosacumulados REAL, porrecaudar REAL, porcrecaudado REAL)'
+    );
+
+    $plan = $sqlite->pdo->prepare(
+        "INSERT INTO wp_sysman_plan_presupuestal (compania,anio,mes,codigo,nombre,destino,naturaleza,movimiento,codigobpin,nombredependencia)
+         VALUES ('001',2026,9,?,?,'','','SI','',?)"
+    );
+    $gasto = $sqlite->pdo->prepare(
+        "INSERT INTO wp_sysman_ejecucion_gastos (compania,anio,mes,codigocuenta,movimiento,apropiacionvigente,compromisos,
+         obligacion,pagos,disponibilidades,saldodisponible,adicion,reduccion,credito,contracredito,aplazamiento,
+         desplazamiento,apropiacioninicial,disponibilidadesabiertas,obligacionesporpagar)
+         VALUES ('001',2026,9,?,'SI',?,?,0,0,0,0,0,0,0,0,0,0,0,0,0)"
+    );
+
+    foreach ( [
+        [ '2.1.1', 'Sueldos', 'SECRETARIA DE EDUCACION', 1000.0, 900.0 ],
+        [ '2.1.2', 'Dotación', 'SECRETARIA DE EDUCACION', 500.0, 100.0 ],
+        [ '2.2.1', 'Vías', 'INFRAESTRUCTURA', 800.0, 400.0 ],
+        [ '2.9.9', 'Sin asignar', '   ', 300.0, 150.0 ],   // dependencia en blanco
+    ] as $f ) {
+        $plan->execute( [ $f[0], $f[1], $f[2] ] );
+        $gasto->execute( [ $f[0], $f[3], $f[4] ] );
+    }
+
+    $repoG = \SysmanSuite\Presupuesto\Repository::instance();
+    $ctxSql = $repoG->contexto( [ 'compania' => '001' ] );
+    check( 'SQL: el contexto toma el último periodo con datos',
+        2026 === $ctxSql['anio'] && 9 === $ctxSql['mes'] );
+
+    $deps = $repoG->dependencias( $ctxSql );
+    check( 'SQL: las filas sin dependencia no se descartan', 3 === count( $deps ) );
+    check( 'SQL: se agrupan bajo "Sin dependencia"',
+        in_array( \SysmanSuite\Presupuesto\Repository::SIN_DEPENDENCIA, array_column( $deps, 'label' ), true ) );
+    check( 'SQL: el total agregado es el de la tabla completa',
+        abs( array_sum( array_column( $deps, 'value' ) ) - 2600.0 ) < 0.01 );
+
+    $rubSin = $repoG->rubros( $ctxSql, \SysmanSuite\Presupuesto\Repository::SIN_DEPENDENCIA );
+    check( 'SQL: se puede abrir el grupo sin dependencia', 1 === count( $rubSin ) );
+    check( 'SQL: los rubros de una dependencia normal siguen bien',
+        2 === count( $repoG->rubros( $ctxSql, 'SECRETARIA DE EDUCACION' ) ) );
+
+    $avG = $repoG->avance( $ctxSql );
+    $porNombre = array_column( $avG, 'porcentaje', 'label' );
+    check( 'SQL: el avance se calcula por dependencia',
+        abs( $porNombre['SECRETARIA DE EDUCACION'] - ( 1000.0 / 1500.0 ) ) < 0.001 );
+
+    // ── Ingresos con el tipo de recurso vacío (el caso reportado) ──
+    $ingIns = $sqlite->pdo->prepare(
+        "INSERT INTO wp_sysman_ejecucion_ingresos (anio,mes,compania,cuenta,codigo,nombre,movimiento,tiporecurso,
+         fuenterecurso,apropiado,modificaciones,totalpresupuesto,recaudosanteriores,recaudosmes,recaudosacumulados,
+         porrecaudar,porcrecaudado) VALUES (?,?,'001',?,?,?,'SI',?,?,0,0,?,0,0,?,?,0)"
+    );
+    foreach ( [
+        [ 2026, 9, '1.4.2.1.01-22', '', '99999999999999999999', 9000.0, 6000.0 ],
+        [ 2026, 9, '1.4.2.1.01-21', '', '99999999999999999999', 1000.0, 500.0 ],
+        [ 2026, 9, '1.1.01.02.100', '', '', 500.0, 400.0 ],           // sin fuente tampoco
+        [ 2026, 5, '1.1.01', 'Recursos propios', 'Tributarios', 100.0, 50.0 ],
+    ] as $f ) {
+        $ingIns->execute( [ $f[0], $f[1], $f[2], $f[2], 'Cuenta ' . $f[2], $f[3], $f[4], $f[5], $f[6], $f[5] - $f[6] ] );
+    }
+
+    $repoI  = \SysmanSuite\Presupuesto\IngresosRepository::instance();
+    $ctxIng = $repoI->contexto( [ 'compania' => '001' ] );
+    check( 'SQL ingresos: el contexto toma septiembre, el último con datos',
+        2026 === $ctxIng['anio'] && 9 === $ctxIng['mes'] );
+
+    check( 'SQL ingresos: con el tipo de recurso vacío se agrupa por fuente',
+        'fuenterecurso' === $repoI->dimension_util( $ctxIng, 'tiporecurso' ) );
+    check( 'SQL ingresos: si el tipo sí viene, se respeta el pedido',
+        'tiporecurso' === $repoI->dimension_util( [ 'compania' => '001', 'anio' => 2026, 'mes' => 5 ], 'tiporecurso' ) );
+
+    $dimIng = $repoI->dimensiones( $ctxIng, 'totalpresupuesto', 0, 'fuenterecurso' );
+    check( 'SQL ingresos: la vista ya no queda vacía', count( $dimIng ) > 0 );
+    check( 'SQL ingresos: el total agregado es el de la tabla',
+        abs( array_sum( array_column( $dimIng, 'value' ) ) - 10500.0 ) < 0.01 );
+    check( 'SQL ingresos: las filas sin fuente van a "Sin clasificar"',
+        in_array( \SysmanSuite\Presupuesto\IngresosRepository::SIN_CLASIFICAR, array_column( $dimIng, 'label' ), true ) );
+    check( 'SQL ingresos: se puede abrir el grupo sin clasificar',
+        1 === count( $repoI->detalle( $ctxIng, \SysmanSuite\Presupuesto\IngresosRepository::SIN_CLASIFICAR, 'totalpresupuesto', 'fuenterecurso' ) ) );
+
+    $avI = $repoI->avance( $ctxIng, '', 0, 'fuenterecurso' );
+    check( 'SQL ingresos: el avance de recaudo se calcula por fuente', count( $avI ) === count( $dimIng ) );
+}
+
 // ─── Resumen ─────────────────────────────────────────────────────
 echo "\n{$passed} aserciones OK, {$failures} fallos\n";
 exit( $failures > 0 ? 1 : 0 );

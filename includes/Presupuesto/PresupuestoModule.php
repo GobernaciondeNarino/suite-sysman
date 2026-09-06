@@ -194,6 +194,14 @@ class PresupuestoModule {
         $valor = sanitize_text_field( $a['valor'] ?: $a['dependencia'] );
         $tipo  = strtolower( trim( (string) $a['tipo'] ) );
 
+        // En ingresos, la dimensión pedida puede venir vacía en todas las filas
+        // del periodo (SYSMAN no siempre diligencia el tipo de recurso). Se
+        // resuelve aquí, una sola vez, para que las etiquetas del shortcode y
+        // las consultas hablen de la misma dimensión.
+        $dimension = $ingresos
+            ? $repo->dimension_util( $ctx, IngresosRepository::validar_dimension( $a['dimension'] ) )
+            : 'dependencia';
+
         $config = [
             'modulo'      => $ingresos ? 'ingresos' : 'gastos',
             'compania'    => $ctx['compania'],
@@ -202,7 +210,7 @@ class PresupuestoModule {
             'campo'       => $ingresos
                 ? IngresosRepository::validar_campo( $a['campo'] )
                 : Repository::validar_campo( $a['campo'] ),
-            'dimension'   => $ingresos ? IngresosRepository::validar_dimension( $a['dimension'] ) : 'dependencia',
+            'dimension'   => $dimension,
             'enlazar'     => self::es_si( $a['enlazar'] ),
             'grupo'       => sanitize_key( $a['grupo'] ?: 'principal' ),
             'limite'      => absint( $a['limite'] ),
@@ -217,16 +225,16 @@ class PresupuestoModule {
                 ? ( self::FORMAS_AVANCE[ $tipo ] ?? 'barras' )
                 : ( in_array( $tipo, self::ANALISIS, true ) ? $tipo : 'descripcion' ),
             'analisis'    => $this->parsear_analisis( $a['analisis'] ),
-            'etiqueta'    => sanitize_text_field( $a['etiqueta'] ) ?: $this->etiqueta_selector( $ingresos, $a['dimension'] ),
+            'etiqueta'    => sanitize_text_field( $a['etiqueta'] ) ?: $this->etiqueta_selector( $ingresos, $dimension ),
             'todas'       => sanitize_text_field( $a['todas'] ),
             'etiqueta_dimension' => $ingresos
-                ? IngresosRepository::etiqueta_dimension( $a['dimension'] )
+                ? IngresosRepository::etiqueta_dimension( $dimension )
                 : __( 'Dependencia', 'sysman-suite' ),
             'etiqueta_plural'    => $ingresos
-                ? IngresosRepository::etiqueta_plural( $a['dimension'] )
+                ? IngresosRepository::etiqueta_plural( $dimension )
                 : __( 'dependencias', 'sysman-suite' ),
             'etiqueta_todas'     => $ingresos
-                ? IngresosRepository::etiqueta_todas( $a['dimension'] )
+                ? IngresosRepository::etiqueta_todas( $dimension )
                 : __( 'Todas las dependencias', 'sysman-suite' ),
         ];
 

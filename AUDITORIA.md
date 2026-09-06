@@ -92,7 +92,14 @@
 - [x] **Detección y limpieza desde la interfaz.** «Verificar duplicados» compara filas frente a registros distintos por tabla y periodo; «Limpiar el periodo antes de importar» reproduce, acotada al informe elegido, la limpieza que había que hacer a mano en SQL.
 - [x] **Ámbito de importación centralizado** en `Import_Scope`: qué identifica un registro y qué se borra antes de insertar dejan de estar repetidos en cinco métodos.
 
-### 3.7 Pendiente (requiere decisión o herramientas externas)
+### 3.7 Implementado en v5.17.0 (agregados que perdían filas)
+
+- [x] **Ingresos aparecía vacío con la tabla llena (reportado en producción).** Las vistas agrupan por `tiporecurso` y la consulta filtraba `tiporecurso <> ''`; como esa columna viene vacía en todos los registros del periodo, se descartaban todas las filas. El periodo estaba bien resuelto: fallaba la agrupación.
+- [x] **Filas sin clasificar descartadas en silencio.** El mismo filtro existía en Gastos sobre `nombredependencia`. Ahora se agrupan bajo «Sin clasificar» / «Sin dependencia» en lugar de desaparecer de los totales, que era el problema de fondo: la cifra global salía menor que la real sin ninguna señal.
+- [x] **Respaldo de dimensión** en Ingresos cuando la pedida no tiene valores en el periodo, resuelto al renderizar el shortcode para que las etiquetas y las consultas hablen de la misma dimensión.
+- [x] **Cobertura de las consultas reales.** La batería ejecutaba solo código puro; las nuevas pruebas levantan SQLite en memoria con la forma de los datos del sitio y verifican que ningún agregado pierde filas.
+
+### 3.8 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
