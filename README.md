@@ -296,6 +296,18 @@ sisman-suite/
 
 ## Changelog
 
+### 5.20.0 — Todas las vistas se limitan a la vigencia actual
+El Plan Presupuestal (`numinforme=4`) trae, además de la vigencia en curso, las reservas y las vigencias futuras. Hasta ahora las vistas las mezclaban.
+
+- **Filtro `tipovigencia = "VIGENCIA ACTUAL"`** en todo lo que cruza el Plan Presupuestal: treemap, lista, ejecución por rubro, avance, análisis y totales de **Gastos**; las **Vistas** de los gráficos; y el módulo **Ejecución** (lista de dependencias, rubros, exportes y CDP).
+- **No era solo un filtro de más: las cifras estaban infladas.** Cuando un rubro figura en el plan en dos vigencias, el cruce con la ejecución lo contaba dos veces. En el caso de prueba, una dependencia con un rubro repetido pasaba de $2.500 a los $1.500 reales, y el total del periodo de $4.300 a $2.300.
+- **Comparación tolerante**: se compara con `UPPER(TRIM(tipovigencia))`, así que «vigencia actual» o « VIGENCIA ACTUAL » también entran; el valor viaja como parámetro preparado, nunca interpolado.
+- **Ejecución**: un seguimiento con vigencia elegida a mano la conserva; los que estaban en «todas» pasan a la vigencia actual, y el selector lo dice.
+- **Diagnóstico de Vistas**: si el periodo tiene plan pero ninguna fila de la vigencia actual, lo explica y lista las vigencias encontradas, en vez de decir que no hay datos.
+- **Ajustable**: el filtro `sysman_suite_tipovigencia` cambia la vigencia (por ejemplo a `RESERVAS`) o la desactiva devolviendo una cadena vacía.
+- **Ingresos no cambia**: su informe no tiene columna de vigencia.
+- **Pruebas**: 170 aserciones (antes 160), con casos contra SQL real para el rubro repetido en dos vigencias, las reservas excluidas y el valor con espacios y en minúsculas.
+
 ### 5.19.0 — Mapa de calor en el gráfico de avance
 `[sysman_gastos_avance]` y `[sysman_ingresos_avance]` pintan cada barra según lo ejecutado (o recaudado), no con un color plano.
 

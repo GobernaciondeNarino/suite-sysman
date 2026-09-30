@@ -1,6 +1,8 @@
 <?php
 namespace SysmanSuite\Ejecucion;
 
+use SysmanSuite\Helpers;
+
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Repository {
@@ -52,7 +54,7 @@ class Repository {
      * the Visualizer delegates here.
      */
     public function get_dependencias( int $anio = 0, int $mes = 0, string $compania = '001' ): array {
-        $cache_key = "gn_sisman_pp_dependencias_{$compania}_{$anio}_{$mes}";
+        $cache_key = 'gn_sisman_pp_dependencias_' . md5( wp_json_encode( [ $compania, $anio, $mes, Helpers::tipovigencia() ] ) );
         $cached = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
@@ -63,6 +65,12 @@ class Repository {
 
         $where   = [ 'compania = %s', "nombredependencia != ''", "movimiento = 'SI'" ];
         $params  = [ $compania ];
+
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia( '' );
+        if ( '' !== $vig ) {
+            $where[] = $vig;
+            $params  = array_merge( $params, $vig_params );
+        }
 
         if ( $anio > 0 ) {
             $where[]  = 'anio = %d';
@@ -116,8 +124,16 @@ class Repository {
         $params = [ $meta['compania'], $meta['anio'], $meta['mes'], $meta['dependencia'] ];
 
         if ( ! empty( $meta['vigencia'] ) ) {
-            $sql .= " AND tipovigencia = %s";
+            $sql     .= ' AND tipovigencia = %s';
             $params[] = $meta['vigencia'];
+        } else {
+            // Sin vigencia elegida en el seguimiento se usa la actual, igual
+            // que el resto del plugin: mezclarlas duplica los rubros.
+            [ $vig, $vig_params ] = Helpers::filtro_vigencia( '' );
+            if ( '' !== $vig ) {
+                $sql   .= ' AND ' . $vig;
+                $params = array_merge( $params, $vig_params );
+            }
         }
 
         $sql .= " ORDER BY codigo";
@@ -290,8 +306,14 @@ class Repository {
         $params = [ $meta['compania'], $meta['anio'], $meta['mes'], $meta['dependencia'] ];
 
         if ( ! empty( $meta['vigencia'] ) ) {
-            $where   .= " AND pp.tipovigencia = %s";
+            $where   .= ' AND pp.tipovigencia = %s';
             $params[] = $meta['vigencia'];
+        } else {
+            [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+            if ( '' !== $vig ) {
+                $where .= " AND {$vig}";
+                $params = array_merge( $params, $vig_params );
+            }
         }
 
         $filters = $options['filtros'] ?? [];
@@ -389,6 +411,12 @@ class Repository {
         $where  = "ac.tipocpte = 'DIS' AND ac.compania = %s AND ac.anio = %d AND ac.mes = %d
                    AND pp.movimiento = 'SI'";
         $params = [ $compania, $anio, $mes ];
+
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vig ) {
+            $where .= " AND {$vig}";
+            $params = array_merge( $params, $vig_params );
+        }
 
         if ( '' !== $dependencia ) {
             $where   .= " AND pp.nombredependencia = %s";

@@ -452,6 +452,19 @@ check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['pa
 check( 'avance de ingresos: concordancia masculina',
     ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
 
+// ─── Filtro de vigencia ──────────────────────────────────────────
+[ $clausula, $paramsVig ] = \SysmanSuite\Helpers::filtro_vigencia();
+check( 'vigencia: la cláusula compara normalizando mayúsculas y espacios',
+    'UPPER(TRIM(pp.tipovigencia)) = %s' === $clausula );
+check( 'vigencia: el valor va como parámetro, no interpolado',
+    [ 'VIGENCIA ACTUAL' ] === $paramsVig );
+
+[ $sinAlias ] = \SysmanSuite\Helpers::filtro_vigencia( '' );
+check( 'vigencia: sin alias usa la columna suelta',
+    'UPPER(TRIM(tipovigencia)) = %s' === $sinAlias );
+check( 'vigencia: por defecto es VIGENCIA ACTUAL',
+    'VIGENCIA ACTUAL' === \SysmanSuite\Helpers::tipovigencia() );
+
 // ─── Consultas reales contra SQLite ──────────────────────────────
 // El resto de la batería no toca la base de datos. Estas comprueban lo que
 // solo se ve ejecutando el SQL: que ninguna fila se quede fuera de los
@@ -470,7 +483,7 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     $sqlite->pdo->exec(
         'CREATE TABLE wp_sysman_plan_presupuestal (id INTEGER PRIMARY KEY, compania TEXT, anio INT, mes INT,
          codigo TEXT, nombre TEXT, destino TEXT, naturaleza TEXT, movimiento TEXT, codigobpin TEXT,
-         nombredependencia TEXT)'
+         nombredependencia TEXT, tipovigencia TEXT)'
     );
     $sqlite->pdo->exec(
         'CREATE TABLE wp_sysman_ejecucion_gastos (id INTEGER PRIMARY KEY, compania TEXT, anio INT, mes INT,
@@ -487,8 +500,8 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     );
 
     $plan = $sqlite->pdo->prepare(
-        "INSERT INTO wp_sysman_plan_presupuestal (compania,anio,mes,codigo,nombre,destino,naturaleza,movimiento,codigobpin,nombredependencia)
-         VALUES ('001',2026,9,?,?,'','','SI','',?)"
+        "INSERT INTO wp_sysman_plan_presupuestal (compania,anio,mes,codigo,nombre,destino,naturaleza,movimiento,codigobpin,nombredependencia,tipovigencia)
+         VALUES ('001',2026,9,?,?,'','','SI','',?,?)"
     );
     $gasto = $sqlite->pdo->prepare(
         "INSERT INTO wp_sysman_ejecucion_gastos (compania,anio,mes,codigocuenta,movimiento,apropiacionvigente,compromisos,
@@ -498,14 +511,22 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     );
 
     foreach ( [
-        [ '2.1.1', 'Sueldos', 'SECRETARIA DE EDUCACION', 1000.0, 900.0 ],
-        [ '2.1.2', 'Dotación', 'SECRETARIA DE EDUCACION', 500.0, 100.0 ],
-        [ '2.2.1', 'Vías', 'INFRAESTRUCTURA', 800.0, 400.0 ],
-        [ '2.9.9', 'Sin asignar', '   ', 300.0, 150.0 ],   // dependencia en blanco
+        [ '2.1.1', 'Sueldos', 'SECRETARIA DE EDUCACION', 1000.0, 900.0, 'VIGENCIA ACTUAL' ],
+        [ '2.1.2', 'Dotación', 'SECRETARIA DE EDUCACION', 500.0, 100.0, '  vigencia actual ' ],
+        [ '2.2.1', 'Vías', 'INFRAESTRUCTURA', 800.0, 400.0, 'VIGENCIA ACTUAL' ],
+        [ '2.9.9', 'Sin asignar', '   ', 300.0, 150.0, 'VIGENCIA ACTUAL' ],   // dependencia en blanco
     ] as $f ) {
-        $plan->execute( [ $f[0], $f[1], $f[2] ] );
+        $plan->execute( [ $f[0], $f[1], $f[2], $f[5] ] );
         $gasto->execute( [ $f[0], $f[3], $f[4] ] );
     }
+
+    // El plan trae el mismo rubro en varias vigencias: si no se recortan, el
+    // cruce con la ejecución cuenta la misma plata dos veces.
+    $plan->execute( [ '2.1.1', 'Sueldos', 'SECRETARIA DE EDUCACION', 'RESERVAS' ] );
+    $plan->execute( [ '2.7.7', 'Reserva pura', 'SECRETARIA DE SALUD', 'RESERVAS' ] );
+    $plan->execute( [ '2.8.8', 'Vigencia futura', 'SECRETARIA DE SALUD', 'VIGENCIA FUTURA' ] );
+    $gasto->execute( [ '2.7.7', 400.0, 400.0 ] );
+    $gasto->execute( [ '2.8.8', 700.0, 0.0 ] );
 
     $repoG = \SysmanSuite\Presupuesto\Repository::instance();
     $ctxSql = $repoG->contexto( [ 'compania' => '001' ] );
@@ -516,7 +537,7 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     check( 'SQL: las filas sin dependencia no se descartan', 3 === count( $deps ) );
     check( 'SQL: se agrupan bajo "Sin dependencia"',
         in_array( \SysmanSuite\Presupuesto\Repository::SIN_DEPENDENCIA, array_column( $deps, 'label' ), true ) );
-    check( 'SQL: el total agregado es el de la tabla completa',
+    check( 'SQL: el total agregado incluye las filas sin dependencia',
         abs( array_sum( array_column( $deps, 'value' ) ) - 2600.0 ) < 0.01 );
 
     $rubSin = $repoG->rubros( $ctxSql, \SysmanSuite\Presupuesto\Repository::SIN_DEPENDENCIA );
@@ -528,6 +549,24 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     $porNombre = array_column( $avG, 'porcentaje', 'label' );
     check( 'SQL: el avance se calcula por dependencia',
         abs( $porNombre['SECRETARIA DE EDUCACION'] - ( 1000.0 / 1500.0 ) ) < 0.001 );
+
+    // ── Vigencia: las vistas solo miran la vigencia actual ──────
+    check( 'SQL vigencia: las reservas quedan fuera de las dependencias',
+        ! in_array( 'SECRETARIA DE SALUD', array_column( $repoG->dependencias( $ctxSql ), 'label' ), true ) );
+
+    $porDep = array_column( $repoG->dependencias( $ctxSql ), 'value', 'label' );
+    check( 'SQL vigencia: un rubro repetido en otra vigencia no se cuenta dos veces',
+        abs( $porDep['SECRETARIA DE EDUCACION'] - 1500.0 ) < 0.01 );
+    check( 'SQL vigencia: se reconoce "vigencia actual" con espacios y en minúsculas',
+        isset( $porDep['INFRAESTRUCTURA'] ) && abs( $porDep['INFRAESTRUCTURA'] - 800.0 ) < 0.01 );
+
+    $totVig = $repoG->totales( $ctxSql );
+    check( 'SQL vigencia: los totales excluyen reservas y vigencias futuras',
+        abs( $totVig['apropiacionvigente'] - 2600.0 ) < 0.01 );
+    check( 'SQL vigencia: el avance tampoco las incluye',
+        ! in_array( 'SECRETARIA DE SALUD', array_column( $repoG->avance( $ctxSql ), 'label' ), true ) );
+    check( 'SQL vigencia: los rubros de una dependencia no se duplican',
+        2 === count( $repoG->rubros( $ctxSql, 'SECRETARIA DE EDUCACION' ) ) );
 
     // ── Ingresos con el tipo de recurso vacío (el caso reportado) ──
     $ingIns = $sqlite->pdo->prepare(
