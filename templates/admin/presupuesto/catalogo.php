@@ -207,6 +207,18 @@ $bloque_ejemplo = "[{$pre}_selector]\n\n[{$pre}_treemap titulo=\"Distribución p
                 ) );
                 ?>
             </p>
+            <?php if ( ! $ingresos && '' !== \SysmanSuite\Helpers::tipovigencia() ) : ?>
+            <p class="description">
+                <?php
+                echo esc_html( sprintf(
+                    /* translators: %s: tipo de vigencia */
+                    __( 'Todas las vistas trabajan sobre la vigencia «%s»: el Plan Presupuestal trae además reservas y vigencias futuras, y mezclarlas repite rubros e infla los totales.', 'sysman-suite' ),
+                    \SysmanSuite\Helpers::tipovigencia()
+                ) );
+                ?>
+            </p>
+            <?php endif; ?>
+
             <h4><?php esc_html_e( 'Atributos comunes', 'sysman-suite' ); ?></h4>
             <table class="widefat striped sysman-pre-atributos">
                 <thead>

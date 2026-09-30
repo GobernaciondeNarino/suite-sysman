@@ -1,6 +1,8 @@
 <?php
 namespace SysmanSuite\Presupuesto;
 
+use SysmanSuite\Helpers;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -149,7 +151,7 @@ class Repository {
 
         $campo     = self::validar_campo( $campo );
         $extra     = self::validar_extra( $extra );
-        $cache_key = 'sysman_pre_deps_' . md5( wp_json_encode( [ $ctx, $campo, $limite, $extra ] ) );
+        $cache_key = 'sysman_pre_deps_' . md5( wp_json_encode( [ $ctx, $campo, $limite, $extra, Helpers::tipovigencia() ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -164,6 +166,16 @@ class Repository {
         }
 
         $expr = $this->expr_dependencia();
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+
+        $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+        $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
+                   AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
+
+        if ( '' !== $vig ) {
+            $where .= " AND {$vig}";
+            $params = array_merge( $params, $vig_params );
+        }
 
         $sql = "SELECT {$expr} AS label,
                        SUM(eg.`{$campo}`) AS value,
@@ -173,8 +185,7 @@ class Repository {
                 INNER JOIN `{$eg}` eg
                     ON pp.codigo = eg.codigocuenta AND pp.compania = eg.compania
                    AND pp.anio = eg.anio AND pp.mes = eg.mes
-                WHERE pp.compania = %s AND pp.anio = %d AND pp.mes = %d
-                  AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'
+                WHERE {$where}
                 GROUP BY {$expr}
                 HAVING value <> 0
                 ORDER BY value DESC";
@@ -184,7 +195,7 @@ class Repository {
         }
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $ctx['compania'], $ctx['anio'], $ctx['mes'] ), ARRAY_A ) ?: [];
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
 
         $out = array_map( static function ( $r ) use ( $extra ) {
             $fila = [
@@ -224,7 +235,7 @@ class Repository {
         $numerador   = self::validar_campo( $numerador );
         $denominador = self::validar_campo( $denominador );
 
-        $cache_key = 'sysman_pre_avance_' . md5( wp_json_encode( [ $ctx, $dependencia, $limite, $numerador, $denominador ] ) );
+        $cache_key = 'sysman_pre_avance_' . md5( wp_json_encode( [ $ctx, $dependencia, $limite, $numerador, $denominador, Helpers::tipovigencia() ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -238,6 +249,12 @@ class Repository {
         $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
                    AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vig ) {
+            $where .= " AND {$vig}";
+            $params = array_merge( $params, $vig_params );
+        }
 
         $expr = $this->expr_dependencia();
 
@@ -327,7 +344,7 @@ class Repository {
         global $wpdb;
 
         $campo     = self::validar_campo( $campo );
-        $cache_key = 'sysman_pre_rubros_' . md5( wp_json_encode( [ $ctx, $dependencia, $campo ] ) );
+        $cache_key = 'sysman_pre_rubros_' . md5( wp_json_encode( [ $ctx, $dependencia, $campo, Helpers::tipovigencia() ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -339,6 +356,12 @@ class Repository {
         $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
                    AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vig ) {
+            $where .= " AND {$vig}";
+            $params = array_merge( $params, $vig_params );
+        }
 
         if ( '' !== $dependencia ) {
             $where   .= ' AND ' . $this->expr_dependencia() . ' = %s';
@@ -385,7 +408,7 @@ class Repository {
     public function totales( array $ctx, string $dependencia = '' ): array {
         global $wpdb;
 
-        $cache_key = 'sysman_pre_totales_' . md5( wp_json_encode( [ $ctx, $dependencia ] ) );
+        $cache_key = 'sysman_pre_totales_' . md5( wp_json_encode( [ $ctx, $dependencia, Helpers::tipovigencia() ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -397,6 +420,12 @@ class Repository {
         $where  = "pp.compania = %s AND pp.anio = %d AND pp.mes = %d
                    AND pp.movimiento = 'SI' AND eg.movimiento = 'SI'";
         $params = [ $ctx['compania'], $ctx['anio'], $ctx['mes'] ];
+
+        [ $vig, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vig ) {
+            $where .= " AND {$vig}";
+            $params = array_merge( $params, $vig_params );
+        }
 
         if ( '' !== $dependencia ) {
             $where   .= ' AND ' . $this->expr_dependencia() . ' = %s';

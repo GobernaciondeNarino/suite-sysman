@@ -637,6 +637,14 @@ class Visualizer {
         $where   = [ "pp.movimiento = 'SI'", "eg.movimiento = 'SI'", 'pp.compania = %s' ];
         $prepare = [ $config['compania'] ];
 
+        // Sin este recorte el plan aporta también reservas y vigencias futuras:
+        // el mismo código aparece varias veces y la ejecución se suma repetida.
+        [ $vigencia, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vigencia ) {
+            $where[] = $vigencia;
+            $prepare = array_merge( $prepare, $vig_params );
+        }
+
         if ( ! empty( $config['dependencia'] ) ) {
             $where[]   = 'pp.nombredependencia = %s';
             $prepare[] = $config['dependencia'];
@@ -1011,12 +1019,39 @@ class Visualizer {
             $pp_dep_args[] = $dep;
         }
 
+        // La Vista solo cruza la vigencia actual: el diagnóstico tiene que
+        // contar lo mismo, o diría que hay rubros donde la Vista no los ve.
+        $vig_clause = '';
+        [ $vigencia, $vig_params ] = Helpers::filtro_vigencia();
+        if ( '' !== $vigencia ) {
+            $vig_clause    = ' AND ' . $vigencia;
+            $pp_dep_args   = array_merge( $pp_dep_args, $vig_params );
+        }
+
         // 1) Plan Presupuestal side.
         $pp_rows = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM `{$pp}` pp WHERE pp.compania = %s AND pp.movimiento = 'SI'{$period_pp}{$dep_clause}",
+            "SELECT COUNT(*) FROM `{$pp}` pp WHERE pp.compania = %s AND pp.movimiento = 'SI'{$period_pp}{$dep_clause}{$vig_clause}",
             $pp_dep_args
         ) );
         if ( 0 === $pp_rows ) {
+            // ¿Es la vigencia la que deja la Vista vacía, o de verdad no hay plan?
+            $pp_otras = '' === $vig_clause ? 0 : (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$pp}` pp WHERE pp.compania = %s AND pp.movimiento = 'SI'{$period_pp}{$dep_clause}",
+                array_slice( $pp_dep_args, 0, count( $pp_dep_args ) - count( $vig_params ) )
+            ) );
+
+            if ( $pp_otras > 0 ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $vigencias = $wpdb->get_col( "SELECT DISTINCT tipovigencia FROM `{$pp}` LIMIT 10" );
+                $notes[] = sprintf(
+                    'Plan Presupuestal tiene %s rubros en ese periodo, pero ninguno de la vigencia "%s" (valores encontrados: %s). Las vistas solo usan la vigencia actual.',
+                    number_format_i18n( $pp_otras ),
+                    Helpers::tipovigencia(),
+                    implode( ', ', array_map( fn( $v ) => '"' . $v . '"', $vigencias ) ) ?: 'ninguno'
+                );
+                return $notes;
+            }
+
             $notes[] = sprintf(
                 'Plan Presupuestal no tiene rubros con movimiento = SI para compañía %s%s%s. Revise el filtro o importe el informe "Plan Presupuestal".',
                 $compania,
@@ -1025,7 +1060,11 @@ class Visualizer {
             );
             return $notes;
         }
-        $notes[] = sprintf( 'Plan Presupuestal: %s rubros con movimiento = SI.', number_format_i18n( $pp_rows ) );
+        $notes[] = sprintf(
+            'Plan Presupuestal: %s rubros con movimiento = SI%s.',
+            number_format_i18n( $pp_rows ),
+            '' !== $vig_clause ? ' de la vigencia "' . Helpers::tipovigencia() . '"' : ''
+        );
 
         // 2) Ejecución de Gastos side.
         $eg_rows = (int) $wpdb->get_var( $wpdb->prepare(

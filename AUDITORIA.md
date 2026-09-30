@@ -104,7 +104,12 @@
 - [x] **La agrupación de ingresos no reflejaba cómo se lee el presupuesto.** Con el tipo de recurso vacío y la fuente en un comodín, la vista quedaba en un solo bloque del 100%. Se añade la dimensión `rubro` —prefijo del código de cuenta, longitud configurable— que es la que usa el área financiera.
 - [x] **Una dimensión con un único valor no agrupa nada.** La elección automática ahora exige más de un valor distinto en el periodo antes de quedarse con una dimensión.
 
-### 3.9 Pendiente (requiere decisión o herramientas externas)
+### 3.9 Implementado en v5.20.0 (vigencia)
+
+- [x] **Las vistas mezclaban vigencias.** El Plan Presupuestal trae la vigencia actual, las reservas y las vigencias futuras; al cruzarlo con la ejecución, un rubro presente en dos vigencias se contaba dos veces y los totales salían inflados. Todas las consultas que tocan el plan aplican ahora `Helpers::filtro_vigencia()`.
+- [x] **Comparación normalizada** (`UPPER(TRIM(...))`) y por parámetro preparado, para que un valor con espacios o en minúsculas no deje la vista vacía.
+
+### 3.10 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.

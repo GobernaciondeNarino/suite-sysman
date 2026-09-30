@@ -26,6 +26,40 @@ class Helpers {
     ];
 
     /**
+     * Vigencia con la que trabajan las vistas del plugin.
+     *
+     * El Plan Presupuestal trae, además de la vigencia en curso, las reservas y
+     * las vigencias futuras. Mezclarlas duplica los rubros al cruzar con la
+     * ejecución —el mismo código aparece más de una vez— e infla los totales,
+     * así que todas las vistas se quedan con la vigencia actual.
+     */
+    public const VIGENCIA_POR_DEFECTO = 'VIGENCIA ACTUAL';
+
+    public static function tipovigencia(): string {
+        return (string) apply_filters( 'sysman_suite_tipovigencia', self::VIGENCIA_POR_DEFECTO );
+    }
+
+    /**
+     * Condición SQL y parámetro para filtrar por vigencia.
+     *
+     * Se compara con UPPER(TRIM(...)) porque el dato llega de la API tal cual se
+     * digitó en SYSMAN. Devolver el filtro vacío (con `sysman_suite_tipovigencia`
+     * → '') desactiva el recorte y vuelve a incluir todas las vigencias.
+     *
+     * @param string $alias Alias de la tabla del plan; '' si la consulta no usa alias.
+     * @return array{0:string, 1:array} Cláusula (puede ir vacía) y sus parámetros.
+     */
+    public static function filtro_vigencia( string $alias = 'pp' ): array {
+        $vigencia = trim( self::tipovigencia() );
+        if ( '' === $vigencia ) {
+            return [ '', [] ];
+        }
+
+        $columna = '' !== $alias ? "{$alias}.tipovigencia" : 'tipovigencia';
+        return [ "UPPER(TRIM({$columna})) = %s", [ mb_strtoupper( $vigencia ) ] ];
+    }
+
+    /**
      * Get the Spanish name for a month number (1-12).
      * Falls back to the raw number when out of range.
      */

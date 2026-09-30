@@ -41,6 +41,11 @@ Ningún agregado del módulo Presupuesto debe filtrar por «dimensión no vacía
 esas filas se agrupan bajo «Sin clasificar» / «Sin dependencia». Descartarlas
 saca su presupuesto de los totales sin que nadie lo note.
 
+Toda consulta que cruce `sysman_plan_presupuestal` debe aplicar
+`Helpers::filtro_vigencia()` (vigencia actual). El plan trae también reservas y
+vigencias futuras: sin ese recorte, un mismo rubro aparece varias veces y la
+ejecución se suma repetida.
+
 ## Reglas del proyecto
 
 - PHP ≥ 8.1, WordPress ≥ 6.0. Sigue los estándares de código de WordPress

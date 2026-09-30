@@ -109,7 +109,7 @@ $current_year = (int) current_time( 'Y' );
                             <select id="gn-ejec-vigencia" style="width:100%;max-width:400px;">
                                 <option value=""><?php esc_html_e( 'Cargando vigencias...', 'sysman-suite' ); ?></option>
                             </select>
-                            <p class="description"><?php esc_html_e( 'Filtra los rubros por tipo de vigencia. Déjelo vacío para ver todos.', 'sysman-suite' ); ?></p>
+                            <p class="description"><?php esc_html_e( 'Filtra los rubros por tipo de vigencia. Si se deja vacío se usa la vigencia actual, que es la que alimenta el resto del plugin.', 'sysman-suite' ); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -182,7 +182,7 @@ jQuery(function($) {
             beforeSend: function(xhr) { xhr.setRequestHeader('X-WP-Nonce', gnEjecucion.restNonce); },
             success: function(data) {
                 $sel.empty();
-                $sel.append('<option value=""><?php echo esc_js( __( 'Todas las vigencias', 'sysman-suite' ) ); ?></option>');
+                $sel.append('<option value=""><?php echo esc_js( __( 'Vigencia actual (por defecto)', 'sysman-suite' ) ); ?></option>');
                 if (data && data.length > 0) {
                     data.forEach(function(vig) {
                         var selected = (vig === savedVig) ? ' selected' : '';
