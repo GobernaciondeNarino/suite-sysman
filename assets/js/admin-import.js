@@ -20,6 +20,7 @@
             $('#sysman-compania').on('change', () => this.toggleCustomCompania());
             $('#sysman-check-dupes').on('click', () => this.checkDuplicates());
             $('#sysman-dupes-result').on('click', '#sysman-repair-schema', () => this.repairSchema());
+            $('#sysman-check-sync').on('click', () => this.checkSync());
         },
 
         toggleReportOptions() {
@@ -75,6 +76,91 @@
                 },
                 complete: () => btn.prop('disabled', false),
             });
+        },
+
+        /* Sincronización: meses por tabla y cruce plan ↔ ejecución ↔ auxiliar. */
+        checkSync() {
+            const btn = $('#sysman-check-sync');
+            const caja = $('#sysman-sync-result');
+
+            btn.prop('disabled', true);
+            caja.html('<p>Verificando…</p>');
+
+            $.post(sysmanAdmin.ajaxUrl, {
+                action: 'sysman_check_sync',
+                nonce: sysmanAdmin.nonce,
+                compania: this.getCompania(),
+                anio: $('#sysman-anio').val(),
+                mes: $('#sysman-mes').val(),
+            })
+                .done((response) => {
+                    if (!response.success) {
+                        caja.html('<div class="notice notice-error inline"><p>'
+                            + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
+                        return;
+                    }
+                    caja.html(this.renderSync(response.data));
+                })
+                .fail(() => caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>'))
+                .always(() => btn.prop('disabled', false));
+        },
+
+        renderSync(data) {
+            const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const num = (n) => Number(n).toLocaleString('es-CO');
+            const pesos = (n) => '$' + Number(n).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            const tablas = {
+                sysman_plan_presupuestal: 'Plan',
+                sysman_ejecucion_gastos: 'Ejecución gastos',
+                sysman_auxiliar_cuentas: 'Auxiliar',
+                sysman_ejecucion_ingresos: 'Ingresos',
+            };
+            let html = '<h3>Sincronización entre tablas</h3>';
+            const c = data.cruce;
+
+            if (c) {
+                const p = c.periodo;
+                html += c.sincronizado
+                    ? '<div class="notice notice-success inline"><p>Periodo ' + esc(p.anio) + '-' + esc(p.mes)
+                      + ': plan, ejecución y auxiliar cuadran. Las vistas muestran toda la ejecución.</p></div>'
+                    : '<div class="notice notice-error inline"><p><strong>Periodo ' + esc(p.anio) + '-' + esc(p.mes) + ':</strong></p><ul style="list-style:disc;margin-left:20px;">'
+                      + c.avisos.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>';
+
+                html += '<table class="widefat striped" style="margin-top:12px;max-width:760px;"><tbody>'
+                    + '<tr><th>Apropiación vigente en la ejecución</th><td style="text-align:right;">' + pesos(c.ejecucion.apropiacion) + ' (' + num(c.ejecucion.filas) + ' rubros)</td></tr>'
+                    + '<tr><th>Apropiación que muestran las vistas</th><td style="text-align:right;">' + pesos(c.en_vistas.apropiacion) + '</td></tr>'
+                    + '<tr><th>Fuera de las vistas (ejecución sin plan)</th><td style="text-align:right;">' + pesos(c.fuera_de_vistas)
+                    + ' · ' + (c.porcentaje_fuera * 100).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' %</td></tr>'
+                    + '<tr><th>Rubros del plan sin ejecución</th><td style="text-align:right;">' + num(c.plan_sin_ejecucion.filas) + '</td></tr>'
+                    + '<tr><th>Plan por tipo de vigencia</th><td style="text-align:right;">'
+                    + Object.keys(c.plan_por_vigencia).map((k) => esc(k || '(vacío)') + ': ' + num(c.plan_por_vigencia[k])).join(' · ') + '</td></tr>'
+                    + '</tbody></table>';
+
+                const ejemplos = (titulo, lista) => (lista && lista.length
+                    ? '<p><strong>' + titulo + ':</strong> ' + lista.map((x) => '<code>' + esc(x) + '</code>').join(' ') + '</p>' : '');
+                html += ejemplos('Ejecución sin plan (mayor apropiación primero)', c.ejecucion_sin_plan.ejemplos)
+                    + ejemplos('Códigos repetidos en el plan', c.plan_repetido.ejemplos)
+                    + ejemplos('Rubros del auxiliar que no están en el plan', c.auxiliar_sin_plan.ejemplos);
+            }
+
+            const cob = data.cobertura || [];
+            if (!cob.length) {
+                return html + '<div class="notice notice-warning inline"><p>No hay datos importados.</p></div>';
+            }
+
+            html += '<h4>Meses importados por tabla</h4><table class="widefat striped"><thead><tr><th>Periodo</th>'
+                + Object.values(tablas).map((t) => '<th style="text-align:right;">' + t + '</th>').join('')
+                + '<th>Observaciones</th></tr></thead><tbody>';
+            cob.forEach((p) => {
+                html += '<tr' + (p.avisos.length ? ' style="background:#fcf8e3;"' : '') + '><td>' + esc(p.anio) + '-' + esc(p.mes) + '</td>'
+                    + Object.keys(tablas).map((k) => {
+                        const t = p.tablas[k];
+                        return '<td style="text-align:right;"' + (t ? ' title="Importado: ' + esc(t.ultima) + '"' : '') + '>'
+                            + (t ? num(t.filas) : '—') + '</td>';
+                    }).join('')
+                    + '<td>' + (p.avisos.length ? p.avisos.map(esc).join('<br>') : '—') + '</td></tr>';
+            });
+            return html + '</tbody></table>';
         },
 
         /* Añade las columnas e índices que falten (nunca borra nada). */

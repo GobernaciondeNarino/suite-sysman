@@ -524,6 +524,69 @@ check( 'Esquema: reconciliar no toca las tablas que no existen', [ 'sysman_plan_
 check( 'Esquema: reconciliar nunca emite DROP',
     [] === array_filter( $fakeEsq->alter, fn( $q ) => false !== stripos( $q, 'DROP' ) ) );
 
+// ─── Sincronización entre tablas ─────────────────────────────────
+$sync = new \SysmanSuite\Sincronizacion();
+
+$solo = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 10, 'tablas' => [
+    'sysman_ejecucion_gastos' => [ 'filas' => 10, 'ultima' => '2026-10-03 09:00:00' ],
+] ] );
+check( 'Sync: ejecución sin plan en el mes se avisa',
+    1 === count( array_filter( $solo['avisos'], fn( $a ) => false !== strpos( $a, 'no plan presupuestal' ) ) ) );
+
+$desfase = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 9, 'tablas' => [
+    'sysman_plan_presupuestal' => [ 'filas' => 5, 'ultima' => '2026-10-01 08:00:00' ],
+    'sysman_ejecucion_gastos'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+    'sysman_auxiliar_cuentas'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+] ] );
+check( 'Sync: plan y ejecución importados con días de diferencia se avisa',
+    1 === count( $desfase['avisos'] ) && false !== strpos( $desfase['avisos'][0], '49 horas' ) );
+
+$alDia = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 9, 'tablas' => [
+    'sysman_plan_presupuestal' => [ 'filas' => 5, 'ultima' => '2026-10-03 08:00:00' ],
+    'sysman_ejecucion_gastos'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+    'sysman_auxiliar_cuentas'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:30:00' ],
+] ] );
+check( 'Sync: un periodo completo y al día no tiene avisos', [] === $alDia['avisos'] );
+
+$base = [
+    'ejecucion'             => [ 'filas' => 4, 'apropiacion' => 1550.0, 'compromisos' => 600.0 ],
+    'en_vistas'             => [ 'filas' => 3, 'apropiacion' => 1600.0, 'compromisos' => 700.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 2, 'apropiacion' => 250.0, 'ejemplos' => [ 'C', 'D' ] ],
+    'plan_sin_ejecucion'    => [ 'filas' => 1, 'ejemplos' => [ 'E' ] ],
+    'plan_repetido'         => [ 'codigos' => 1, 'inflado' => 300.0, 'ejemplos' => [ 'B' ] ],
+    'plan_por_vigencia'     => [ 'VIGENCIA ACTUAL' => 4, 'RESERVAS' => 1, '' => 1 ],
+    'plan_sin_tipovigencia' => 1,
+    'auxiliar_sin_plan'     => [ 'rubros' => 1, 'ejemplos' => [ 'Z' ] ],
+];
+$diag = $sync->con_diagnostico( $base );
+check( 'Sync: cuantifica lo que queda fuera de las vistas', 250.0 === $diag['fuera_de_vistas']
+    && abs( $diag['porcentaje_fuera'] - 250 / 1550 ) < 1e-9 );
+check( 'Sync: avisa ejecución sin plan, repetidos, sin vigencia y auxiliar (4 avisos)', 4 === count( $diag['avisos'] ) && ! $diag['sincronizado'] );
+check( 'Sync: con repetidos no se da por descuadre lo que ya se explicó',
+    [] === array_filter( $diag['avisos'], fn( $a ) => false !== strpos( $a, 'no cuadran' ) ) );
+
+$limpio = $sync->con_diagnostico( array_merge( $base, [
+    'en_vistas'             => [ 'filas' => 4, 'apropiacion' => 1550.0, 'compromisos' => 600.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 0, 'apropiacion' => 0.0, 'ejemplos' => [] ],
+    'plan_repetido'         => [ 'codigos' => 0, 'inflado' => 0.0, 'ejemplos' => [] ],
+    'plan_sin_tipovigencia' => 0,
+    'auxiliar_sin_plan'     => [ 'rubros' => 0, 'ejemplos' => [] ],
+] ) );
+check( 'Sync: cuando todo cuadra, sincronizado', $limpio['sincronizado'] && [] === $limpio['avisos'] );
+
+$descuadre = $sync->con_diagnostico( array_merge( $base, [
+    'en_vistas'             => [ 'filas' => 4, 'apropiacion' => 1000.0, 'compromisos' => 600.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 0, 'apropiacion' => 0.0, 'ejemplos' => [] ],
+    'plan_repetido'         => [ 'codigos' => 0, 'inflado' => 0.0, 'ejemplos' => [] ],
+    'plan_sin_tipovigencia' => 0,
+    'auxiliar_sin_plan'     => [ 'rubros' => 0, 'ejemplos' => [] ],
+] ) );
+check( 'Sync: un descuadre sin explicación se avisa',
+    1 === count( $descuadre['avisos'] ) && false !== strpos( $descuadre['avisos'][0], 'no cuadran' ) );
+
+check( 'Sync: la clave del plan incluye tipovigencia (reservas no son duplicados)',
+    in_array( 'tipovigencia', \SysmanSuite\Import_Scope::clave_natural( 'sysman_plan_presupuestal' ), true ) );
+
 // ─── Carpeta canónica del plugin: suite-sysman ───────────────────
 // Sistema de archivos mínimo, sobre disco real, con la interfaz de WP_Filesystem.
 class Test_Filesystem {

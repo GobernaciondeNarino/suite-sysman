@@ -93,46 +93,71 @@ class Repository {
     }
 
     /**
-     * Most recent period with execution data for a company.
+     * Most recent period the Gastos views can actually show.
+     *
+     * Las vistas cruzan Plan Presupuestal y Ejecución de Gastos del mismo
+     * año/mes: si se importó la ejecución de octubre pero aún no el plan, el
+     * último mes «con ejecución» saldría en blanco. Se toma el último periodo
+     * presente en las dos tablas y, si no hay ninguno común, el último de la
+     * ejecución (como antes).
      */
     public function ultimo_periodo( string $compania = '001' ): array {
-        global $wpdb;
-
-        $cache_key = 'sysman_pre_ultimo_' . md5( $compania );
+        $cache_key = 'sysman_pre_ultimo_' . md5( wp_json_encode( [ $compania, Helpers::tipovigencia() ] ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
         }
 
-        $eg  = $wpdb->prefix . 'sysman_ejecucion_gastos';
-        $row = $wpdb->get_row( $wpdb->prepare(
-            "SELECT anio, mes FROM `{$eg}` WHERE compania = %s AND movimiento = 'SI'
-             ORDER BY anio DESC, mes DESC LIMIT 1",
-            $compania
-        ), ARRAY_A );
-
-        $periodo = [
-            'anio' => (int) ( $row['anio'] ?? 0 ),
-            'mes'  => (int) ( $row['mes'] ?? 0 ),
-        ];
+        $comunes = $this->periodos( $compania );
+        $periodo = $comunes[0] ?? ( $this->periodos_tabla( 'sysman_ejecucion_gastos', $compania, 1 )[0] ?? [ 'anio' => 0, 'mes' => 0 ] );
 
         set_transient( $cache_key, $periodo, self::CACHE_TTL );
         return $periodo;
     }
 
     /**
-     * Every period that has execution data, newest first.
+     * Every period present in both Plan Presupuestal (vigencia actual) and
+     * Ejecución de Gastos, newest first.
      *
      * @return array<int, array{anio:int, mes:int}>
      */
     public function periodos( string $compania = '001' ): array {
-        global $wpdb;
-        $eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
+        $plan = [];
+        foreach ( $this->periodos_tabla( 'sysman_plan_presupuestal', $compania ) as $p ) {
+            $plan[ $p['anio'] . '-' . $p['mes'] ] = true;
+        }
 
+        return array_values( array_filter(
+            $this->periodos_tabla( 'sysman_ejecucion_gastos', $compania ),
+            static fn( $p ) => isset( $plan[ $p['anio'] . '-' . $p['mes'] ] )
+        ) );
+    }
+
+    /**
+     * Distinct periods with movement rows in one table of the Gastos chain.
+     *
+     * @return array<int, array{anio:int, mes:int}>
+     */
+    private function periodos_tabla( string $nombre, string $compania, int $limite = 60 ): array {
+        global $wpdb;
+
+        $tabla  = $wpdb->prefix . $nombre;
+        $where  = "compania = %s AND movimiento = 'SI'";
+        $params = [ $compania ];
+
+        if ( 'sysman_plan_presupuestal' === $nombre ) {
+            [ $vig, $vig_params ] = Helpers::filtro_vigencia( '' );
+            if ( '' !== $vig ) {
+                $where .= " AND {$vig}";
+                $params = array_merge( $params, $vig_params );
+            }
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- tabla fija, filtro con marcadores.
         $rows = $wpdb->get_results( $wpdb->prepare(
-            "SELECT DISTINCT anio, mes FROM `{$eg}` WHERE compania = %s AND movimiento = 'SI'
-             ORDER BY anio DESC, mes DESC LIMIT 60",
-            $compania
+            "SELECT DISTINCT anio, mes FROM `{$tabla}` WHERE {$where}
+             ORDER BY anio DESC, mes DESC LIMIT " . max( 1, (int) $limite ),
+            $params
         ), ARRAY_A ) ?: [];
 
         return array_map(
