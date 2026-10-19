@@ -1,0 +1,9 @@
+# Lo que queda fuera del paquete instalable (git archive / zipball / release).
+/.github            export-ignore
+/.claude            export-ignore
+/tests              export-ignore
+/.gitattributes     export-ignore
+/instructions.md    export-ignore
+/update.md          export-ignore
+/AUDITORIA.md       export-ignore
+/CLAUDE.md          export-ignore

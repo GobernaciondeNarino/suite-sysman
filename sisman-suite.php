@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: SYSMAN Suite
- * Plugin URI:  https://github.com/GobernaciondeNarino/sysman-suite
+ * Plugin URI:  https://github.com/GobernaciondeNarino/suite-sysman
  * Description: Plugin para importar, almacenar y visualizar datos presupuestales desde el sistema SYSMAN de la Gobernación de Nariño.
  * Version:     5.20.0
  * Author:      Gobernación de Nariño
@@ -161,6 +161,11 @@ final class Sysman_Suite {
 
         // D3 is no longer loaded separately: v4 bundles the D3 modules it needs.
         delete_option( 'sysman_d3_cdn_url' );
+
+        // El repositorio se renombró a «suite-sysman».
+        if ( 'GobernaciondeNarino/sysman-suite' === get_option( 'sysman_github_repo' ) ) {
+            update_option( 'sysman_github_repo', 'GobernaciondeNarino/suite-sysman' );
+        }
     }
 
     /**
@@ -433,7 +438,7 @@ final class Sysman_Suite {
         ] );
         register_setting( 'sysman_settings', 'sysman_github_repo', [
             'type'              => 'string',
-            'default'           => 'GobernaciondeNarino/sysman-suite',
+            'default'           => 'GobernaciondeNarino/suite-sysman',
             'sanitize_callback' => 'sanitize_text_field',
         ] );
         register_setting( 'sysman_settings', 'sysman_d3plus_cdn_url', [

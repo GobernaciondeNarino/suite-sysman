@@ -11,12 +11,31 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Updater {
 
-    private const DEFAULT_GITHUB_REPO = 'GobernaciondeNarino/sysman-suite';
+    private const DEFAULT_GITHUB_REPO = 'GobernaciondeNarino/suite-sysman';
+
+    /** Nombre del repositorio antes del cambio; se migra solo. */
+    private const LEGACY_GITHUB_REPO  = 'GobernaciondeNarino/sysman-suite';
+
     private const CACHE_KEY    = 'sysman_suite_update_info';
     private const CACHE_EXPIRY = 12 * HOUR_IN_SECONDS;
 
+    /**
+     * Carpeta en la que debe quedar el plugin dentro de wp-content/plugins.
+     *
+     * Ni el zipball de GitHub («GobernaciondeNarino-suite-sysman-1a2b3c») ni el
+     * «Download ZIP» de una rama («suite-sysman-main») traen este nombre, así
+     * que la carpeta extraída se renombra al instalar o actualizar.
+     */
+    public const SLUG = 'suite-sysman';
+
     private function get_github_repo(): string {
-        return get_option( 'sysman_github_repo', self::DEFAULT_GITHUB_REPO );
+        $repo = (string) get_option( 'sysman_github_repo', self::DEFAULT_GITHUB_REPO );
+        return self::LEGACY_GITHUB_REPO === $repo || '' === $repo ? self::DEFAULT_GITHUB_REPO : $repo;
+    }
+
+    /** Basename que tendrá el plugin una vez instalado en su carpeta canónica. */
+    public static function basename_canonico(): string {
+        return self::SLUG . '/' . basename( SYSMAN_SUITE_FILE );
     }
 
     public function __construct() {
@@ -24,6 +43,10 @@ class Updater {
         add_filter( 'plugins_api', [ $this, 'plugin_info' ], 20, 3 );
         add_action( 'upgrader_process_complete', [ $this, 'clear_cache' ], 10, 2 );
         add_filter( 'plugin_row_meta', [ $this, 'plugin_row_meta' ], 10, 2 );
+
+        // Carpeta canónica «suite-sysman», venga el zip de donde venga.
+        add_filter( 'upgrader_source_selection', [ $this, 'renombrar_carpeta' ], 10, 4 );
+        add_filter( 'upgrader_post_install', [ $this, 'conservar_activacion' ], 10, 3 );
         add_action( 'in_plugin_update_message-' . SYSMAN_SUITE_BASENAME, [ $this, 'update_message' ], 10, 2 );
 
         // Admin notice for major updates
@@ -53,7 +76,7 @@ class Updater {
                 : [];
 
             $transient->response[ SYSMAN_SUITE_BASENAME ] = (object) [
-                'slug'        => 'sysman-suite',
+                'slug'        => self::SLUG,
                 'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $remote['version'],
                 'url'         => $remote['url'],
@@ -66,7 +89,7 @@ class Updater {
         } else {
             // Plugin is up to date
             $transient->no_update[ SYSMAN_SUITE_BASENAME ] = (object) [
-                'slug'        => 'sysman-suite',
+                'slug'        => self::SLUG,
                 'plugin'      => SYSMAN_SUITE_BASENAME,
                 'new_version' => $current_version,
                 'url'         => 'https://github.com/' . $this->get_github_repo(),
@@ -80,7 +103,7 @@ class Updater {
      * Provide plugin info for the WordPress update screen.
      */
     public function plugin_info( $result, $action, $args ) {
-        if ( 'plugin_information' !== $action || 'sysman-suite' !== ( $args->slug ?? '' ) ) {
+        if ( 'plugin_information' !== $action || ! in_array( $args->slug ?? '', [ self::SLUG, 'sysman-suite' ], true ) ) {
             return $result;
         }
 
@@ -91,7 +114,7 @@ class Updater {
 
         return (object) [
             'name'            => 'SYSMAN Suite',
-            'slug'            => 'sysman-suite',
+            'slug'            => self::SLUG,
             'version'         => $remote['version'],
             'author'          => '<a href="https://narino.gov.co">Gobernación de Nariño</a>',
             'author_profile'  => 'https://narino.gov.co',
@@ -212,6 +235,102 @@ class Updater {
         $html = nl2br( $html );
 
         return $html;
+    }
+
+    /**
+     * ¿El paquete que se está instalando es este plugin?
+     *
+     * En una actualización WordPress lo dice en $hook_extra['plugin']; en una
+     * instalación nueva desde un zip no hay más pista que el archivo principal.
+     */
+    private function es_este_plugin( string $source, array $hook_extra ): bool {
+        if ( isset( $hook_extra['plugin'] ) ) {
+            return SYSMAN_SUITE_BASENAME === $hook_extra['plugin'];
+        }
+
+        if ( ( $hook_extra['type'] ?? '' ) !== 'plugin' && ! isset( $hook_extra['action'] ) ) {
+            return false;
+        }
+
+        global $wp_filesystem;
+        $principal = trailingslashit( $source ) . basename( SYSMAN_SUITE_FILE );
+
+        // Con FTP/SSH la ruta no es local: se pregunta al sistema de archivos de WP.
+        return $wp_filesystem ? $wp_filesystem->exists( $principal ) : file_exists( $principal );
+    }
+
+    /**
+     * Renombra la carpeta extraída a «suite-sysman».
+     *
+     * @param string|\WP_Error $source        Carpeta extraída.
+     * @param string           $remote_source Carpeta temporal que la contiene.
+     * @return string|\WP_Error
+     */
+    public function renombrar_carpeta( $source, $remote_source, $upgrader = null, $hook_extra = [] ) {
+        global $wp_filesystem;
+
+        if ( is_wp_error( $source ) || ! is_string( $source ) || ! $wp_filesystem ) {
+            return $source;
+        }
+
+        if ( ! $this->es_este_plugin( $source, (array) $hook_extra ) ) {
+            return $source;
+        }
+
+        $destino = trailingslashit( $remote_source ) . self::SLUG;
+        if ( untrailingslashit( $source ) === $destino ) {
+            return $source;
+        }
+
+        if ( $wp_filesystem->exists( $destino ) ) {
+            $wp_filesystem->delete( $destino, true );
+        }
+
+        if ( ! $wp_filesystem->move( untrailingslashit( $source ), $destino ) ) {
+            return new \WP_Error(
+                'sysman_renombrar_carpeta',
+                __( 'No se pudo renombrar la carpeta del plugin a «suite-sysman».', 'sysman-suite' )
+            );
+        }
+
+        return trailingslashit( $destino );
+    }
+
+    /**
+     * Si la actualización movió el plugin de carpeta, lo deja activo.
+     *
+     * WordPress guarda los plugins activos por «carpeta/archivo.php». Al pasar
+     * de «sisman-suite/…» o «suite-sysman-main/…» a «suite-sysman/…» esa ruta
+     * deja de existir y el plugin quedaría desactivado tras actualizar.
+     */
+    public function conservar_activacion( $response, $hook_extra, $result ) {
+        if ( SYSMAN_SUITE_BASENAME !== ( $hook_extra['plugin'] ?? '' ) ) {
+            return $response;
+        }
+
+        $anterior = SYSMAN_SUITE_BASENAME;
+        $nuevo    = self::basename_canonico();
+        if ( $anterior === $nuevo ) {
+            return $response;
+        }
+
+        $activos = (array) get_option( 'active_plugins', [] );
+        $pos     = array_search( $anterior, $activos, true );
+        if ( false !== $pos ) {
+            $activos[ $pos ] = $nuevo;
+            update_option( 'active_plugins', array_values( array_unique( $activos ) ) );
+        }
+
+        if ( is_multisite() ) {
+            $red = (array) get_site_option( 'active_sitewide_plugins', [] );
+            if ( isset( $red[ $anterior ] ) ) {
+                $red[ $nuevo ] = $red[ $anterior ];
+                unset( $red[ $anterior ] );
+                update_site_option( 'active_sitewide_plugins', $red );
+            }
+        }
+
+        return $response;
     }
 
     /**

@@ -82,6 +82,23 @@ function wp_json_encode( $data, $flags = 0 ) {
     return json_encode( $data, $flags );
 }
 function esc_url_raw( $url ) { return $url; }
+
+// ─── Opciones y utilidades de rutas (actualizador) ───────────────
+$GLOBALS['__test_options'] = [];
+function get_option( $key, $default = false ) {
+    return array_key_exists( $key, $GLOBALS['__test_options'] ) ? $GLOBALS['__test_options'][ $key ] : $default;
+}
+function update_option( $key, $value, $autoload = null ) {
+    $GLOBALS['__test_options'][ $key ] = $value;
+    return true;
+}
+function is_multisite() { return false; }
+function trailingslashit( $p ) { return rtrim( $p, '/\\' ) . '/'; }
+function untrailingslashit( $p ) { return rtrim( $p, '/\\' ); }
+function is_wp_error( $v ) { return $v instanceof WP_Error; }
+class WP_Error {
+    public function __construct( public string $code = '', public string $message = '' ) {}
+}
 function rest_url( $path = '' ) { return 'https://ejemplo.test/wp-json/' . ltrim( $path, '/' ); }
 function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }
 
@@ -109,7 +126,14 @@ class Database {
 }
 ' );
 
+// El actualizador necesita saber dónde está instalado el plugin. Se simula la
+// carpeta que deja el «Download ZIP» de GitHub para una rama.
+define( 'SYSMAN_SUITE_FILE', '/srv/wp-content/plugins/suite-sysman-main/sisman-suite.php' );
+define( 'SYSMAN_SUITE_BASENAME', 'suite-sysman-main/sisman-suite.php' );
+define( 'SYSMAN_SUITE_VERSION', '0.0.0-test' );
+
 require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
+require_once dirname( __DIR__ ) . '/includes/class-updater.php';
 require_once dirname( __DIR__ ) . '/includes/class-import-scope.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';

@@ -452,6 +452,57 @@ check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['pa
 check( 'avance de ingresos: concordancia masculina',
     ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
 
+// ─── Carpeta canónica del plugin: suite-sysman ───────────────────
+// Sistema de archivos mínimo, sobre disco real, con la interfaz de WP_Filesystem.
+class Test_Filesystem {
+    public function exists( $p ) { return file_exists( $p ); }
+    public function move( $a, $b ) { return rename( $a, $b ); }
+    public function delete( $p, $recursivo = false ) {
+        if ( is_dir( $p ) ) {
+            foreach ( array_diff( scandir( $p ), [ '.', '..' ] ) as $f ) { $this->delete( "$p/$f", true ); }
+            return rmdir( $p );
+        }
+        return file_exists( $p ) ? unlink( $p ) : true;
+    }
+}
+$GLOBALS['wp_filesystem'] = new Test_Filesystem();
+
+$upd     = new \SysmanSuite\Updater();
+$tmp     = sys_get_temp_dir() . '/sysman-upd-' . getmypid();
+$zipball = $tmp . '/GobernaciondeNarino-suite-sysman-1a2b3c';
+@mkdir( $zipball, 0777, true );
+file_put_contents( $zipball . '/sisman-suite.php', '<?php' );
+
+$res = $upd->renombrar_carpeta( $zipball . '/', $tmp, null, [ 'plugin' => SYSMAN_SUITE_BASENAME ] );
+check( 'carpeta: el zipball de GitHub queda como suite-sysman', $tmp . '/suite-sysman/' === $res );
+check( 'carpeta: el archivo principal llega a la carpeta nueva', file_exists( $tmp . '/suite-sysman/sisman-suite.php' ) );
+
+// Un zip de otro plugin no se toca.
+$ajeno = $tmp . '/otro-plugin';
+@mkdir( $ajeno );
+file_put_contents( $ajeno . '/otro.php', '<?php' );
+check( 'carpeta: otros plugins no se renombran',
+    $ajeno . '/' === $upd->renombrar_carpeta( $ajeno . '/', $tmp, null, [ 'plugin' => 'otro-plugin/otro.php' ] ) );
+
+// Instalación nueva desde un zip subido a mano: sin 'plugin' en $hook_extra.
+$subido = $tmp . '/suite-sysman-main';
+@mkdir( $subido );
+file_put_contents( $subido . '/sisman-suite.php', '<?php' );
+$GLOBALS['wp_filesystem']->delete( $tmp . '/suite-sysman', true );
+check( 'carpeta: una instalación desde zip también queda en suite-sysman',
+    $tmp . '/suite-sysman/' === $upd->renombrar_carpeta( $subido . '/', $tmp, null, [ 'type' => 'plugin', 'action' => 'install' ] ) );
+$GLOBALS['wp_filesystem']->delete( $tmp, true );
+
+// Al cambiar de carpeta, el plugin activo sigue activo.
+update_option( 'active_plugins', [ 'akismet/akismet.php', SYSMAN_SUITE_BASENAME ] );
+$upd->conservar_activacion( true, [ 'plugin' => SYSMAN_SUITE_BASENAME ], [] );
+$activos = get_option( 'active_plugins' );
+check( 'carpeta: la activación pasa a suite-sysman/sisman-suite.php',
+    in_array( 'suite-sysman/sisman-suite.php', $activos, true ) );
+check( 'carpeta: la ruta vieja deja de figurar como activa',
+    ! in_array( SYSMAN_SUITE_BASENAME, $activos, true ) );
+check( 'carpeta: los demás plugins activos no se tocan', in_array( 'akismet/akismet.php', $activos, true ) );
+
 // ─── Filtro de vigencia ──────────────────────────────────────────
 [ $clausula, $paramsVig ] = \SysmanSuite\Helpers::filtro_vigencia();
 check( 'vigencia: la cláusula compara normalizando mayúsculas y espacios',

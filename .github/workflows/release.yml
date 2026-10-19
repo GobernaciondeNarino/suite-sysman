@@ -1,0 +1,40 @@
+name: Release
+
+# Publica en cada etiqueta vX.Y.Z un zip instalable cuya carpeta raíz es
+# «suite-sysman». El actualizador del plugin prefiere este archivo al zipball
+# de GitHub, que trae una carpeta con el nombre del repositorio y el commit.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Comprobar que la versión coincide con la etiqueta
+        run: |
+          etiqueta="${GITHUB_REF_NAME#v}"
+          version=$(grep -m1 "^ \* Version:" sisman-suite.php | awk '{print $3}')
+          if [ "$etiqueta" != "$version" ]; then
+            echo "La etiqueta ($etiqueta) no coincide con la versión del plugin ($version)" >&2
+            exit 1
+          fi
+
+      - name: Armar suite-sysman.zip
+        run: |
+          mkdir -p build/suite-sysman
+          git archive HEAD | tar -x -C build/suite-sysman
+          cd build && zip -rq ../suite-sysman.zip suite-sysman
+
+      - name: Publicar el release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: suite-sysman.zip
+          generate_release_notes: true

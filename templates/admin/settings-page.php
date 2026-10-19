@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $api_base_url   = get_option( 'sysman_api_base_url', 'https://narino-gob.sysman.com.co/sysmanApi/autoservicio/v1/informesGobNar' );
-$github_repo    = get_option( 'sysman_github_repo', 'GobernaciondeNarino/sysman-suite' );
+$github_repo    = get_option( 'sysman_github_repo', 'GobernaciondeNarino/suite-sysman' );
 $d3plus_cdn_url = get_option( 'sysman_d3plus_cdn_url', SYSMAN_SUITE_D3PLUS_CDN );
 $compania       = get_option( 'sysman_api_compania', '001' );
 $anio           = get_option( 'sysman_api_anio', (int) current_time( 'Y' ) );
@@ -130,7 +130,7 @@ $frequency      = get_option( 'sysman_import_frequency', 'daily' );
                                 <span style="color:#666;">https://github.com/</span>
                                 <input type="text" id="sysman_github_repo" name="sysman_github_repo"
                                        value="<?php echo esc_attr( $github_repo ); ?>"
-                                       class="regular-text" placeholder="GobernaciondeNarino/sysman-suite">
+                                       class="regular-text" placeholder="GobernaciondeNarino/suite-sysman">
                             </div>
                             <p class="description">
                                 <?php esc_html_e( 'Repositorio desde donde se verifican actualizaciones del plugin. Formato: propietario/repositorio.', 'sysman-suite' ); ?>
