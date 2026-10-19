@@ -41,6 +41,8 @@ class Importer {
         add_action( 'wp_ajax_sysman_check_duplicates', [ $this, 'ajax_check_duplicates' ] );
         add_action( 'wp_ajax_sysman_repair_schema', [ $this, 'ajax_repair_schema' ] );
         add_action( 'wp_ajax_sysman_check_sync', [ $this, 'ajax_check_sync' ] );
+        add_action( 'wp_ajax_sysman_remove_duplicates', [ $this, 'ajax_remove_duplicates' ] );
+        add_action( 'wp_ajax_sysman_delete_months', [ $this, 'ajax_delete_months' ] );
     }
 
     /** Nombre de la opción que hace de cerrojo entre importaciones. */
@@ -116,6 +118,28 @@ class Importer {
     public function limpiar_periodo( string $compania, int $anio, int $mes = 0, string $informe = 'all' ): array {
         $tablas = self::TABLAS_POR_INFORME[ $informe ] ?? [];
         return $this->database->purge_period( $compania, $anio, $mes, $tablas );
+    }
+
+    /**
+     * Delete whole months from the monthly tables (plan, ejecución, auxiliar
+     * e ingresos). Nómina es anual y no se toca.
+     *
+     * Las vistas consultan un mes a la vez: los meses que nadie consulta solo
+     * ocupan espacio y alargan los informes de integridad.
+     *
+     * @param int[] $meses 1–12; cualquier otro valor se ignora, nunca se
+     *                     interpreta como «el año entero».
+     * @return array<int, array<string, int>> Filas borradas por mes y tabla.
+     */
+    public function eliminar_meses( string $compania, int $anio, array $meses ): array {
+        $borradas = [];
+        foreach ( array_unique( array_map( 'intval', $meses ) ) as $mes ) {
+            if ( $mes < 1 || $mes > 12 ) {
+                continue;
+            }
+            $borradas[ $mes ] = $this->database->purge_period( $compania, $anio, $mes, Import_Scope::tablas_mensuales() );
+        }
+        return $borradas;
     }
 
     /**
@@ -559,9 +583,140 @@ class Importer {
         }
 
         wp_send_json_success( [
+            'compania'  => $compania,
             'nota'      => $nota,
+            'en_vistas' => $this->periodos_en_vistas( $compania ),
             'cobertura' => $cobertura,
             'cruce'     => $anio > 0 && $mes > 0 ? $sync->cruce( $compania, $anio, $mes ) : null,
+        ] );
+    }
+
+    /**
+     * AJAX: elimina las copias de importaciones anteriores de un periodo (o de
+     * todos los que marca el informe de duplicados, si no se indica tabla).
+     */
+    public function ajax_remove_duplicates(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        $tabla    = sanitize_key( wp_unslash( $_POST['tabla'] ?? '' ) );
+        $compania = sanitize_text_field( wp_unslash( $_POST['compania'] ?? '' ) );
+        $anio     = absint( $_POST['anio'] ?? 0 );
+        $mes      = absint( $_POST['mes'] ?? 0 );
+
+        if ( '' !== $tabla ) {
+            if ( ! in_array( $tabla, Import_Scope::tablas(), true ) ) {
+                wp_send_json_error( [ 'message' => 'Tabla no válida.' ] );
+            }
+            if ( '' === $compania || $anio < 2000 || $anio > 2100 || $mes > 12 ) {
+                wp_send_json_error( [ 'message' => 'Periodo no válido.' ] );
+            }
+        }
+
+        if ( ! $this->adquirir_bloqueo( 'duplicados' ) ) {
+            wp_send_json_error( [ 'message' => 'Hay una importación en curso; elimine los duplicados cuando termine.' ] );
+        }
+
+        try {
+            $hechos = '' === $tabla
+                ? $this->database->remove_all_duplicates( $anio )
+                : [ [
+                    'tabla'    => $tabla,
+                    'compania' => $compania,
+                    'anio'     => $anio,
+                    'mes'      => $mes,
+                    'borradas' => $this->database->remove_duplicates( $tabla, $compania, $anio, $mes ),
+                ] ];
+        } finally {
+            $this->liberar_bloqueo();
+        }
+
+        $fallos = array_filter( $hechos, static fn( $h ) => false === $h['borradas'] );
+        if ( ! empty( $fallos ) ) {
+            wp_send_json_error( [ 'message' => 'No se pudieron eliminar los duplicados de ' . count( $fallos ) . ' periodo(s). Revise el log.' ] );
+        }
+
+        wp_send_json_success( [
+            'eliminadas' => array_sum( array_column( $hechos, 'borradas' ) ),
+            'periodos'   => count( $hechos ),
+        ] );
+    }
+
+    /**
+     * Periodos que las vistas públicas muestran cuando no se les fija uno: el
+     * último mes con plan y ejecución (Gastos) y el último con ingresos.
+     *
+     * @return array{gastos:array{anio:int, mes:int}, ingresos:array{anio:int, mes:int}}
+     */
+    public function periodos_en_vistas( string $compania ): array {
+        return [
+            'gastos'   => \SysmanSuite\Presupuesto\Repository::instance()->ultimo_periodo( $compania ),
+            'ingresos' => \SysmanSuite\Presupuesto\IngresosRepository::instance()->ultimo_periodo( $compania ),
+        ];
+    }
+
+    /**
+     * AJAX: elimina meses importados. Con `mes` borra ese mes; con
+     * `conservar`, todos los meses del año salvo ese y los que las vistas
+     * muestran por defecto.
+     */
+    public function ajax_delete_months(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        $compania  = sanitize_text_field( wp_unslash( $_POST['compania'] ?? '001' ) ) ?: '001';
+        $anio      = absint( $_POST['anio'] ?? 0 );
+        $mes       = absint( $_POST['mes'] ?? 0 );
+        $conservar = absint( $_POST['conservar'] ?? 0 );
+
+        if ( $anio < 2000 || $anio > 2100 ) {
+            wp_send_json_error( [ 'message' => 'Año no válido.' ] );
+        }
+
+        if ( $mes >= 1 && $mes <= 12 ) {
+            $meses = [ $mes ];
+        } elseif ( $conservar >= 1 && $conservar <= 12 ) {
+            $con_datos = array_column( ( new Sincronizacion() )->cobertura( $compania, $anio ), 'mes' );
+
+            // Si el mes que se conserva no tiene datos, borrar «los demás»
+            // vaciaría el año entero.
+            if ( ! in_array( $conservar, $con_datos, true ) ) {
+                wp_send_json_error( [ 'message' => 'El mes que se conserva no tiene datos importados; no se eliminó nada.' ] );
+            }
+
+            // El mes elegido puede estar a medio importar (ejecución sin plan)
+            // mientras las vistas siguen mostrando el anterior: ese tampoco se
+            // borra en bloque, o las páginas publicadas quedarían vacías.
+            $protegidos = [ $conservar ];
+            foreach ( $this->periodos_en_vistas( $compania ) as $p ) {
+                if ( (int) $p['anio'] === $anio ) {
+                    $protegidos[] = (int) $p['mes'];
+                }
+            }
+            $meses = array_values( array_diff( $con_datos, $protegidos ) );
+        } else {
+            wp_send_json_error( [ 'message' => 'Mes no válido.' ] );
+        }
+
+        if ( ! $this->adquirir_bloqueo( 'meses' ) ) {
+            wp_send_json_error( [ 'message' => 'Hay una importación en curso; elimine los meses cuando termine.' ] );
+        }
+
+        try {
+            $borradas = $this->eliminar_meses( $compania, $anio, $meses );
+        } finally {
+            $this->liberar_bloqueo();
+        }
+
+        wp_send_json_success( [
+            'meses'      => array_keys( $borradas ),
+            'eliminadas' => array_sum( array_map( 'array_sum', $borradas ) ),
         ] );
     }
 
