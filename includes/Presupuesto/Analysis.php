@@ -830,7 +830,7 @@ class Analysis {
         return '$' . number_format_i18n( $valor, 0 );
     }
 
-    private static function porcentaje( float $fraccion ): string {
+    public static function porcentaje( float $fraccion ): string {
         return number_format_i18n( $fraccion * 100, 1 ) . '%';
     }
 

@@ -202,15 +202,23 @@ $meses = [
         </div>
         <div class="sysman-card-body">
             <p class="description">
-                <?php esc_html_e( 'Compara, para cada tabla y periodo, cuántas filas hay frente a cuántos registros distintos representan. Si sobran filas, el periodo se importó dos veces y las cifras salen infladas: la solución es reimportar ese periodo con «Limpiar el periodo antes de importar».', 'sysman-suite' ); ?>
+                <?php esc_html_e( 'Revisa la estructura de las cinco tablas (columnas, índices, motor, periodos inválidos y posibles textos truncados) y compara, para cada tabla y periodo, cuántas filas hay frente a cuántos registros distintos representan. Si sobran filas, el periodo se importó dos veces y las cifras salen infladas: la solución es reimportar ese periodo con «Limpiar el periodo antes de importar».', 'sysman-suite' ); ?>
             </p>
             <p>
                 <button type="button" id="sysman-check-dupes" class="button">
                     <span class="dashicons dashicons-search" aria-hidden="true"></span>
-                    <?php esc_html_e( 'Verificar duplicados', 'sysman-suite' ); ?>
+                    <?php esc_html_e( 'Verificar integridad', 'sysman-suite' ); ?>
+                </button>
+                <button type="button" id="sysman-check-sync" class="button">
+                    <span class="dashicons dashicons-randomize" aria-hidden="true"></span>
+                    <?php esc_html_e( 'Verificar sincronización', 'sysman-suite' ); ?>
                 </button>
             </p>
+            <p class="description">
+                <?php esc_html_e( 'La sincronización revisa que los informes importados por separado correspondan al mismo corte: qué meses tiene cada tabla y, para el año y mes elegidos arriba, cuánto presupuesto de la ejecución no encuentra su rubro en el plan y queda fuera de las vistas.', 'sysman-suite' ); ?>
+            </p>
             <div id="sysman-dupes-result" aria-live="polite"></div>
+            <div id="sysman-sync-result" aria-live="polite"></div>
         </div>
     </div>
 

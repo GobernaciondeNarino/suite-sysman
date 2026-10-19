@@ -452,6 +452,321 @@ check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['pa
 check( 'avance de ingresos: concordancia masculina',
     ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
 
+// ─── Integridad estructural: reconciliar el esquema ─────────────
+use SysmanSuite\Ejecucion\Schema;
+
+foreach ( array_keys( Schema::TABLAS ) as $nombreTabla ) {
+    $defT = Schema::definicion( $nombreTabla );
+    check( "Esquema {$nombreTabla}: el DDL se parsea en columnas e índices",
+        count( $defT['columnas'] ) > 5 && count( $defT['indices'] ) > 1
+        && ! isset( $defT['columnas']['PRIMARY'] ) && ! isset( $defT['columnas']['KEY'] ) );
+}
+
+$defPlan = Schema::definicion( 'sysman_plan_presupuestal' );
+check( 'Esquema: tipovigencia está en el DDL del plan',
+    0 === strpos( $defPlan['columnas']['tipovigencia'] ?? '', 'tipovigencia VARCHAR(64)' ) );
+check( 'Esquema: las columnas con dígitos se reconocen (apellido1/apellido2)',
+    isset( Schema::definicion( 'sysman_personal_nomina' )['columnas']['apellido1'], Schema::definicion( 'sysman_personal_nomina' )['columnas']['apellido2'] ) );
+check( 'Esquema: ingresos tiene índice por compañía y periodo',
+    isset( Schema::definicion( 'sysman_ejecucion_ingresos' )['indices']['idx_compania_anio_mes'] ) );
+check( 'Esquema: el auxiliar tiene índice para la cadena por rubro',
+    isset( Schema::definicion( 'sysman_auxiliar_cuentas' )['indices']['idx_rubro_periodo'] ) );
+
+// Una instalación antigua: el plan sin tipovigencia ni idx_lookup, con una columna heredada.
+$colsViejas = array_diff( array_keys( $defPlan['columnas'] ), [ 'tipovigencia' ] );
+$colsViejas[] = 'synced_at';
+$idxViejos  = array_merge( [ 'PRIMARY' ], array_diff( array_keys( $defPlan['indices'] ), [ 'idx_lookup' ] ) );
+$difPlan    = Schema::diferencias( 'sysman_plan_presupuestal', $colsViejas, $idxViejos );
+check( 'Esquema: detecta la columna que falta', [ 'tipovigencia' ] === array_keys( $difPlan['columnas_faltantes'] ) );
+check( 'Esquema: detecta el índice que falta', [ 'idx_lookup' ] === array_keys( $difPlan['indices_faltantes'] ) );
+check( 'Esquema: informa la columna sobrante sin proponer borrarla', [ 'synced_at' ] === $difPlan['columnas_sobrantes'] );
+check( 'Esquema: una tabla completa no tiene diferencias',
+    [] === Schema::diferencias( 'sysman_plan_presupuestal', array_keys( $defPlan['columnas'] ), array_merge( [ 'PRIMARY' ], array_keys( $defPlan['indices'] ) ) )['columnas_faltantes'] );
+check( 'Esquema: la comparación no distingue mayúsculas (Windows/macOS)',
+    [] === Schema::diferencias( 'sysman_plan_presupuestal', array_map( 'strtoupper', array_keys( $defPlan['columnas'] ) ), [] )['columnas_faltantes'] );
+
+check( 'Esquema: longitudes VARCHAR del DDL',
+    50 === ( Schema::longitudes_varchar( 'sysman_ejecucion_ingresos' )['cuenta'] ?? 0 )
+    && ! isset( Schema::longitudes_varchar( 'sysman_ejecucion_ingresos' )['apropiado'] ) );
+
+// reconciliar() sobre un $wpdb simulado: emite ALTER TABLE ADD solo para lo que falta.
+class Schema_Fake_Wpdb {
+    public string $prefix = 'wp_';
+    public string $last_error = '';
+    public array $alter = [];
+    public array $cols = [];
+    public array $idx = [];
+    public function prepare( $q, ...$a ) { return vsprintf( str_replace( '%s', "'%s'", $q ), $a ); }
+    public function get_var( $q ) {
+        return preg_match( "/SHOW TABLES LIKE '([^']+)'/", $q, $m ) && isset( $this->cols[ $m[1] ] ) ? $m[1] : null;
+    }
+    public function get_col( $q, $i = 0 ) {
+        preg_match( '/`([^`]+)`/', $q, $m );
+        return $this->cols[ $m[1] ] ?? [];
+    }
+    public function get_results( $q, $o = null ) {
+        preg_match( '/`([^`]+)`/', $q, $m );
+        return array_map( fn( $k ) => [ 'Key_name' => $k ], $this->idx[ $m[1] ] ?? [] );
+    }
+    public function query( $q ) { $this->alter[] = $q; return 1; }
+}
+$wpdbReal       = $GLOBALS['wpdb'] ?? null;
+$fakeEsq        = new Schema_Fake_Wpdb();
+$fakeEsq->cols['wp_sysman_plan_presupuestal'] = array_values( array_diff( array_keys( $defPlan['columnas'] ), [ 'tipovigencia' ] ) );
+$fakeEsq->idx['wp_sysman_plan_presupuestal']  = array_merge( [ 'PRIMARY' ], array_keys( $defPlan['indices'] ) );
+$GLOBALS['wpdb'] = $fakeEsq;
+$cambiosEsq      = Schema::reconciliar();
+$GLOBALS['wpdb'] = $wpdbReal;
+check( 'Esquema: reconciliar añade la columna faltante con su definición canónica',
+    1 === count( $fakeEsq->alter )
+    && false !== strpos( $fakeEsq->alter[0], "ALTER TABLE `wp_sysman_plan_presupuestal` ADD COLUMN tipovigencia VARCHAR(64) NOT NULL DEFAULT ''" ) );
+check( 'Esquema: reconciliar no toca las tablas que no existen', [ 'sysman_plan_presupuestal' ] === array_keys( $cambiosEsq ) );
+check( 'Esquema: reconciliar nunca emite DROP',
+    [] === array_filter( $fakeEsq->alter, fn( $q ) => false !== stripos( $q, 'DROP' ) ) );
+
+// ─── Sincronización entre tablas ─────────────────────────────────
+$sync = new \SysmanSuite\Sincronizacion();
+
+$solo = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 10, 'tablas' => [
+    'sysman_ejecucion_gastos' => [ 'filas' => 10, 'ultima' => '2026-10-03 09:00:00' ],
+] ] );
+check( 'Sync: ejecución sin plan en el mes se avisa',
+    1 === count( array_filter( $solo['avisos'], fn( $a ) => false !== strpos( $a, 'no plan presupuestal' ) ) ) );
+
+$desfase = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 9, 'tablas' => [
+    'sysman_plan_presupuestal' => [ 'filas' => 5, 'ultima' => '2026-10-01 08:00:00' ],
+    'sysman_ejecucion_gastos'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+    'sysman_auxiliar_cuentas'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+] ] );
+check( 'Sync: plan y ejecución importados con días de diferencia se avisa',
+    1 === count( $desfase['avisos'] ) && false !== strpos( $desfase['avisos'][0], '49 horas' ) );
+
+$alDia = $sync->con_avisos( [ 'anio' => 2026, 'mes' => 9, 'tablas' => [
+    'sysman_plan_presupuestal' => [ 'filas' => 5, 'ultima' => '2026-10-03 08:00:00' ],
+    'sysman_ejecucion_gastos'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:00:00' ],
+    'sysman_auxiliar_cuentas'  => [ 'filas' => 5, 'ultima' => '2026-10-03 09:30:00' ],
+] ] );
+check( 'Sync: un periodo completo y al día no tiene avisos', [] === $alDia['avisos'] );
+
+$base = [
+    'ejecucion'             => [ 'filas' => 4, 'apropiacion' => 1550.0, 'compromisos' => 600.0 ],
+    'en_vistas'             => [ 'filas' => 3, 'apropiacion' => 1600.0, 'compromisos' => 700.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 2, 'apropiacion' => 250.0, 'ejemplos' => [ 'C', 'D' ] ],
+    'plan_sin_ejecucion'    => [ 'filas' => 1, 'ejemplos' => [ 'E' ] ],
+    'plan_repetido'         => [ 'codigos' => 1, 'inflado' => 300.0, 'ejemplos' => [ 'B' ] ],
+    'plan_por_vigencia'     => [ 'VIGENCIA ACTUAL' => 4, 'RESERVAS' => 1, '' => 1 ],
+    'plan_sin_tipovigencia' => 1,
+    'auxiliar_sin_plan'     => [ 'rubros' => 1, 'ejemplos' => [ 'Z' ] ],
+];
+$diag = $sync->con_diagnostico( $base );
+check( 'Sync: cuantifica lo que queda fuera de las vistas', 250.0 === $diag['fuera_de_vistas']
+    && abs( $diag['porcentaje_fuera'] - 250 / 1550 ) < 1e-9 );
+check( 'Sync: avisa ejecución sin plan, repetidos, sin vigencia y auxiliar (4 avisos)', 4 === count( $diag['avisos'] ) && ! $diag['sincronizado'] );
+check( 'Sync: con repetidos no se da por descuadre lo que ya se explicó',
+    [] === array_filter( $diag['avisos'], fn( $a ) => false !== strpos( $a, 'no cuadran' ) ) );
+
+$limpio = $sync->con_diagnostico( array_merge( $base, [
+    'en_vistas'             => [ 'filas' => 4, 'apropiacion' => 1550.0, 'compromisos' => 600.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 0, 'apropiacion' => 0.0, 'ejemplos' => [] ],
+    'plan_repetido'         => [ 'codigos' => 0, 'inflado' => 0.0, 'ejemplos' => [] ],
+    'plan_sin_tipovigencia' => 0,
+    'auxiliar_sin_plan'     => [ 'rubros' => 0, 'ejemplos' => [] ],
+] ) );
+check( 'Sync: cuando todo cuadra, sincronizado', $limpio['sincronizado'] && [] === $limpio['avisos'] );
+
+$descuadre = $sync->con_diagnostico( array_merge( $base, [
+    'en_vistas'             => [ 'filas' => 4, 'apropiacion' => 1000.0, 'compromisos' => 600.0 ],
+    'ejecucion_sin_plan'    => [ 'filas' => 0, 'apropiacion' => 0.0, 'ejemplos' => [] ],
+    'plan_repetido'         => [ 'codigos' => 0, 'inflado' => 0.0, 'ejemplos' => [] ],
+    'plan_sin_tipovigencia' => 0,
+    'auxiliar_sin_plan'     => [ 'rubros' => 0, 'ejemplos' => [] ],
+] ) );
+check( 'Sync: un descuadre sin explicación se avisa',
+    1 === count( $descuadre['avisos'] ) && false !== strpos( $descuadre['avisos'][0], 'no cuadran' ) );
+
+check( 'Sync: la clave del plan incluye tipovigencia (reservas no son duplicados)',
+    in_array( 'tipovigencia', \SysmanSuite\Import_Scope::clave_natural( 'sysman_plan_presupuestal' ), true ) );
+
+// ─── IA: clientes, redactor y asistente ──────────────────────────
+use SysmanSuite\IA\ClaudeCliente;
+use SysmanSuite\IA\OpenAICliente;
+use SysmanSuite\IA\Redactor;
+use SysmanSuite\IA\IAModule;
+
+$cl = new ClaudeCliente( 'sk-test', 'claude-opus-5-5', 'medium' );
+$cuerpoCl = $cl->cuerpo( 'sistema', 'usuario' );
+check( 'Claude: modelo, sistema y un único mensaje de usuario (sin prefill)',
+    'claude-opus-5-5' === $cuerpoCl['model'] && 'sistema' === $cuerpoCl['system']
+    && 1 === count( $cuerpoCl['messages'] ) && 'user' === $cuerpoCl['messages'][0]['role'] );
+check( 'Claude: sin temperature ni budget_tokens (Opus 5.5 los rechaza)',
+    ! isset( $cuerpoCl['temperature'] ) && ! isset( $cuerpoCl['thinking'] ) && 'medium' === $cuerpoCl['output_config']['effort'] );
+check( 'Claude: Opus pide reintento del servidor ante un rechazo, con su cabecera beta',
+    'default' === ( $cuerpoCl['fallbacks'] ?? '' ) && 'server-side-fallback-2026-07-01' === ( $cl->cabeceras()['anthropic-beta'] ?? '' ) );
+$haiku = new ClaudeCliente( 'sk-test', 'claude-haiku-5-5' );
+check( 'Claude: Haiku no envía fallbacks (no tiene reintento del servidor)',
+    ! isset( $haiku->cuerpo( 'a', 'b' )['fallbacks'] ) && ! isset( $haiku->cabeceras()['anthropic-beta'] ) );
+check( 'Claude: cabeceras de autenticación y versión',
+    'sk-test' === $cl->cabeceras()['x-api-key'] && '2023-06-01' === $cl->cabeceras()['anthropic-version'] );
+
+$okCl = ClaudeCliente::leer_respuesta( [ 'model' => 'claude-opus-5-5', 'stop_reason' => 'end_turn', 'content' => [
+    [ 'type' => 'thinking', 'thinking' => '' ], [ 'type' => 'text', 'text' => ' Hola ' ], [ 'type' => 'text', 'text' => 'mundo' ],
+] ] );
+check( 'Claude: solo junta los bloques de texto (ignora el pensamiento)', is_array( $okCl ) && 'Hola mundo' === $okCl['texto'] );
+check( 'Claude: un rechazo se detecta antes de leer el contenido',
+    is_wp_error( ClaudeCliente::leer_respuesta( [ 'stop_reason' => 'refusal', 'content' => [ [ 'type' => 'text', 'text' => 'x' ] ] ] ) ) );
+check( 'Claude: una respuesta cortada no se publica',
+    is_wp_error( ClaudeCliente::leer_respuesta( [ 'stop_reason' => 'max_tokens', 'content' => [ [ 'type' => 'text', 'text' => 'x' ] ] ] ) ) );
+
+$oa = new OpenAICliente( 'sk-oa', 'gpt-5-mini' );
+$cuerpoOa = $oa->cuerpo( 'sis', 'usu' );
+check( 'OpenAI: max_completion_tokens y mensajes system + user',
+    isset( $cuerpoOa['max_completion_tokens'] ) && 'system' === $cuerpoOa['messages'][0]['role'] && ! isset( $cuerpoOa['temperature'] ) );
+check( 'OpenAI: lee el contenido', 'Texto' === ( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => 'Texto' ], 'finish_reason' => 'stop' ] ] ] )['texto'] ?? '' ) );
+check( 'OpenAI: rechazo y corte son errores',
+    is_wp_error( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => null, 'refusal' => 'no' ] ] ] ] ) )
+    && is_wp_error( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => 'a' ], 'finish_reason' => 'length' ] ] ] ) ) );
+
+check( 'IA cifras: importes y porcentajes normalizados',
+    [ '$2.738.700.871.545', '53,7%' ] === Redactor::cifras( 'Un total de $2.738.700.871.545. Equivale al 53,7 % del presupuesto.' ) );
+
+$fuenteIA = 'El total es $1.000.000 y Educación concentra $600.000, el 60,0 %.';
+$textoOk  = 'La Gobernación de Nariño consolida un presupuesto de $1.000.000, del cual la Secretaría de Educación concentra $600.000, equivalente al 60,0 % del total.';
+check( 'IA validar: acepta un texto con las mismas cifras', $textoOk === Redactor::validar( $textoOk, $fuenteIA ) );
+check( 'IA validar: rechaza un importe inventado',
+    is_wp_error( Redactor::validar( str_replace( '$600.000', '$650.000', $textoOk ), $fuenteIA ) ) );
+check( 'IA validar: rechaza un porcentaje inventado',
+    is_wp_error( Redactor::validar( str_replace( '60,0 %', '61 %', $textoOk ), $fuenteIA ) ) );
+check( 'IA validar: quita markdown, comillas y saltos (un solo párrafo)',
+    $textoOk === Redactor::validar( "\"**La Gobernación de Nariño** consolida un presupuesto de \$1.000.000,\n\ndel cual la Secretaría de Educación concentra \$600.000, equivalente al 60,0 % del total.\"", $fuenteIA ) );
+check( 'IA validar: rechaza textos demasiado cortos', is_wp_error( Redactor::validar( 'Hola.', $fuenteIA ) ) );
+
+[ $sisIA, $usuIA ] = Redactor::prompt( 'Texto base.', [ 'tipo' => 'cualitativo', 'vista' => 'avance', 'filas' => [] ] );
+check( 'IA prompt: exige un párrafo, solo los datos dados y cifras exactas',
+    false !== strpos( $sisIA, 'único párrafo' ) && false !== strpos( $sisIA, 'Usa únicamente' ) && false !== strpos( $sisIA, 'exactamente' ) );
+check( 'IA prompt: en avance, el global ponderado no es promedio', false !== strpos( $sisIA, 'ponderado' ) );
+check( 'IA prompt: los datos viajan delimitados', false !== strpos( $usuIA, '<texto_base>' ) && false !== strpos( $usuIA, '<datos>' ) );
+
+// Proveedor simulado: cuenta llamadas y devuelve lo que se le indique.
+class Proveedor_Falso implements \SysmanSuite\IA\Proveedor {
+    public int $llamadas = 0;
+    public function __construct( public $respuesta ) {}
+    public function nombre(): string { return 'anthropic'; }
+    public function modelo(): string { return 'claude-opus-5-5'; }
+    public function generar( string $s, string $u ) { $this->llamadas++; return $this->respuesta; }
+}
+$analisisIA = [ 'titulo' => 'Descripción', 'parrafos' => [ $fuenteIA ], 'metricas' => [] ];
+$hechosIA   = [ 'tipo' => 'descripcion', 'filas' => [ [ 'nombre' => 'Educación', 'valor' => '$600.000', 'participacion' => '60,0 %' ] ] ];
+
+$GLOBALS['__test_transients'] = [];
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 30;
+$falso = new Proveedor_Falso( [ 'texto' => $textoOk, 'modelo' => 'claude-opus-5-5' ] );
+$red   = new Redactor( $falso );
+$r1    = $red->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: publica el texto del modelo con fuente ia', 'ia' === $r1['fuente'] && [ $textoOk ] === $r1['parrafos'] );
+$r2 = $red->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: el mismo dato se sirve de caché (una sola llamada)', 'ia' === $r2['fuente'] && 1 === $falso->llamadas );
+
+$GLOBALS['__test_transients'] = [];
+$malo = new Proveedor_Falso( [ 'texto' => str_replace( '$600.000', '$999.999', $textoOk ), 'modelo' => 'x' ] );
+$r3   = ( new Redactor( $malo ) )->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: con una cifra inventada publica el texto por reglas', 'reglas' === $r3['fuente'] && [ $fuenteIA ] === $r3['parrafos'] );
+( new Redactor( $malo ) )->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: tras un fallo no se reintenta enseguida', 1 === $malo->llamadas );
+
+$GLOBALS['__test_transients'] = [];
+$caido = new Proveedor_Falso( new WP_Error( 'ia_http', 'Claude respondió 529' ) );
+check( 'IA redactar: si el proveedor falla, texto por reglas',
+    'reglas' === ( new Redactor( $caido ) )->redactar( $analisisIA, $hechosIA )['fuente'] );
+
+$GLOBALS['__test_transients'] = [];
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 0;
+$sinCupo = new Proveedor_Falso( [ 'texto' => $textoOk, 'modelo' => 'x' ] );
+check( 'IA redactar: con el tope agotado no llama al proveedor',
+    'reglas' === ( new Redactor( $sinCupo ) )->redactar( $analisisIA, $hechosIA )['fuente'] && 0 === $sinCupo->llamadas );
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 30;
+
+check( 'IA redactar: sin proveedor configurado, texto por reglas',
+    'reglas' === ( new Redactor( null ) )->redactar( $analisisIA, $hechosIA )['fuente'] );
+
+$hechosV = \SysmanSuite\Presupuesto\RestController::hechos(
+    [ 'compania' => '001', 'anio' => 2026, 'mes' => 9 ], 'descripcion',
+    [ [ 'label' => 'Educación', 'value' => 600000 ], [ 'label' => 'Salud', 'value' => 400000 ] ],
+    [], [ 'modulo' => 'gastos', 'campo_label' => 'Apropiación vigente', 'dimension_plural' => 'dependencias' ]
+);
+check( 'IA hechos: cifras ya formateadas y participación calculada',
+    '$1.000.000' === $hechosV['total'] && '60,0%' === $hechosV['filas'][0]['participacion'] && 'septiembre de 2026' === $hechosV['periodo'] );
+$hechosA = \SysmanSuite\Presupuesto\RestController::hechos(
+    [ 'compania' => '001', 'anio' => 2026, 'mes' => 9 ], 'descripcion',
+    [ [ 'label' => 'Salud', 'base' => 100, 'ejecutado' => 50, 'porcentaje' => 0.5 ] ],
+    [], [ 'avance' => [ 'base' => 100, 'ejecutado' => 50, 'porcentaje' => 0.5 ] ]
+);
+check( 'IA hechos: en avance va el global ponderado', '50,0%' === $hechosA['porcentaje_global_ponderado'] && 'avance' === $hechosA['vista'] );
+
+$deps = [ 'SECRETARÍA DE EDUCACIÓN', 'SECRETARÍA DE SALUD', 'DESPACHO DEL GOBERNADOR' ];
+check( 'Asistente: encuentra la dependencia sin tildes ni mayúsculas', 'SECRETARÍA DE SALUD' === IAModule::buscar_nombre( 'secretaria de salud', $deps ) );
+check( 'Asistente: encuentra por una palabra dicha', 'SECRETARÍA DE EDUCACIÓN' === IAModule::buscar_nombre( 'educacion', $deps ) );
+check( 'Asistente: por palabras sueltas', 'DESPACHO DEL GOBERNADOR' === IAModule::buscar_nombre( 'la oficina del gobernador', $deps ) );
+check( 'Asistente: sin coincidencia devuelve null', null === IAModule::buscar_nombre( 'hacienda', $deps ) );
+
+$GLOBALS['__test_options']['sysman_elevenlabs_secreto'] = str_repeat( 'a', 48 );
+$req = new WP_REST_Request();
+check( 'Asistente: la herramienta sin secreto se rechaza', is_wp_error( IAModule::instance()->permiso_herramienta( $req ) ) );
+$req->set_header( 'X-Sysman-Secreto', str_repeat( 'b', 48 ) );
+check( 'Asistente: con secreto equivocado se rechaza', is_wp_error( IAModule::instance()->permiso_herramienta( $req ) ) );
+$req->set_header( 'X-Sysman-Secreto', str_repeat( 'a', 48 ) );
+check( 'Asistente: con el secreto correcto se atiende', true === IAModule::instance()->permiso_herramienta( $req ) );
+
+// ─── Carpeta canónica del plugin: suite-sysman ───────────────────
+// Sistema de archivos mínimo, sobre disco real, con la interfaz de WP_Filesystem.
+class Test_Filesystem {
+    public function exists( $p ) { return file_exists( $p ); }
+    public function move( $a, $b ) { return rename( $a, $b ); }
+    public function delete( $p, $recursivo = false ) {
+        if ( is_dir( $p ) ) {
+            foreach ( array_diff( scandir( $p ), [ '.', '..' ] ) as $f ) { $this->delete( "$p/$f", true ); }
+            return rmdir( $p );
+        }
+        return file_exists( $p ) ? unlink( $p ) : true;
+    }
+}
+$GLOBALS['wp_filesystem'] = new Test_Filesystem();
+
+$upd     = new \SysmanSuite\Updater();
+$tmp     = sys_get_temp_dir() . '/sysman-upd-' . getmypid();
+$zipball = $tmp . '/GobernaciondeNarino-suite-sysman-1a2b3c';
+@mkdir( $zipball, 0777, true );
+file_put_contents( $zipball . '/sisman-suite.php', '<?php' );
+
+$res = $upd->renombrar_carpeta( $zipball . '/', $tmp, null, [ 'plugin' => SYSMAN_SUITE_BASENAME ] );
+check( 'carpeta: el zipball de GitHub queda como suite-sysman', $tmp . '/suite-sysman/' === $res );
+check( 'carpeta: el archivo principal llega a la carpeta nueva', file_exists( $tmp . '/suite-sysman/sisman-suite.php' ) );
+
+// Un zip de otro plugin no se toca.
+$ajeno = $tmp . '/otro-plugin';
+@mkdir( $ajeno );
+file_put_contents( $ajeno . '/otro.php', '<?php' );
+check( 'carpeta: otros plugins no se renombran',
+    $ajeno . '/' === $upd->renombrar_carpeta( $ajeno . '/', $tmp, null, [ 'plugin' => 'otro-plugin/otro.php' ] ) );
+
+// Instalación nueva desde un zip subido a mano: sin 'plugin' en $hook_extra.
+$subido = $tmp . '/suite-sysman-main';
+@mkdir( $subido );
+file_put_contents( $subido . '/sisman-suite.php', '<?php' );
+$GLOBALS['wp_filesystem']->delete( $tmp . '/suite-sysman', true );
+check( 'carpeta: una instalación desde zip también queda en suite-sysman',
+    $tmp . '/suite-sysman/' === $upd->renombrar_carpeta( $subido . '/', $tmp, null, [ 'type' => 'plugin', 'action' => 'install' ] ) );
+$GLOBALS['wp_filesystem']->delete( $tmp, true );
+
+// Al cambiar de carpeta, el plugin activo sigue activo.
+update_option( 'active_plugins', [ 'akismet/akismet.php', SYSMAN_SUITE_BASENAME ] );
+$upd->conservar_activacion( true, [ 'plugin' => SYSMAN_SUITE_BASENAME ], [] );
+$activos = get_option( 'active_plugins' );
+check( 'carpeta: la activación pasa a suite-sysman/sisman-suite.php',
+    in_array( 'suite-sysman/sisman-suite.php', $activos, true ) );
+check( 'carpeta: la ruta vieja deja de figurar como activa',
+    ! in_array( SYSMAN_SUITE_BASENAME, $activos, true ) );
+check( 'carpeta: los demás plugins activos no se tocan', in_array( 'akismet/akismet.php', $activos, true ) );
+
 // ─── Filtro de vigencia ──────────────────────────────────────────
 [ $clausula, $paramsVig ] = \SysmanSuite\Helpers::filtro_vigencia();
 check( 'vigencia: la cláusula compara normalizando mayúsculas y espacios',

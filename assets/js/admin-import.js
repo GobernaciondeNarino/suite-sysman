@@ -11,7 +11,7 @@
     const ImportManager = {
         init() {
             this.bindEvents();
-            this.toggleAuxiliarOptions();
+            this.toggleReportOptions();
         },
 
         bindEvents() {
@@ -19,6 +19,8 @@
             $('#sysman-report').on('change', () => this.toggleReportOptions());
             $('#sysman-compania').on('change', () => this.toggleCustomCompania());
             $('#sysman-check-dupes').on('click', () => this.checkDuplicates());
+            $('#sysman-dupes-result').on('click', '#sysman-repair-schema', () => this.repairSchema());
+            $('#sysman-check-sync').on('click', () => this.checkSync());
         },
 
         toggleReportOptions() {
@@ -66,13 +68,185 @@
                             + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
                         return;
                     }
-                    caja.html(this.renderDuplicates(response.data.periodos || []));
+                    caja.html(this.renderEstructura(response.data.estructura)
+                        + this.renderDuplicates(response.data.periodos || []));
                 },
                 error: () => {
                     caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>');
                 },
                 complete: () => btn.prop('disabled', false),
             });
+        },
+
+        /* Sincronización: meses por tabla y cruce plan ↔ ejecución ↔ auxiliar. */
+        checkSync() {
+            const btn = $('#sysman-check-sync');
+            const caja = $('#sysman-sync-result');
+
+            btn.prop('disabled', true);
+            caja.html('<p>Verificando…</p>');
+
+            $.post(sysmanAdmin.ajaxUrl, {
+                action: 'sysman_check_sync',
+                nonce: sysmanAdmin.nonce,
+                compania: this.getCompania(),
+                anio: $('#sysman-anio').val(),
+                mes: $('#sysman-mes').val(),
+            })
+                .done((response) => {
+                    if (!response.success) {
+                        caja.html('<div class="notice notice-error inline"><p>'
+                            + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
+                        return;
+                    }
+                    caja.html(this.renderSync(response.data));
+                })
+                .fail(() => caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>'))
+                .always(() => btn.prop('disabled', false));
+        },
+
+        renderSync(data) {
+            const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const num = (n) => Number(n).toLocaleString('es-CO');
+            const pesos = (n) => '$' + Number(n).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            const tablas = {
+                sysman_plan_presupuestal: 'Plan',
+                sysman_ejecucion_gastos: 'Ejecución gastos',
+                sysman_auxiliar_cuentas: 'Auxiliar',
+                sysman_ejecucion_ingresos: 'Ingresos',
+            };
+            let html = '<h3>Sincronización entre tablas</h3>';
+            if (data.nota) {
+                html += '<p class="description">' + esc(data.nota) + '</p>';
+            }
+            const c = data.cruce;
+
+            if (c) {
+                const p = c.periodo;
+                html += c.sincronizado
+                    ? '<div class="notice notice-success inline"><p>Periodo ' + esc(p.anio) + '-' + esc(p.mes)
+                      + ': el plan y la ejecución cuadran. Las vistas muestran toda la ejecución.</p></div>'
+                    : '<div class="notice notice-error inline"><p><strong>Periodo ' + esc(p.anio) + '-' + esc(p.mes) + ':</strong></p><ul style="list-style:disc;margin-left:20px;">'
+                      + c.avisos.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>';
+
+                html += '<table class="widefat striped" style="margin-top:12px;max-width:760px;"><tbody>'
+                    + '<tr><th>Apropiación vigente en la ejecución</th><td style="text-align:right;">' + pesos(c.ejecucion.apropiacion) + ' (' + num(c.ejecucion.filas) + ' rubros)</td></tr>'
+                    + '<tr><th>Apropiación que muestran las vistas</th><td style="text-align:right;">' + pesos(c.en_vistas.apropiacion) + '</td></tr>'
+                    + '<tr><th>Fuera de las vistas (ejecución sin plan)</th><td style="text-align:right;">' + pesos(c.fuera_de_vistas)
+                    + ' · ' + (c.porcentaje_fuera * 100).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' %</td></tr>'
+                    + '<tr><th>Rubros del plan sin ejecución</th><td style="text-align:right;">' + num(c.plan_sin_ejecucion.filas) + '</td></tr>'
+                    + '<tr><th>Plan por tipo de vigencia</th><td style="text-align:right;">'
+                    + Object.keys(c.plan_por_vigencia).map((k) => esc(k || '(vacío)') + ': ' + num(c.plan_por_vigencia[k])).join(' · ') + '</td></tr>'
+                    + '</tbody></table>';
+
+                const ejemplos = (titulo, lista) => (lista && lista.length
+                    ? '<p><strong>' + titulo + ':</strong> ' + lista.map((x) => '<code>' + esc(x) + '</code>').join(' ') + '</p>' : '');
+                html += ejemplos('Ejecución sin plan (mayor apropiación primero)', c.ejecucion_sin_plan.ejemplos)
+                    + ejemplos('Códigos repetidos en el plan', c.plan_repetido.ejemplos)
+                    + ejemplos('Rubros del auxiliar que no están en el plan', c.auxiliar_sin_plan.ejemplos);
+            }
+
+            const cob = data.cobertura || [];
+            if (!cob.length) {
+                return html + '<div class="notice notice-warning inline"><p>No hay datos importados.</p></div>';
+            }
+
+            html += '<h4>Meses importados por tabla</h4><table class="widefat striped"><thead><tr><th>Periodo</th>'
+                + Object.values(tablas).map((t) => '<th style="text-align:right;">' + t + '</th>').join('')
+                + '<th>Observaciones</th></tr></thead><tbody>';
+            cob.forEach((p) => {
+                html += '<tr' + (p.avisos.length ? ' style="background:#fcf8e3;"' : '') + '><td>' + esc(p.anio) + '-' + esc(p.mes) + '</td>'
+                    + Object.keys(tablas).map((k) => {
+                        const t = p.tablas[k];
+                        return '<td style="text-align:right;"' + (t ? ' title="Importado: ' + esc(t.ultima) + '"' : '') + '>'
+                            + (t ? num(t.filas) : '—') + '</td>';
+                    }).join('')
+                    + '<td>' + (p.avisos.length ? p.avisos.map(esc).join('<br>') : '—') + '</td></tr>';
+            });
+            return html + '</tbody></table>';
+        },
+
+        /* Añade las columnas e índices que falten (nunca borra nada). */
+        repairSchema() {
+            const btn = $('#sysman-repair-schema');
+            btn.prop('disabled', true).text('Reparando…');
+
+            $.post(sysmanAdmin.ajaxUrl, { action: 'sysman_repair_schema', nonce: sysmanAdmin.nonce })
+                .done((response) => {
+                    if (!response.success) {
+                        btn.prop('disabled', false).text('Reparar estructura');
+                        window.alert(response.data && response.data.message ? response.data.message : 'Error');
+                        return;
+                    }
+                    $('#sysman-estructura').replaceWith(this.renderEstructura(response.data.estructura));
+                })
+                .fail(() => {
+                    btn.prop('disabled', false).text('Reparar estructura');
+                    window.alert('No se pudo reparar la estructura.');
+                });
+        },
+
+        renderEstructura(estructura) {
+            if (!estructura || !estructura.tablas) {
+                return '';
+            }
+            const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const num = (n) => Number(n).toLocaleString('es-CO');
+            const lista = (a) => (a && a.length ? a.map((x) => '<code>' + esc(x) + '</code>').join(' ') : '—');
+
+            let reparable = false;
+            let problemas = 0;
+            let filas = '';
+
+            estructura.tablas.forEach((t) => {
+                if (!t.existe) {
+                    problemas++;
+                    filas += '<tr style="background:#fcf0f1;"><td><code>' + esc(t.tabla) + '</code></td>'
+                        + '<td colspan="6"><strong>La tabla no existe.</strong> Desactive y active el plugin para crearla.</td></tr>';
+                    return;
+                }
+                const faltan = t.columnas_faltantes.length + t.indices_faltantes.length;
+                const trunc = Object.keys(t.posible_truncado || {});
+                const mal = faltan > 0 || !t.transaccional || t.filas_invalidas > 0 || trunc.length > 0;
+                if (faltan > 0) { reparable = true; }
+                if (mal) { problemas++; }
+
+                filas += '<tr' + (mal ? ' style="background:#fcf0f1;"' : '') + '>'
+                    + '<td><code>' + esc(t.tabla) + '</code></td>'
+                    + '<td style="text-align:right;">' + num(t.filas) + '</td>'
+                    + '<td>' + esc(t.motor) + (t.transaccional ? '' : ' <strong>(sin transacciones)</strong>') + '</td>'
+                    + '<td>' + lista(t.columnas_faltantes) + '</td>'
+                    + '<td>' + lista(t.indices_faltantes) + '</td>'
+                    + '<td style="text-align:right;">' + num(t.filas_invalidas) + '</td>'
+                    + '<td>' + lista(trunc) + '</td>'
+                    + '</tr>';
+            });
+
+            let html = '<div id="sysman-estructura"><h3 style="margin-top:0;">Estructura de las tablas</h3>';
+
+            html += problemas
+                ? '<div class="notice notice-error inline"><p><strong>' + problemas + ' tabla(s) con observaciones.</strong> '
+                  + (reparable ? 'Faltan columnas o índices: el botón los añade sin tocar los datos.' : 'Revise el detalle.') + '</p>'
+                  + (reparable ? '<p><button type="button" id="sysman-repair-schema" class="button button-primary">Reparar estructura</button></p>' : '')
+                  + '</div>'
+                : '<div class="notice notice-success inline"><p>Estructura completa: todas las columnas e índices están en su lugar.</p></div>';
+
+            if (estructura.intercalacion_mixta) {
+                html += '<div class="notice notice-warning inline"><p>Las columnas de cruce entre tablas usan intercalaciones distintas ('
+                    + Object.keys(estructura.intercalaciones_cruce).map((k) => esc(k) + ': ' + esc(estructura.intercalaciones_cruce[k])).join(', ')
+                    + '). Los cruces serán lentos o fallarán; unifique la intercalación de las tablas.</p></div>';
+            }
+
+            html += '<table class="widefat striped" style="margin-top:12px;"><thead><tr>'
+                + '<th>Tabla</th><th style="text-align:right;">Filas</th><th>Motor</th>'
+                + '<th>Columnas faltantes</th><th>Índices faltantes</th>'
+                + '<th style="text-align:right;">Periodo inválido</th><th>Posible truncado</th></tr></thead><tbody>'
+                + filas + '</tbody></table>'
+                + '<p class="description">«Sin transacciones»: la importación no puede revertirse si falla a mitad; convierta la tabla a InnoDB. '
+                + '«Posible truncado»: el valor más largo llena el campo, puede que la API envíe textos más largos de lo que cabe.</p></div>'
+                + '<h3>Duplicados por periodo</h3>';
+
+            return html;
         },
 
         renderDuplicates(periodos) {

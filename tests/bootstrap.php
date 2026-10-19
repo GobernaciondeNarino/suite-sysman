@@ -82,6 +82,25 @@ function wp_json_encode( $data, $flags = 0 ) {
     return json_encode( $data, $flags );
 }
 function esc_url_raw( $url ) { return $url; }
+
+// ─── Opciones y utilidades de rutas (actualizador) ───────────────
+$GLOBALS['__test_options'] = [];
+function get_option( $key, $default = false ) {
+    return array_key_exists( $key, $GLOBALS['__test_options'] ) ? $GLOBALS['__test_options'][ $key ] : $default;
+}
+function update_option( $key, $value, $autoload = null ) {
+    $GLOBALS['__test_options'][ $key ] = $value;
+    return true;
+}
+function is_multisite() { return false; }
+function trailingslashit( $p ) { return rtrim( $p, '/\\' ) . '/'; }
+function untrailingslashit( $p ) { return rtrim( $p, '/\\' ); }
+function is_wp_error( $v ) { return $v instanceof WP_Error; }
+class WP_Error {
+    public function __construct( public string $code = '', public string $message = '' ) {}
+    public function get_error_code() { return $this->code; }
+    public function get_error_message() { return $this->message; }
+}
 function rest_url( $path = '' ) { return 'https://ejemplo.test/wp-json/' . ltrim( $path, '/' ); }
 function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }
 
@@ -109,10 +128,43 @@ class Database {
 }
 ' );
 
+// El actualizador necesita saber dónde está instalado el plugin. Se simula la
+// carpeta que deja el «Download ZIP» de GitHub para una rama.
+define( 'SYSMAN_SUITE_FILE', '/srv/wp-content/plugins/suite-sysman-main/sisman-suite.php' );
+define( 'SYSMAN_SUITE_BASENAME', 'suite-sysman-main/sisman-suite.php' );
+define( 'SYSMAN_SUITE_VERSION', '0.0.0-test' );
+
 require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
+require_once dirname( __DIR__ ) . '/includes/class-updater.php';
 require_once dirname( __DIR__ ) . '/includes/class-import-scope.php';
+require_once dirname( __DIR__ ) . '/includes/Ejecucion/Schema.php';
+require_once dirname( __DIR__ ) . '/includes/class-sincronizacion.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Repository.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/IngresosRepository.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Analysis.php';
+
+// ─── IA ──────────────────────────────────────────────────────────
+function delete_transient( $key ) { unset( $GLOBALS['__test_transients'][ $key ] ); return true; }
+function wp_strip_all_tags( $t ) { return trim( strip_tags( (string) $t ) ); }
+function remove_accents( $t ) {
+    return strtr( (string) $t, [ 'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n',
+        'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N' ] );
+}
+function wp_generate_password( $n = 12, $s = true, $e = false ) { return substr( str_repeat( bin2hex( random_bytes( 32 ) ), 2 ), 0, $n ); }
+class WP_REST_Request {
+    private array $p = []; private array $h = [];
+    public function __construct( $m = 'GET', $r = '' ) {}
+    public function set_param( $k, $v ) { $this->p[ $k ] = $v; }
+    public function get_param( $k ) { return $this->p[ $k ] ?? null; }
+    public function set_header( $k, $v ) { $this->h[ strtolower( str_replace( '-', '_', $k ) ) ] = $v; }
+    public function get_header( $k ) { return $this->h[ strtolower( str_replace( '-', '_', $k ) ) ] ?? null; }
+}
+require_once dirname( __DIR__ ) . '/includes/IA/Proveedor.php';
+require_once dirname( __DIR__ ) . '/includes/IA/Config.php';
+require_once dirname( __DIR__ ) . '/includes/IA/ClaudeCliente.php';
+require_once dirname( __DIR__ ) . '/includes/IA/OpenAICliente.php';
+require_once dirname( __DIR__ ) . '/includes/IA/Redactor.php';
+require_once dirname( __DIR__ ) . '/includes/Presupuesto/RestController.php';
+require_once dirname( __DIR__ ) . '/includes/IA/IAModule.php';

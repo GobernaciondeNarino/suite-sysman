@@ -39,6 +39,8 @@ class Importer {
         add_action( 'wp_ajax_sysman_start_import', [ $this, 'ajax_start_import' ] );
         add_action( 'wp_ajax_sysman_import_status', [ $this, 'ajax_import_status' ] );
         add_action( 'wp_ajax_sysman_check_duplicates', [ $this, 'ajax_check_duplicates' ] );
+        add_action( 'wp_ajax_sysman_repair_schema', [ $this, 'ajax_repair_schema' ] );
+        add_action( 'wp_ajax_sysman_check_sync', [ $this, 'ajax_check_sync' ] );
     }
 
     /** Nombre de la opción que hace de cerrojo entre importaciones. */
@@ -520,8 +522,70 @@ class Importer {
         $anio = absint( $_POST['anio'] ?? 0 );
 
         wp_send_json_success( [
-            'anio'     => $anio,
-            'periodos' => $this->database->duplicate_report( $anio ),
+            'anio'       => $anio,
+            'periodos'   => $this->database->duplicate_report( $anio ),
+            'estructura' => \SysmanSuite\Ejecucion\Schema::integridad(),
+        ] );
+    }
+
+    /**
+     * AJAX: sincronización entre tablas — periodos importados por informe y
+     * cruce plan ↔ ejecución ↔ auxiliar del periodo elegido (o el último).
+     */
+    public function ajax_check_sync(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        $compania = sanitize_text_field( wp_unslash( $_POST['compania'] ?? '001' ) ) ?: '001';
+        $anio     = absint( $_POST['anio'] ?? 0 );
+        $mes      = absint( $_POST['mes'] ?? 0 );
+
+        $sync      = new Sincronizacion();
+        $cobertura = $sync->cobertura( $compania );
+
+        // Si el mes elegido no tiene nada importado (el formulario propone el
+        // mes en curso), se revisa el periodo más reciente con datos.
+        $nota      = '';
+        $importado = array_filter( $cobertura, static fn( $p ) => $p['anio'] === $anio && $p['mes'] === $mes );
+        if ( empty( $importado ) && ! empty( $cobertura ) ) {
+            if ( $anio > 0 && $mes > 0 ) {
+                $nota = sprintf( 'No hay datos importados para %d-%d; se revisa el último periodo importado.', $anio, $mes );
+            }
+            $anio = (int) $cobertura[0]['anio'];
+            $mes  = (int) $cobertura[0]['mes'];
+        }
+
+        wp_send_json_success( [
+            'nota'      => $nota,
+            'cobertura' => $cobertura,
+            'cruce'     => $anio > 0 && $mes > 0 ? $sync->cruce( $compania, $anio, $mes ) : null,
+        ] );
+    }
+
+    /**
+     * AJAX: añade a las tablas las columnas e índices que les falten.
+     * Nunca borra columnas ni datos.
+     */
+    public function ajax_repair_schema(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        if ( ! $this->adquirir_bloqueo( 'estructura' ) ) {
+            wp_send_json_error( [ 'message' => 'Hay una importación en curso; repare la estructura cuando termine.' ] );
+        }
+
+        $cambios = \SysmanSuite\Ejecucion\Schema::reconciliar();
+        $this->liberar_bloqueo();
+
+        wp_send_json_success( [
+            'cambios'    => $cambios,
+            'estructura' => \SysmanSuite\Ejecucion\Schema::integridad(),
         ] );
     }
 

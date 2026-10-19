@@ -18,8 +18,20 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/class-visualizer.php` — CPT `sysman_chart`, construcción segura de
   consultas para gráficos D3plus y shortcode `[sysman_chart]`.
 - `includes/class-rest-api.php` — REST `sysman-suite/v1` (registros, stats, charts).
+- `includes/class-sincronizacion.php` — informe de cruce plan ↔ ejecución ↔ auxiliar
+  (solo lectura). `Ejecucion/Schema.php` es la fuente única del DDL: al añadir
+  columnas o índices, cámbialos ahí y sube `Schema::VERSION`; `reconciliar()`
+  los lleva a las instalaciones existentes (nunca borra).
+- `includes/IA/` — redacción de análisis con Claude/OpenAI (`Redactor`: la IA
+  solo reescribe el texto por reglas y cada cifra del resultado se verifica
+  contra los datos; ante cualquier duda se publica el texto por reglas) y
+  asistente de voz ElevenLabs (`IAModule`, shortcode `[sysman_asistente]`,
+  herramienta `asistente/consulta` con secreto compartido). Nunca enviar a un
+  proveedor de IA datos de `sysman_personal_nomina`.
 - `includes/class-logger.php` — log de importaciones (en `wp-content/uploads`).
-- `includes/class-updater.php` — actualizaciones desde GitHub Releases.
+- `includes/class-updater.php` — actualizaciones desde GitHub Releases. La
+  carpeta instalada es siempre `suite-sysman` (renombra el ZIP y conserva la
+  activación).
 - `includes/Ejecucion/` — módulo de seguimiento de ejecución presupuestal
   (REST `gn-sisman/v1`, shortcode `[gn_ejecucion]`).
 - `includes/DatosAbiertos/` — exportes CSV/TXT/JSON de datos abiertos.

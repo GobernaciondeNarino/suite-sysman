@@ -54,6 +54,9 @@ class RestController {
             // Porcentaje de ejecución (gastos) o de recaudo (ingresos).
             'avance'       => [ 'get_avance', 'pre_lectura', 120 ],
             'analisis'     => [ 'get_analisis', 'pre_analisis', 60 ],
+            // Mismo análisis redactado con IA (si está configurada). Cupo propio:
+            // cada texto nuevo cuesta una llamada al proveedor.
+            'analisis-ia'  => [ 'get_analisis_ia', 'pre_analisis_ia', 20 ],
         ];
 
         foreach ( $rutas as $ruta => $cfg ) {
@@ -69,7 +72,7 @@ class RestController {
                 $args['dependencia'] = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
             } elseif ( in_array( $ruta, [ 'rubro', 'item' ], true ) ) {
                 $args['codigo'] = [ 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ];
-            } elseif ( 'analisis' === $ruta ) {
+            } elseif ( in_array( $ruta, [ 'analisis', 'analisis-ia' ], true ) ) {
                 $args['vista']       = [ 'default' => 'dimensiones', 'sanitize_callback' => 'sanitize_text_field' ];
                 $args['tipo']        = [ 'default' => 'descripcion', 'sanitize_callback' => 'sanitize_text_field' ];
                 $args['valor']       = [ 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ];
@@ -298,6 +301,120 @@ class RestController {
     }
 
     public function get_analisis( \WP_REST_Request $r ): \WP_REST_Response {
+        [ $ctx, $analisis ] = $this->analizar( $r );
+
+        return new \WP_REST_Response( [
+            'meta' => $this->meta( $r, $ctx, [ 'tipo' => $r->get_param( 'tipo' ), 'campo' => $this->campo( $r ), 'valor' => $this->valor( $r ) ] ),
+            'data' => $analisis + [ 'fuente' => 'reglas' ],
+        ] );
+    }
+
+    /**
+     * El análisis redactado con IA. Si no hay proveedor configurado, si falla
+     * o si el texto trae una cifra que no está en los datos, devuelve el
+     * mismo texto por reglas (`fuente` = reglas).
+     */
+    public function get_analisis_ia( \WP_REST_Request $r ): \WP_REST_Response {
+        [ $ctx, $analisis, $filas, $totales, $opciones ] = $this->analizar( $r );
+
+        $hechos   = self::hechos( $ctx, (string) $r->get_param( 'tipo' ), $filas, $totales, $opciones );
+        $analisis = ( new \SysmanSuite\IA\Redactor() )->redactar( $analisis, $hechos );
+
+        return new \WP_REST_Response( [
+            'meta' => $this->meta( $r, $ctx, [ 'tipo' => $r->get_param( 'tipo' ), 'campo' => $this->campo( $r ), 'valor' => $this->valor( $r ) ] ),
+            'data' => $analisis,
+        ] );
+    }
+
+    /**
+     * Datos de la vista en forma legible, para que la IA redacte sobre las
+     * mismas cifras que el texto por reglas (ya formateadas: no calcula nada).
+     */
+    public static function hechos( array $ctx, string $tipo, array $filas, array $totales, array $opciones ): array {
+        $avance = ! empty( $opciones['avance'] );
+        $pct    = static fn( $x ) => Analysis::porcentaje( (float) $x );
+
+        $hechos = [
+            'entidad'    => 'Gobernación de Nariño',
+            'modulo'     => $opciones['modulo'] ?? 'gastos',
+            'tipo'       => in_array( $tipo, [ 'descripcion', 'cualitativo', 'cuantitativo' ], true ) ? $tipo : 'descripcion',
+            'vista'      => $avance ? 'avance' : 'importes',
+            'periodo'    => mb_strtolower( Helpers::month_name( (int) $ctx['mes'] ) ) . ' de ' . (int) $ctx['anio'],
+            'agrupacion' => '' !== ( $opciones['valor'] ?? '' )
+                ? 'detalle de ' . $opciones['valor']
+                : (string) ( $opciones['dimension_plural'] ?? 'dependencias' ),
+            'filas'      => [],
+        ];
+
+        if ( $avance ) {
+            $a = $opciones['avance'];
+            $hechos['medida']          = 'porcentaje ' . ( $opciones['ejecutado_label'] ?? 'comprometido' ) . ' frente a ' . ( $opciones['base_label'] ?? 'apropiación vigente' );
+            $hechos['base_total']      = Analysis::moneda( (float) ( $a['base'] ?? 0 ) );
+            $hechos['ejecutado_total'] = Analysis::moneda( (float) ( $a['ejecutado'] ?? 0 ) );
+            $hechos['porcentaje_global_ponderado'] = null !== ( $a['porcentaje'] ?? null ) ? $pct( $a['porcentaje'] ) : 'sin dato';
+            foreach ( array_slice( $filas, 0, 20 ) as $f ) {
+                $hechos['filas'][] = [
+                    'nombre'     => (string) ( $f['label'] ?? '' ),
+                    'base'       => Analysis::moneda( (float) ( $f['base'] ?? 0 ) ),
+                    'ejecutado'  => Analysis::moneda( (float) ( $f['ejecutado'] ?? 0 ) ),
+                    'porcentaje' => null !== ( $f['porcentaje'] ?? null ) ? $pct( $f['porcentaje'] ) : 'sin presupuesto',
+                ];
+            }
+            $hechos['cantidad'] = count( $filas );
+            return $hechos;
+        }
+
+        $total = array_sum( array_map( static fn( $f ) => (float) ( $f['value'] ?? 0 ), $filas ) );
+        $hechos['medida']   = (string) ( $opciones['campo_label'] ?? $opciones['campo'] ?? '' );
+        $hechos['total']    = Analysis::moneda( $total );
+        $hechos['cantidad'] = count( $filas );
+
+        foreach ( array_slice( $filas, 0, 15 ) as $f ) {
+            $v = (float) ( $f['value'] ?? 0 );
+            $hechos['filas'][] = [
+                'nombre'        => (string) ( $f['label'] ?? $f['nombre'] ?? '' ),
+                'valor'         => Analysis::moneda( $v ),
+                'participacion' => 0.0 !== $total ? $pct( $v / $total ) : $pct( 0 ),
+            ];
+        }
+        if ( count( $filas ) > 15 ) {
+            $resto = $total - array_sum( array_map( static fn( $f ) => (float) ( $f['value'] ?? 0 ), array_slice( $filas, 0, 15 ) ) );
+            $hechos['resto'] = [
+                'cantidad'      => count( $filas ) - 15,
+                'valor'         => Analysis::moneda( $resto ),
+                'participacion' => 0.0 !== $total ? $pct( $resto / $total ) : $pct( 0 ),
+            ];
+        }
+
+        return $hechos;
+    }
+
+    /**
+     * Análisis por reglas para uso interno (asistente de voz), sin pasar por
+     * el despachador REST ni por su límite por IP.
+     *
+     * @param array $params Mismos parámetros que el endpoint `analisis`.
+     * @return array{0:array, 1:array, 2:array, 3:array, 4:array}
+     */
+    public function analisis_interno( array $params ): array {
+        $r = new \WP_REST_Request( 'GET', '/' . self::NS . '/presupuesto/analisis' );
+        $defectos = [
+            'compania' => '001', 'anio' => 0, 'mes' => 0, 'modulo' => 'gastos', 'dimension' => '',
+            'campo' => '', 'longitud' => 0, 'vista' => 'dimensiones', 'tipo' => 'descripcion',
+            'valor' => '', 'dependencia' => '',
+        ];
+        foreach ( array_merge( $defectos, array_intersect_key( $params, $defectos ) ) as $k => $v ) {
+            $r->set_param( $k, $v );
+        }
+        return $this->analizar( $r );
+    }
+
+    /**
+     * Calcula el análisis por reglas de una vista.
+     *
+     * @return array{0:array, 1:array, 2:array, 3:array, 4:array} ctx, análisis, filas, totales, opciones.
+     */
+    private function analizar( \WP_REST_Request $r ): array {
         $ctx        = $this->ctx( $r );
         $campo      = $this->campo( $r );
         $valor      = $this->valor( $r );
@@ -334,29 +451,28 @@ class RestController {
             $totales = $repo->totales( $ctx, $valor );
         }
 
+        $opciones = [
+            'campo'              => $campo,
+            'campo_label'        => $this->etiqueta_campo( $r, $campo ),
+            'valor'              => $valor,
+            'modulo'             => $ingresos ? 'ingresos' : 'gastos',
+            'dimension_label'    => $ingresos ? IngresosRepository::etiqueta_dimension( $dimension ) : 'dependencia',
+            'dimension_plural'   => $ingresos ? IngresosRepository::etiqueta_plural( $dimension ) : 'dependencias',
+            'dimension_femenino' => $ingresos ? IngresosRepository::es_femenino( $dimension ) : true,
+            'base_label'         => $ingresos ? 'presupuesto definitivo' : 'apropiación vigente',
+            'ejecutado_label'    => $ingresos ? 'recaudado' : 'comprometido',
+            'avance'             => $es_avance ? self::totales_avance( $filas ) : [],
+        ];
+
         $analisis = Analysis::generar(
             (string) $r->get_param( 'tipo' ),
             $vista_pedida,
             $ctx,
             [ 'filas' => $filas, 'totales' => $totales ],
-            [
-                'campo'              => $campo,
-                'campo_label'        => $this->etiqueta_campo( $r, $campo ),
-                'valor'              => $valor,
-                'modulo'             => $ingresos ? 'ingresos' : 'gastos',
-                'dimension_label'    => $ingresos ? IngresosRepository::etiqueta_dimension( $dimension ) : 'dependencia',
-                'dimension_plural'   => $ingresos ? IngresosRepository::etiqueta_plural( $dimension ) : 'dependencias',
-                'dimension_femenino' => $ingresos ? IngresosRepository::es_femenino( $dimension ) : true,
-                'base_label'         => $ingresos ? 'presupuesto definitivo' : 'apropiación vigente',
-                'ejecutado_label'    => $ingresos ? 'recaudado' : 'comprometido',
-                'avance'             => $es_avance ? self::totales_avance( $filas ) : [],
-            ]
+            $opciones
         );
 
-        return new \WP_REST_Response( [
-            'meta' => $this->meta( $r, $ctx, [ 'tipo' => $r->get_param( 'tipo' ), 'campo' => $campo, 'valor' => $valor ] ),
-            'data' => $analisis,
-        ] );
+        return [ $ctx, $analisis, $filas, $totales, $opciones ];
     }
 
     /**

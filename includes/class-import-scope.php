@@ -23,7 +23,10 @@ class Import_Scope {
      */
     public const CLAVES_NATURALES = [
         'sysman_ejecucion_gastos'   => [ 'compania', 'anio', 'mes', 'codigocuenta' ],
-        'sysman_plan_presupuestal'  => [ 'compania', 'anio', 'mes', 'codigo' ],
+        // El plan repite el código en cada tipo de vigencia (actual, reservas,
+        // vigencias futuras): sin tipovigencia esas filas legítimas contarían
+        // como duplicados.
+        'sysman_plan_presupuestal'  => [ 'compania', 'anio', 'mes', 'codigo', 'tipovigencia' ],
         'sysman_ejecucion_ingresos' => [ 'compania', 'anio', 'mes', 'cuenta', 'codigo' ],
         // El auxiliar admite varias líneas por comprobante, así que la clave
         // incluye tercero, documento y valores: dos filas idénticas en todo eso
