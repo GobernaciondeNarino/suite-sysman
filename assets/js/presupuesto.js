@@ -685,6 +685,29 @@
     }
 
     /* ── Analisis ─────────────────────────────────────────────── */
+    function parrafosHtml(a) {
+        return (a.parrafos || []).map(function (t) {
+            return '<p class="sysman-pre__analisis-parrafo">' + esc(t) + '</p>';
+        }).join('');
+    }
+
+    /* Con ia="si", el texto por reglas se muestra de inmediato y se cambia
+       por la redaccion con IA cuando llega. Si la IA no esta configurada,
+       falla o el texto no pasa la verificacion de cifras, se queda el de
+       reglas (el servidor responde fuente = "reglas"). */
+    function mejorarConIA(caja, cfg, params) {
+        if (!cfg.ia) { return; }
+        api('analisis-ia', params).then(function (r) {
+            var a = (r && r.data) || {};
+            // La caja pudo reemplazarse mientras tanto (otro filtro elegido).
+            if (a.fuente !== 'ia' || !caja.isConnected) { return; }
+            caja.innerHTML = parrafosHtml(a) + (cfg.aviso_ia
+                ? '<p class="sysman-pre__aviso-ia">Redacción asistida por inteligencia artificial a partir de las cifras del sistema SYSMAN.</p>'
+                : '');
+            caja.setAttribute('data-fuente', 'ia');
+        }).catch(function () { /* se conserva el texto por reglas */ });
+    }
+
     function initAnalisis(el, cfg) {
         var valor = cfg.valor || '';
         var clave = Coord.clave(cfg);
@@ -702,16 +725,16 @@
             params.valor = valor;
 
             api('analisis', params).then(function (resp) {
-                var a = resp.data || {};
                 // Prosa continua para la ciudadania: solo parrafos. Ni titulo,
                 // ni etiqueta de ambito, ni cuadro de metricas — el alcance y
                 // las cifras van dentro del propio texto (ver Analysis.php).
-                cuerpoDe(el).innerHTML = '<div class="sysman-pre__analisis sysman-pre__analisis--'
-                    + esc(cfg.tipo) + '">'
-                    + (a.parrafos || []).map(function (p) {
-                        return '<p class="sysman-pre__analisis-parrafo">' + esc(p) + '</p>';
-                    }).join('')
-                    + '</div>';
+                var caja = document.createElement('div');
+                caja.className = 'sysman-pre__analisis sysman-pre__analisis--' + cfg.tipo;
+                caja.innerHTML = parrafosHtml(resp.data || {});
+                var cuerpo = cuerpoDe(el);
+                cuerpo.innerHTML = '';
+                cuerpo.appendChild(caja);
+                mejorarConIA(caja, cfg, params);
             }).catch(function (e) { pintarError(el, e.message); });
         }
 
@@ -977,10 +1000,8 @@
                     p.valor = actual;
 
                     api('analisis', p).then(function (r) {
-                        var a = (r && r.data) || {};
-                        caja.innerHTML = (a.parrafos || []).map(function (t) {
-                            return '<p class="sysman-pre__analisis-parrafo">' + esc(t) + '</p>';
-                        }).join('');
+                        caja.innerHTML = parrafosHtml((r && r.data) || {});
+                        mejorarConIA(caja, cfg, p);
                     }).catch(function () { caja.remove(); });
                 });
             }).catch(function (e) { pintarError(el, e.message); });

@@ -180,6 +180,9 @@ class PresupuestoModule {
             'tipo'        => '',
             // Card de avance: qué textos van debajo del gráfico.
             'analisis'    => 'descripcion',
+            // Redacción de los análisis con IA (Claude u OpenAI, si está configurada).
+            'ia'          => 'no',
+            'aviso_ia'    => 'si',
             'etiqueta'    => '',
             'todas'       => '— Todas —',
         ];
@@ -229,6 +232,8 @@ class PresupuestoModule {
                 ? ( self::FORMAS_AVANCE[ $tipo ] ?? 'barras' )
                 : ( in_array( $tipo, self::ANALISIS, true ) ? $tipo : 'descripcion' ),
             'analisis'    => $this->parsear_analisis( $a['analisis'] ),
+            'ia'          => self::es_si( $a['ia'] ) && \SysmanSuite\IA\Config::activo(),
+            'aviso_ia'    => self::es_si( $a['aviso_ia'] ),
             'etiqueta'    => sanitize_text_field( $a['etiqueta'] ) ?: $this->etiqueta_selector( $ingresos, $dimension ),
             'todas'       => sanitize_text_field( $a['todas'] ),
             'etiqueta_dimension' => $ingresos

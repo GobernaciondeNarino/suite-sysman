@@ -582,6 +582,13 @@
     margin-bottom: 0;
 }
 
+/* Transparencia: el texto lo redactó una IA sobre cifras verificadas. */
+.sysman-pre__analisis .sysman-pre__aviso-ia {
+    margin: 0.4em 0 0;
+    font-size: 0.8em;
+    color: var(--pre-suave);
+}
+
 /* ── Selector ────────────────────────────────────────────────── */
 .sysman-pre--selector .sysman-pre__cuerpo {
     display: flex;
@@ -744,4 +751,18 @@
     font-size: 0.78rem;
     font-weight: 700;
     color: var(--pre-texto);
+}
+
+/* ── Asistente de voz (ElevenLabs) ───────────────────────────── */
+.sysman-asistente__aviso {
+    margin: 0.5em 0 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--pre-suave, #5b636a);
+}
+
+.sysman-asistente__error {
+    margin: 0 0 0.5em;
+    font-size: 0.9rem;
+    color: #b32d2e;
 }

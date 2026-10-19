@@ -109,7 +109,15 @@
 - [x] **Las vistas mezclaban vigencias.** El Plan Presupuestal trae la vigencia actual, las reservas y las vigencias futuras; al cruzarlo con la ejecución, un rubro presente en dos vigencias se contaba dos veces y los totales salían inflados. Todas las consultas que tocan el plan aplican ahora `Helpers::filtro_vigencia()`.
 - [x] **Comparación normalizada** (`UPPER(TRIM(...))`) y por parámetro preparado, para que un valor con espacios o en minúsculas no deje la vista vacía.
 
-### 3.10 Pendiente (requiere decisión o herramientas externas)
+### 3.10 Implementado en v5.21.0 (estructura, sincronización e IA)
+
+- [x] **Esquema que no evolucionaba en instalaciones existentes.** `CREATE TABLE IF NOT EXISTS` no añade columnas: `Schema::reconciliar()` completa columnas e índices del DDL canónico (sin borrar nada) y un informe de estructura lo hace visible.
+- [x] **Importación frágil ante textos largos** en modo estricto: se recorta a la longitud de la columna y se registra.
+- [x] **Periodo de Gastos sin plan.** El último periodo se elegía solo por la ejecución; ahora exige plan y ejecución del mismo mes.
+- [x] **Presupuesto que no cruza, invisible.** El informe de sincronización cuantifica la ejecución sin plan, los códigos repetidos del plan y su inflado, y los desfases entre importaciones.
+- [x] **IA con salvaguardas**: verificación de cifras, caché, tope por hora, claves fuera del navegador y de la base de datos (opcional), y respaldo por reglas.
+
+### 3.11 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
@@ -119,6 +127,8 @@
 - [ ] **Accesibilidad UI admin**: pasada de contraste/focus-visible con el skill `ui-ux-pro-max` sobre `admin.css` y los acordeones de Ejecución.
 - [ ] **Crear `assets/icon-128.png`** (ícono del plugin para el updater y la pantalla de plugins).
 - [ ] **Índice único por clave natural** en las cinco tablas, que haría imposible la duplicación por construcción. Requiere confirmar antes, con datos reales, que el origen no emite legítimamente dos filas con la misma clave (por ejemplo, un rubro con dos fuentes de financiación); un índice mal elegido descartaría datos válidos en silencio.
+- [ ] **Códigos repetidos en el plan de la vigencia actual**: el informe de sincronización los detecta y cuantifica, pero las vistas aún los suman repetidos. Corregirlo en las consultas (plan deduplicado por código) requiere confirmar con datos reales si un código puede repetirse legítimamente (por ejemplo, con dos dependencias).
+- [ ] **Asistente de voz**: revisar con el área jurídica el aviso de tratamiento de datos y la política de retención de conversaciones configurada en ElevenLabs.
 - [ ] **Reintentos ante fallos de la API** en `import_all()` (backoff simple); con las transacciones de v5.9.0 un fallo ya no destruye datos, solo pospone la actualización.
 
 ## 4. Metodología

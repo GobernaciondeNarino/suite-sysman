@@ -587,6 +587,135 @@ check( 'Sync: un descuadre sin explicación se avisa',
 check( 'Sync: la clave del plan incluye tipovigencia (reservas no son duplicados)',
     in_array( 'tipovigencia', \SysmanSuite\Import_Scope::clave_natural( 'sysman_plan_presupuestal' ), true ) );
 
+// ─── IA: clientes, redactor y asistente ──────────────────────────
+use SysmanSuite\IA\ClaudeCliente;
+use SysmanSuite\IA\OpenAICliente;
+use SysmanSuite\IA\Redactor;
+use SysmanSuite\IA\IAModule;
+
+$cl = new ClaudeCliente( 'sk-test', 'claude-opus-5-5', 'medium' );
+$cuerpoCl = $cl->cuerpo( 'sistema', 'usuario' );
+check( 'Claude: modelo, sistema y un único mensaje de usuario (sin prefill)',
+    'claude-opus-5-5' === $cuerpoCl['model'] && 'sistema' === $cuerpoCl['system']
+    && 1 === count( $cuerpoCl['messages'] ) && 'user' === $cuerpoCl['messages'][0]['role'] );
+check( 'Claude: sin temperature ni budget_tokens (Opus 5.5 los rechaza)',
+    ! isset( $cuerpoCl['temperature'] ) && ! isset( $cuerpoCl['thinking'] ) && 'medium' === $cuerpoCl['output_config']['effort'] );
+check( 'Claude: Opus pide reintento del servidor ante un rechazo, con su cabecera beta',
+    'default' === ( $cuerpoCl['fallbacks'] ?? '' ) && 'server-side-fallback-2026-07-01' === ( $cl->cabeceras()['anthropic-beta'] ?? '' ) );
+$haiku = new ClaudeCliente( 'sk-test', 'claude-haiku-5-5' );
+check( 'Claude: Haiku no envía fallbacks (no tiene reintento del servidor)',
+    ! isset( $haiku->cuerpo( 'a', 'b' )['fallbacks'] ) && ! isset( $haiku->cabeceras()['anthropic-beta'] ) );
+check( 'Claude: cabeceras de autenticación y versión',
+    'sk-test' === $cl->cabeceras()['x-api-key'] && '2023-06-01' === $cl->cabeceras()['anthropic-version'] );
+
+$okCl = ClaudeCliente::leer_respuesta( [ 'model' => 'claude-opus-5-5', 'stop_reason' => 'end_turn', 'content' => [
+    [ 'type' => 'thinking', 'thinking' => '' ], [ 'type' => 'text', 'text' => ' Hola ' ], [ 'type' => 'text', 'text' => 'mundo' ],
+] ] );
+check( 'Claude: solo junta los bloques de texto (ignora el pensamiento)', is_array( $okCl ) && 'Hola mundo' === $okCl['texto'] );
+check( 'Claude: un rechazo se detecta antes de leer el contenido',
+    is_wp_error( ClaudeCliente::leer_respuesta( [ 'stop_reason' => 'refusal', 'content' => [ [ 'type' => 'text', 'text' => 'x' ] ] ] ) ) );
+check( 'Claude: una respuesta cortada no se publica',
+    is_wp_error( ClaudeCliente::leer_respuesta( [ 'stop_reason' => 'max_tokens', 'content' => [ [ 'type' => 'text', 'text' => 'x' ] ] ] ) ) );
+
+$oa = new OpenAICliente( 'sk-oa', 'gpt-5-mini' );
+$cuerpoOa = $oa->cuerpo( 'sis', 'usu' );
+check( 'OpenAI: max_completion_tokens y mensajes system + user',
+    isset( $cuerpoOa['max_completion_tokens'] ) && 'system' === $cuerpoOa['messages'][0]['role'] && ! isset( $cuerpoOa['temperature'] ) );
+check( 'OpenAI: lee el contenido', 'Texto' === ( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => 'Texto' ], 'finish_reason' => 'stop' ] ] ] )['texto'] ?? '' ) );
+check( 'OpenAI: rechazo y corte son errores',
+    is_wp_error( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => null, 'refusal' => 'no' ] ] ] ] ) )
+    && is_wp_error( OpenAICliente::leer_respuesta( [ 'choices' => [ [ 'message' => [ 'content' => 'a' ], 'finish_reason' => 'length' ] ] ] ) ) );
+
+check( 'IA cifras: importes y porcentajes normalizados',
+    [ '$2.738.700.871.545', '53,7%' ] === Redactor::cifras( 'Un total de $2.738.700.871.545. Equivale al 53,7 % del presupuesto.' ) );
+
+$fuenteIA = 'El total es $1.000.000 y Educación concentra $600.000, el 60,0 %.';
+$textoOk  = 'La Gobernación de Nariño consolida un presupuesto de $1.000.000, del cual la Secretaría de Educación concentra $600.000, equivalente al 60,0 % del total.';
+check( 'IA validar: acepta un texto con las mismas cifras', $textoOk === Redactor::validar( $textoOk, $fuenteIA ) );
+check( 'IA validar: rechaza un importe inventado',
+    is_wp_error( Redactor::validar( str_replace( '$600.000', '$650.000', $textoOk ), $fuenteIA ) ) );
+check( 'IA validar: rechaza un porcentaje inventado',
+    is_wp_error( Redactor::validar( str_replace( '60,0 %', '61 %', $textoOk ), $fuenteIA ) ) );
+check( 'IA validar: quita markdown, comillas y saltos (un solo párrafo)',
+    $textoOk === Redactor::validar( "\"**La Gobernación de Nariño** consolida un presupuesto de \$1.000.000,\n\ndel cual la Secretaría de Educación concentra \$600.000, equivalente al 60,0 % del total.\"", $fuenteIA ) );
+check( 'IA validar: rechaza textos demasiado cortos', is_wp_error( Redactor::validar( 'Hola.', $fuenteIA ) ) );
+
+[ $sisIA, $usuIA ] = Redactor::prompt( 'Texto base.', [ 'tipo' => 'cualitativo', 'vista' => 'avance', 'filas' => [] ] );
+check( 'IA prompt: exige un párrafo, solo los datos dados y cifras exactas',
+    false !== strpos( $sisIA, 'único párrafo' ) && false !== strpos( $sisIA, 'Usa únicamente' ) && false !== strpos( $sisIA, 'exactamente' ) );
+check( 'IA prompt: en avance, el global ponderado no es promedio', false !== strpos( $sisIA, 'ponderado' ) );
+check( 'IA prompt: los datos viajan delimitados', false !== strpos( $usuIA, '<texto_base>' ) && false !== strpos( $usuIA, '<datos>' ) );
+
+// Proveedor simulado: cuenta llamadas y devuelve lo que se le indique.
+class Proveedor_Falso implements \SysmanSuite\IA\Proveedor {
+    public int $llamadas = 0;
+    public function __construct( public $respuesta ) {}
+    public function nombre(): string { return 'anthropic'; }
+    public function modelo(): string { return 'claude-opus-5-5'; }
+    public function generar( string $s, string $u ) { $this->llamadas++; return $this->respuesta; }
+}
+$analisisIA = [ 'titulo' => 'Descripción', 'parrafos' => [ $fuenteIA ], 'metricas' => [] ];
+$hechosIA   = [ 'tipo' => 'descripcion', 'filas' => [ [ 'nombre' => 'Educación', 'valor' => '$600.000', 'participacion' => '60,0 %' ] ] ];
+
+$GLOBALS['__test_transients'] = [];
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 30;
+$falso = new Proveedor_Falso( [ 'texto' => $textoOk, 'modelo' => 'claude-opus-5-5' ] );
+$red   = new Redactor( $falso );
+$r1    = $red->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: publica el texto del modelo con fuente ia', 'ia' === $r1['fuente'] && [ $textoOk ] === $r1['parrafos'] );
+$r2 = $red->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: el mismo dato se sirve de caché (una sola llamada)', 'ia' === $r2['fuente'] && 1 === $falso->llamadas );
+
+$GLOBALS['__test_transients'] = [];
+$malo = new Proveedor_Falso( [ 'texto' => str_replace( '$600.000', '$999.999', $textoOk ), 'modelo' => 'x' ] );
+$r3   = ( new Redactor( $malo ) )->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: con una cifra inventada publica el texto por reglas', 'reglas' === $r3['fuente'] && [ $fuenteIA ] === $r3['parrafos'] );
+( new Redactor( $malo ) )->redactar( $analisisIA, $hechosIA );
+check( 'IA redactar: tras un fallo no se reintenta enseguida', 1 === $malo->llamadas );
+
+$GLOBALS['__test_transients'] = [];
+$caido = new Proveedor_Falso( new WP_Error( 'ia_http', 'Claude respondió 529' ) );
+check( 'IA redactar: si el proveedor falla, texto por reglas',
+    'reglas' === ( new Redactor( $caido ) )->redactar( $analisisIA, $hechosIA )['fuente'] );
+
+$GLOBALS['__test_transients'] = [];
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 0;
+$sinCupo = new Proveedor_Falso( [ 'texto' => $textoOk, 'modelo' => 'x' ] );
+check( 'IA redactar: con el tope agotado no llama al proveedor',
+    'reglas' === ( new Redactor( $sinCupo ) )->redactar( $analisisIA, $hechosIA )['fuente'] && 0 === $sinCupo->llamadas );
+$GLOBALS['__test_options']['sysman_ia_limite_hora'] = 30;
+
+check( 'IA redactar: sin proveedor configurado, texto por reglas',
+    'reglas' === ( new Redactor( null ) )->redactar( $analisisIA, $hechosIA )['fuente'] );
+
+$hechosV = \SysmanSuite\Presupuesto\RestController::hechos(
+    [ 'compania' => '001', 'anio' => 2026, 'mes' => 9 ], 'descripcion',
+    [ [ 'label' => 'Educación', 'value' => 600000 ], [ 'label' => 'Salud', 'value' => 400000 ] ],
+    [], [ 'modulo' => 'gastos', 'campo_label' => 'Apropiación vigente', 'dimension_plural' => 'dependencias' ]
+);
+check( 'IA hechos: cifras ya formateadas y participación calculada',
+    '$1.000.000' === $hechosV['total'] && '60,0%' === $hechosV['filas'][0]['participacion'] && 'septiembre de 2026' === $hechosV['periodo'] );
+$hechosA = \SysmanSuite\Presupuesto\RestController::hechos(
+    [ 'compania' => '001', 'anio' => 2026, 'mes' => 9 ], 'descripcion',
+    [ [ 'label' => 'Salud', 'base' => 100, 'ejecutado' => 50, 'porcentaje' => 0.5 ] ],
+    [], [ 'avance' => [ 'base' => 100, 'ejecutado' => 50, 'porcentaje' => 0.5 ] ]
+);
+check( 'IA hechos: en avance va el global ponderado', '50,0%' === $hechosA['porcentaje_global_ponderado'] && 'avance' === $hechosA['vista'] );
+
+$deps = [ 'SECRETARÍA DE EDUCACIÓN', 'SECRETARÍA DE SALUD', 'DESPACHO DEL GOBERNADOR' ];
+check( 'Asistente: encuentra la dependencia sin tildes ni mayúsculas', 'SECRETARÍA DE SALUD' === IAModule::buscar_nombre( 'secretaria de salud', $deps ) );
+check( 'Asistente: encuentra por una palabra dicha', 'SECRETARÍA DE EDUCACIÓN' === IAModule::buscar_nombre( 'educacion', $deps ) );
+check( 'Asistente: por palabras sueltas', 'DESPACHO DEL GOBERNADOR' === IAModule::buscar_nombre( 'la oficina del gobernador', $deps ) );
+check( 'Asistente: sin coincidencia devuelve null', null === IAModule::buscar_nombre( 'hacienda', $deps ) );
+
+$GLOBALS['__test_options']['sysman_elevenlabs_secreto'] = str_repeat( 'a', 48 );
+$req = new WP_REST_Request();
+check( 'Asistente: la herramienta sin secreto se rechaza', is_wp_error( IAModule::instance()->permiso_herramienta( $req ) ) );
+$req->set_header( 'X-Sysman-Secreto', str_repeat( 'b', 48 ) );
+check( 'Asistente: con secreto equivocado se rechaza', is_wp_error( IAModule::instance()->permiso_herramienta( $req ) ) );
+$req->set_header( 'X-Sysman-Secreto', str_repeat( 'a', 48 ) );
+check( 'Asistente: con el secreto correcto se atiende', true === IAModule::instance()->permiso_herramienta( $req ) );
+
 // ─── Carpeta canónica del plugin: suite-sysman ───────────────────
 // Sistema de archivos mínimo, sobre disco real, con la interfaz de WP_Filesystem.
 class Test_Filesystem {

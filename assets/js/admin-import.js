@@ -11,7 +11,7 @@
     const ImportManager = {
         init() {
             this.bindEvents();
-            this.toggleAuxiliarOptions();
+            this.toggleReportOptions();
         },
 
         bindEvents() {
@@ -116,13 +116,16 @@
                 sysman_ejecucion_ingresos: 'Ingresos',
             };
             let html = '<h3>Sincronización entre tablas</h3>';
+            if (data.nota) {
+                html += '<p class="description">' + esc(data.nota) + '</p>';
+            }
             const c = data.cruce;
 
             if (c) {
                 const p = c.periodo;
                 html += c.sincronizado
                     ? '<div class="notice notice-success inline"><p>Periodo ' + esc(p.anio) + '-' + esc(p.mes)
-                      + ': plan, ejecución y auxiliar cuadran. Las vistas muestran toda la ejecución.</p></div>'
+                      + ': el plan y la ejecución cuadran. Las vistas muestran toda la ejecución.</p></div>'
                     : '<div class="notice notice-error inline"><p><strong>Periodo ' + esc(p.anio) + '-' + esc(p.mes) + ':</strong></p><ul style="list-style:disc;margin-left:20px;">'
                       + c.avisos.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>';
 

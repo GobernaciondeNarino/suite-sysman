@@ -544,15 +544,22 @@ class Importer {
         $mes      = absint( $_POST['mes'] ?? 0 );
 
         $sync      = new Sincronizacion();
-        $cobertura = $sync->cobertura( $compania, $anio );
+        $cobertura = $sync->cobertura( $compania );
 
-        // Sin mes válido, se revisa el periodo más reciente importado.
-        if ( $mes < 1 || $mes > 12 || $anio < 1 ) {
-            $anio = (int) ( $cobertura[0]['anio'] ?? 0 );
-            $mes  = (int) ( $cobertura[0]['mes'] ?? 0 );
+        // Si el mes elegido no tiene nada importado (el formulario propone el
+        // mes en curso), se revisa el periodo más reciente con datos.
+        $nota      = '';
+        $importado = array_filter( $cobertura, static fn( $p ) => $p['anio'] === $anio && $p['mes'] === $mes );
+        if ( empty( $importado ) && ! empty( $cobertura ) ) {
+            if ( $anio > 0 && $mes > 0 ) {
+                $nota = sprintf( 'No hay datos importados para %d-%d; se revisa el último periodo importado.', $anio, $mes );
+            }
+            $anio = (int) $cobertura[0]['anio'];
+            $mes  = (int) $cobertura[0]['mes'];
         }
 
         wp_send_json_success( [
+            'nota'      => $nota,
             'cobertura' => $cobertura,
             'cruce'     => $anio > 0 && $mes > 0 ? $sync->cruce( $compania, $anio, $mes ) : null,
         ] );

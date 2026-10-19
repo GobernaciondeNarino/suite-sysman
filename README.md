@@ -79,7 +79,7 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 
 ## Instalacion
 
-1. Subir la carpeta `sysman-suite` al directorio `/wp-content/plugins/`
+1. Descargar `suite-sysman.zip` de la última versión en GitHub Releases y subirlo en **Plugins > Añadir nuevo > Subir plugin**. El plugin queda siempre en `/wp-content/plugins/suite-sysman/`, aunque se instale desde el «Download ZIP» de una rama (que trae la carpeta `suite-sysman-main`) o se actualice desde una versión anterior instalada como `sysman-suite`: el instalador la renombra y conserva la activación.
 2. Activar el plugin desde el menu 'Plugins' de WordPress
 3. Navegar a **SYSMAN Suite > Configuracion** para establecer la URL de la API
 4. Ir a **SYSMAN Suite > Importar Datos** para la primera importacion
@@ -295,6 +295,35 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.21.0 — Carpeta suite-sysman, integridad, sincronización e inteligencia artificial
+
+**Instalación**
+- **La carpeta del plugin es siempre `suite-sysman`.** Al instalar o actualizar, el ZIP de GitHub (`suite-sysman-main`, `GobernaciondeNarino-suite-sysman-1a2b3c`…) se renombra antes de copiarse, y si el plugin estaba activo con otra carpeta (`sysman-suite`), la activación pasa a la nueva sin desactivarlo. El repositorio por defecto del actualizador es `GobernaciondeNarino/suite-sysman` (se migra la opción guardada).
+- **Release con ZIP propio**: al publicar una etiqueta `v*`, GitHub Actions arma `suite-sysman.zip` con la carpeta correcta y sin archivos de desarrollo (`.gitattributes` excluye pruebas, workflows y documentación interna).
+
+**Integridad de las tablas**
+- **Las instalaciones antiguas recibían columnas nuevas solo en papel.** `CREATE TABLE IF NOT EXISTS` no altera una tabla existente, y el importador descartaba en silencio los campos sin columna (así podía faltar `tipovigencia`). `Schema::reconciliar()` añade las columnas e índices del DDL canónico que falten —nunca borra— al actualizar y con el botón **Reparar estructura**. `Schema::run()` cubre ahora las cinco tablas.
+- **Índices nuevos** para las consultas reales: ingresos `(compania, anio, mes)`, personal `(compania, anio)` y auxiliar `(compania, anio, mes, rubro)` para la cadena de comprobantes.
+- **Informe de estructura** en *Importar Datos → Integridad de los datos*: motor (sin InnoDB la importación no puede revertirse), columnas e índices faltantes o sobrantes, filas con periodo inválido, columnas cuyo valor más largo llena el campo e intercalaciones distintas en las columnas de cruce.
+- **Textos demasiado largos**: se recortan al tamaño de la columna y se registra en el log. Antes, en modo estricto de MySQL, un solo texto largo hacía fallar la importación completa.
+
+**Sincronización entre tablas**
+- **Gastos ya no sale en blanco al importar un mes nuevo a medias.** El periodo por defecto es el último presente en el plan (vigencia actual) *y* en la ejecución; antes bastaba la ejecución, y si el plan de ese mes aún no estaba, todas las vistas quedaban vacías.
+- **Informe de sincronización** (botón *Verificar sincronización*): meses importados por tabla y su fecha, desfase de más de 24 h entre la importación del plan y la de la ejecución, y para el periodo elegido: cuánto de la ejecución no encuentra su rubro en el plan y queda **fuera de las vistas** (importe y porcentaje), rubros del plan sin ejecución, **códigos repetidos** en la vigencia actual y cuánto inflan los totales, filas del plan sin `tipovigencia` y rubros del auxiliar que no están en el plan.
+- **La clave natural del plan incluye `tipovigencia`**: las reservas y vigencias futuras de un rubro dejan de contarse como duplicados.
+
+**Inteligencia artificial** (nueva página *SYSMAN Suite → Inteligencia artificial*)
+- **Análisis redactados con Claude o ChatGPT**: `ia="si"` en `[sysman_gastos_analisis]`, `[sysman_ingresos_analisis]` y en los textos del card de avance. Se muestra primero el texto por reglas y se reemplaza por la redacción del modelo cuando llega. El modelo no consulta la base de datos: recibe el texto por reglas y las cifras ya formateadas, y **cada importe y porcentaje del resultado se verifica contra esos datos**; si aparece una cifra distinta, si el proveedor falla o se agota el tope, se publica el texto por reglas. Debajo va un aviso de redacción asistida (`aviso_ia="no"` lo quita).
+- **Claude**: modelo por defecto Claude Opus 5.5 (también Sonnet 5.5 y Haiku 5.5), esfuerzo configurable y reintento automático del lado de Anthropic cuando el clasificador declina una solicitud. **OpenAI**: modelo editable (por defecto `gpt-5-mini`).
+- **Costo acotado**: cada texto se reutiliza mientras los datos no cambien (24 h por defecto), una sola generación a la vez por texto, tope de textos nuevos por hora en todo el sitio (30 por defecto) y cupo REST propio por IP.
+- **Asistente de voz para la ciudadanía con ElevenLabs**: `[sysman_asistente]` inserta el agente conversacional con el resumen del presupuesto de gastos e ingresos como variables dinámicas (`entidad`, `periodo`, `resumen_gastos`, `resumen_ingresos`). Con **agente privado**, el sitio pide una URL firmada en cada visita y la clave nunca llega al navegador. La herramienta de servidor `POST /wp-json/sysman-suite/v1/asistente/consulta` (protegida con la cabecera `X-Sysman-Secreto`) responde por tema —resumen, gastos, una dependencia buscada por nombre hablado, avance de gastos, ingresos, avance del recaudo— con las mismas cifras de los shortcodes. Nunca expone datos de personal de nómina. Aviso de tratamiento de datos (Ley 1581 de 2012) con enlace configurable.
+- **Claves seguras**: pueden definirse en `wp-config.php` (`SYSMAN_ANTHROPIC_API_KEY`, `SYSMAN_OPENAI_API_KEY`, `SYSMAN_ELEVENLABS_API_KEY`) y el panel nunca las muestra.
+
+**Correcciones**
+- *Importar Datos*: el script de administración llamaba a una función inexistente al cargar (error en consola heredado de versiones anteriores).
+
+**Pruebas**: 240 aserciones (antes 177), más verificación de punta a punta en WordPress 7.1 sobre MariaDB 10.11: reconciliación de una tabla antigua, recorte en modo estricto, sincronización con datos desfasados, endpoints del asistente y redacción con IA con el proveedor simulado.
 
 ### 5.20.0 — Todas las vistas se limitan a la vigencia actual
 El Plan Presupuestal (`numinforme=4`) trae, además de la vigencia en curso, las reservas y las vigencias futuras. Hasta ahora las vistas las mezclaban.
