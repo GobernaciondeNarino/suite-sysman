@@ -388,6 +388,57 @@ foreach ( $IS::CLAVES_NATURALES as $tabla => $clave ) {
 }
 check( 'toda clave natural empieza por el ámbito del borrado', $coherentes );
 
+// ─── Eliminar meses y copias exactas ─────────────────────────────
+// Borrar «un mes» solo puede tocar las tablas mensuales: en nómina el mismo
+// ámbito se llevaría el año entero.
+check( 'meses: las tablas mensuales son las cuatro con columna mes',
+    [ 'sysman_ejecucion_gastos', 'sysman_plan_presupuestal', 'sysman_ejecucion_ingresos', 'sysman_auxiliar_cuentas' ]
+    === $IS::tablas_mensuales() );
+check( 'meses: nómina no es una tabla mensual', ! in_array( 'sysman_personal_nomina', $IS::tablas_mensuales(), true ) );
+
+$mesSolo = true;
+foreach ( $IS::tablas_mensuales() as $tabla ) {
+    [ $w ] = $IS::scope_borrado( $tabla, '001', 2026, 3 );
+    if ( 'compania = %s AND anio = %d AND mes = %d' !== $w ) {
+        $mesSolo = false;
+    }
+}
+check( 'meses: en las tablas mensuales se borra solo el mes pedido', $mesSolo );
+
+$huella = $IS::huella_sql( [ 'id', 'compania', 'anio', 'nombre', 'fecha_importacion' ] );
+check( 'huella: compara todas las columnas de datos, en orden',
+    "MD5(CONCAT_WS('|~|', COALESCE(`compania`, ''), COALESCE(`anio`, ''), COALESCE(`nombre`, '')))" === $huella );
+check( 'huella: sin columnas de datos no hay huella', '' === $IS::huella_sql( [ 'id', 'fecha_importacion' ] ) );
+check( 'huella: descarta nombres de columna que no son identificadores',
+    ! str_contains( $IS::huella_sql( [ 'compania', 'x`; DROP TABLE wp_users; --' ] ), 'DROP' ) );
+
+// Copias: sobra la fila que tiene otra idéntica importada después. Las que
+// llegan juntas en una misma importación son líneas que SYSMAN repite —en los
+// datos reales, un CDP con dos líneas iguales de $50.000.000— y se conservan.
+$copia = static fn( $id, $fecha, $huella = 'a' ) => [ 'id' => $id, 'fecha' => $fecha, 'huella' => $huella ];
+
+$reimport = $IS::clasificar_copias( [ $copia( 1, '2026-10-01 08:00:00' ), $copia( 2, '2026-10-01 09:30:00' ) ] );
+check( 'copias: una reimportación deja sobrando la fila vieja', [ 1 ] === $reimport['sobrantes'] && 0 === $reimport['repetidas'] );
+
+$origen = $IS::clasificar_copias( [ $copia( 7, '2026-10-19 20:43:38' ), $copia( 8, '2026-10-19 20:43:38' ) ] );
+check( 'copias: dos líneas iguales de la misma importación se conservan', [] === $origen['sobrantes'] && 1 === $origen['repetidas'] );
+
+$lotes = $IS::clasificar_copias( [ $copia( 500, '2026-10-19 20:43:38' ), $copia( 501, '2026-10-19 20:43:39' ) ] );
+check( 'copias: dos lotes seguidos de la misma importación no son copia', [] === $lotes['sobrantes'] );
+
+$parDoble = $IS::clasificar_copias( [
+    $copia( 1, '2026-09-01 08:00:00' ), $copia( 2, '2026-09-01 08:00:00' ),
+    $copia( 3, '2026-10-01 08:00:00' ), $copia( 4, '2026-10-01 08:00:00' ),
+] );
+check( 'copias: de un par repetido importado dos veces se queda el par nuevo',
+    [ 1, 2 ] === $parDoble['sobrantes'] && 1 === $parDoble['repetidas'] );
+
+$mezcla = $IS::clasificar_copias( [
+    $copia( 3, '2026-09-01 08:00:00', 'b' ), $copia( 1, '2026-09-01 08:00:00', 'a' ),
+    $copia( 4, '2026-10-01 08:00:00', 'b' ), $copia( 2, '2026-10-01 08:00:00', 'c' ),
+] );
+check( 'copias: filas distintas no se comparan entre sí', [ 3 ] === $mezcla['sobrantes'] && 0 === $mezcla['repetidas'] );
+
 // ─── Vista de avance: porcentaje de ejecución ────────────────────
 $fila = static fn( $l, $b, $e ) => [
     'label' => $l, 'codigo' => '', 'base' => (float) $b, 'ejecutado' => (float) $e,
@@ -959,6 +1010,49 @@ if ( ! extension_loaded( 'pdo_sqlite' ) ) {
     check( 'SQL rubro: el avance también agrupa por rubro', 2 === count( $avRub ) );
     check( 'SQL rubro: el avance dentro de un rubro baja a sus cuentas',
         2 === count( $repoI->avance( $ctxIng, '1.1.01.02.105', 0, 'rubro', 'recaudosacumulados', 'totalpresupuesto', 13 ) ) );
+
+    // ── Copias: la consulta real con la huella, sobre SQLite ──
+    // MD5 y CONCAT_WS son de MySQL; aquí se registran con su misma semántica
+    // (CONCAT_WS se salta los NULL, de ahí el COALESCE de la huella).
+    $dup = new Sysman_Sqlite_Wpdb();
+    $dup->pdo->sqliteCreateFunction( 'MD5', 'md5', 1 );
+    $dup->pdo->sqliteCreateFunction( 'CONCAT_WS', static fn( $sep, ...$v ) => implode( $sep, array_filter( $v, static fn( $x ) => null !== $x ) ), -1 );
+    $dup->pdo->exec(
+        'CREATE TABLE wp_sysman_auxiliar_cuentas (id INTEGER PRIMARY KEY, compania TEXT, anio INT, mes INT,
+         tipocpte TEXT, numero TEXT, valordebito REAL, descripcion TEXT, fecha_importacion TEXT)'
+    );
+    $insDup = $dup->pdo->prepare(
+        'INSERT INTO wp_sysman_auxiliar_cuentas (compania,anio,mes,tipocpte,numero,valordebito,descripcion,fecha_importacion)
+         VALUES (?,?,?,?,?,?,?,?)'
+    );
+    foreach ( [
+        [ '001', 2026, 9, 'RES', '10', 50.0, 'Contrato', '2026-10-01 08:00:00' ],  // id 1: importación vieja
+        [ '001', 2026, 9, 'RES', '10', 50.0, 'Contrato', '2026-10-01 08:00:00' ],  // id 2: (SYSMAN la repite)
+        [ '001', 2026, 9, 'RES', '11', 70.0, null, '2026-10-01 08:00:00' ],        // id 3: vieja, con NULL
+        [ '001', 2026, 9, 'RES', '10', 50.0, 'Contrato', '2026-10-02 08:00:00' ],  // id 4: importación nueva
+        [ '001', 2026, 9, 'RES', '10', 50.0, 'Contrato', '2026-10-02 08:00:00' ],  // id 5: (SYSMAN la repite)
+        [ '001', 2026, 9, 'RES', '11', 70.0, null, '2026-10-02 08:00:00' ],        // id 6: nueva, con NULL
+        [ '001', 2026, 9, 'RES', '12', 70.0, '', '2026-10-02 08:00:00' ],          // id 7: otro número
+        [ '001', 2026, 9, 'DIS', '10', 50.0, 'Contrato', '2026-10-02 08:00:00' ],  // id 8: otro comprobante
+        [ '001', 2026, 8, 'RES', '10', 50.0, 'Contrato', '2026-09-01 08:00:00' ],  // id 9: otro mes
+    ] as $r ) {
+        $insDup->execute( $r );
+    }
+
+    $colsDup = array_column( $dup->get_results( 'PRAGMA table_info(wp_sysman_auxiliar_cuentas)' ), 'name' );
+    $hDup    = $IS::huella_sql( $colsDup );
+    [ $wDup, $pDup ] = $IS::scope_borrado( 'sysman_auxiliar_cuentas', '001', 2026, 9 );
+    $clasDup = $IS::clasificar_copias( $dup->get_results( $dup->prepare(
+        "SELECT id, fecha_importacion AS fecha, {$hDup} AS huella FROM wp_sysman_auxiliar_cuentas WHERE {$wDup}", $pDup
+    ) ) );
+
+    check( 'SQL copias: sobran las tres filas de la importación vieja', [ 1, 2, 3 ] === $clasDup['sobrantes'] );
+    check( 'SQL copias: la línea que SYSMAN repite cuenta como repetida, no como copia', 1 === $clasDup['repetidas'] );
+    check( 'SQL copias: el NULL entra en la huella sin correr las columnas',
+        $dup->get_var( "SELECT {$hDup} FROM wp_sysman_auxiliar_cuentas WHERE id = 3" )
+        === $dup->get_var( "SELECT {$hDup} FROM wp_sysman_auxiliar_cuentas WHERE id = 6" ) );
+    check( 'SQL copias: otro comprobante y otro mes no son copia',
+        ! in_array( 8, $clasDup['sobrantes'], true ) && ! in_array( 9, $clasDup['sobrantes'], true ) );
 }
 
 // ─── Resumen ─────────────────────────────────────────────────────

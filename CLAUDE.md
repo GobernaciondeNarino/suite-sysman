@@ -15,6 +15,9 @@ visualizar datos presupuestales desde el sistema SYSMAN.
 - `includes/class-import-scope.php` — qué identifica un registro de cada informe
   y qué filas se borran antes de insertar. Si tocas el ámbito del borrado o el
   de la inserción, ambos deben seguir coincidiendo o los datos se duplican.
+  Una fila idéntica a otra no es por eso un duplicado: SYSMAN entrega líneas
+  iguales en un mismo informe (el auxiliar, con datos reales). Solo sobra la
+  que tiene otra idéntica importada después (`clasificar_copias()`).
 - `includes/class-visualizer.php` — CPT `sysman_chart`, construcción segura de
   consultas para gráficos D3plus y shortcode `[sysman_chart]`.
 - `includes/class-rest-api.php` — REST `sysman-suite/v1` (registros, stats, charts).

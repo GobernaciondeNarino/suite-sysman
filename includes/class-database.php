@@ -428,11 +428,13 @@ class Database {
      * Duplicate report: for every table and period, how many rows there are and
      * how many distinct records they actually represent.
      *
-     * Only reports; no deletion. Un exceso puede ser duplicación real (una
-     * importación que se solapó) o, en el auxiliar, varias líneas legítimas del
-     * mismo comprobante — por eso la limpieza es reimportar el periodo.
+     * Only reports. In the periods with surplus it splits it: `copias` are
+     * rows with an identical row imported later (what remove_duplicates()
+     * deletes), `repetidas` are identical lines that arrived together in one
+     * import, as SYSMAN sends them. The rest share the key but differ in some
+     * value; reimporting the period with the cleanup option settles those.
      *
-     * @return array<int, array{tabla:string, compania:string, anio:int, mes:int, filas:int, unicas:int, exceso:int}>
+     * @return array<int, array{tabla:string, compania:string, anio:int, mes:int, filas:int, unicas:int, exceso:int, copias:int, repetidas:int}>
      */
     public function duplicate_report( int $anio = 0 ): array {
         global $wpdb;
@@ -463,19 +465,134 @@ class Database {
             ) ?: [];
 
             foreach ( $filas as $f ) {
+                $exceso = (int) $f['filas'] - (int) $f['unicas'];
+                $copias = $exceso > 0
+                    ? $this->classify_copies( $nombre, (string) $f['compania'], (int) $f['anio'], (int) $f['mes'] )
+                    : null;
+
                 $informe[] = [
-                    'tabla'    => $nombre,
-                    'compania' => (string) $f['compania'],
-                    'anio'     => (int) $f['anio'],
-                    'mes'      => (int) $f['mes'],
-                    'filas'    => (int) $f['filas'],
-                    'unicas'   => (int) $f['unicas'],
-                    'exceso'   => (int) $f['filas'] - (int) $f['unicas'],
+                    'tabla'     => $nombre,
+                    'compania'  => (string) $f['compania'],
+                    'anio'      => (int) $f['anio'],
+                    'mes'       => (int) $f['mes'],
+                    'filas'     => (int) $f['filas'],
+                    'unicas'    => (int) $f['unicas'],
+                    'exceso'    => $exceso,
+                    'copias'    => count( $copias['sobrantes'] ?? [] ),
+                    'repetidas' => (int) ( $copias['repetidas'] ?? 0 ),
                 ];
             }
         }
 
         return $informe;
+    }
+
+    /**
+     * Classify the identical rows of a period (Import_Scope::clasificar_copias()),
+     * or null when the table is not one of the importer's or does not exist.
+     *
+     * @return array{sobrantes:int[], repetidas:int}|null
+     */
+    public function classify_copies( string $nombre, string $compania, int $anio, int $mes = 0 ): ?array {
+        global $wpdb;
+
+        $tabla = $wpdb->prefix . $nombre;
+        if ( ! in_array( $nombre, Import_Scope::tablas(), true ) || ! $this->ensure_table_exists( $tabla ) ) {
+            return null;
+        }
+
+        $huella = Import_Scope::huella_sql( $this->get_table_columns( $tabla ) );
+        if ( '' === $huella ) {
+            return null;
+        }
+
+        [ $where, $params ] = Import_Scope::scope_borrado( $nombre, $compania, $anio, $mes );
+
+        // Solo id, fecha y un hash de 32 caracteres por fila: un periodo del
+        // auxiliar (más de 10.000 filas) cabe en pocos megas de memoria.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $filas = $wpdb->get_results( $wpdb->prepare(
+            "SELECT id, fecha_importacion AS fecha, {$huella} AS huella FROM `{$tabla}` WHERE {$where}",
+            $params
+        ), ARRAY_A ) ?: [];
+
+        return Import_Scope::clasificar_copias( $filas );
+    }
+
+    /**
+     * Remove the rows of a period that have an identical row imported later.
+     *
+     * La otra salida a una duplicación, además de reimportar con limpieza, y
+     * sin depender de la API. De cada grupo de filas idénticas se conserva la
+     * última importación completa, con las líneas que SYSMAN repite dentro de
+     * un mismo informe (Import_Scope::clasificar_copias()).
+     *
+     * @param string $nombre Tabla sin prefijo, una de Import_Scope::tablas().
+     * @param int    $mes    0 = el año entero.
+     * @return int|false Filas borradas, o false si la tabla no es válida o la
+     *                   consulta falló.
+     */
+    public function remove_duplicates( string $nombre, string $compania, int $anio, int $mes = 0 ): int|false {
+        global $wpdb;
+
+        $copias = $this->classify_copies( $nombre, $compania, $anio, $mes );
+        if ( null === $copias ) {
+            return false;
+        }
+
+        $tabla              = $wpdb->prefix . $nombre;
+        [ $where, $params ] = Import_Scope::scope_borrado( $nombre, $compania, $anio, $mes );
+        $periodo            = $mes > 0 ? "{$anio}-{$mes}" : "año {$anio}";
+        $borradas           = 0;
+
+        foreach ( array_chunk( $copias['sobrantes'], 500 ) as $lote ) {
+            $ids = implode( ',', array_fill( 0, count( $lote ), '%d' ) );
+            // El ámbito del periodo va también en el DELETE: aunque los ids
+            // salgan de él, nunca se borra nada fuera del periodo pedido.
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $n = $wpdb->query( $wpdb->prepare(
+                "DELETE FROM `{$tabla}` WHERE {$where} AND id IN ({$ids})",
+                array_merge( $params, $lote )
+            ) );
+
+            if ( false === $n ) {
+                $this->logger->log( "Error al eliminar duplicados en {$tabla} ({$compania}, {$periodo}): {$wpdb->last_error}", 'error' );
+                return false;
+            }
+            $borradas += (int) $n;
+        }
+
+        if ( $borradas > 0 ) {
+            $this->flush_dependencias_cache();
+            \SysmanSuite\Presupuesto\Repository::limpiar_cache();
+        }
+
+        $this->logger->log( "Copias de importaciones anteriores eliminadas en {$tabla} ({$compania}, {$periodo}): {$borradas} filas." );
+        return $borradas;
+    }
+
+    /**
+     * Remove the copies of earlier imports in every period the report flags.
+     *
+     * @return array<int, array{tabla:string, compania:string, anio:int, mes:int, borradas:int|false}>
+     */
+    public function remove_all_duplicates( int $anio = 0 ): array {
+        $hechos = [];
+
+        foreach ( $this->duplicate_report( $anio ) as $p ) {
+            if ( $p['copias'] <= 0 ) {
+                continue;
+            }
+            $hechos[] = [
+                'tabla'    => $p['tabla'],
+                'compania' => $p['compania'],
+                'anio'     => $p['anio'],
+                'mes'      => $p['mes'],
+                'borradas' => $this->remove_duplicates( $p['tabla'], $p['compania'], $p['anio'], $p['mes'] ),
+            ];
+        }
+
+        return $hechos;
     }
 
     /**
@@ -512,7 +629,7 @@ class Database {
 
         $periodo = $mes > 0 ? "{$anio}-{$mes}" : "año {$anio}";
         $this->logger->log(
-            "Limpieza previa del periodo ({$compania}, {$periodo}): "
+            "Limpieza del periodo ({$compania}, {$periodo}): "
             . implode( ', ', array_map(
                 static fn( $t, $n ) => "{$t}={$n}",
                 array_keys( $borradas ),

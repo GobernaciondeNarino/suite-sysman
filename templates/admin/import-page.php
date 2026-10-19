@@ -202,7 +202,7 @@ $meses = [
         </div>
         <div class="sysman-card-body">
             <p class="description">
-                <?php esc_html_e( 'Revisa la estructura de las cinco tablas (columnas, índices, motor, periodos inválidos y posibles textos truncados) y compara, para cada tabla y periodo, cuántas filas hay frente a cuántos registros distintos representan. Si sobran filas, el periodo se importó dos veces y las cifras salen infladas: la solución es reimportar ese periodo con «Limpiar el periodo antes de importar».', 'sysman-suite' ); ?>
+                <?php esc_html_e( 'Revisa la estructura de las cinco tablas (columnas, índices, motor, periodos inválidos y posibles textos truncados) y compara, para cada tabla y periodo, cuántas filas hay frente a cuántos registros distintos representan. Las filas que son copia de una importación anterior inflan las cifras y se pueden eliminar desde el informe (se conserva la última importación); las que SYSMAN entrega repetidas en un mismo informe se conservan. También puede reimportar el periodo con «Limpiar el periodo antes de importar».', 'sysman-suite' ); ?>
             </p>
             <p>
                 <button type="button" id="sysman-check-dupes" class="button">
@@ -215,7 +215,7 @@ $meses = [
                 </button>
             </p>
             <p class="description">
-                <?php esc_html_e( 'La sincronización revisa que los informes importados por separado correspondan al mismo corte: qué meses tiene cada tabla y, para el año y mes elegidos arriba, cuánto presupuesto de la ejecución no encuentra su rubro en el plan y queda fuera de las vistas.', 'sysman-suite' ); ?>
+                <?php esc_html_e( 'La sincronización revisa que los informes importados por separado correspondan al mismo corte: qué meses tiene cada tabla y, para el año y mes elegidos arriba, cuánto presupuesto de la ejecución no encuentra su rubro en el plan y queda fuera de las vistas. Si hay datos de otros meses que ya no necesita, puede eliminarlos desde el mismo informe; se conserva el mes revisado.', 'sysman-suite' ); ?>
             </p>
             <div id="sysman-dupes-result" aria-live="polite"></div>
             <div id="sysman-sync-result" aria-live="polite"></div>

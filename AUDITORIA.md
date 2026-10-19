@@ -117,7 +117,13 @@
 - [x] **Presupuesto que no cruza, invisible.** El informe de sincronización cuantifica la ejecución sin plan, los códigos repetidos del plan y su inflado, y los desfases entre importaciones.
 - [x] **IA con salvaguardas**: verificación de cifras, caché, tope por hora, claves fuera del navegador y de la base de datos (opcional), y respaldo por reglas.
 
-### 3.11 Pendiente (requiere decisión o herramientas externas)
+### 3.11 Implementado en v5.22.0 (eliminar duplicados y meses)
+
+- [x] **Los duplicados se detectaban pero no se podían quitar sin la API.** «Eliminar copias» borra las filas que tienen otra idéntica (salvo `id` y `fecha_importacion`) importada al menos 5 s después, y conserva la última importación completa (`Import_Scope::clasificar_copias()`, `Database::remove_duplicates()`).
+- [x] **Falsos positivos del informe de duplicados.** Con datos reales (corte 2026-10), una sola importación limpia del auxiliar trae 5 líneas idénticas en todas las columnas que exporta la API. Ahora se informan aparte como *repetidas en el origen* y no se borran.
+- [x] **Meses sobrantes.** «Eliminar» por mes y «Eliminar los otros meses» en el informe de sincronización, solo sobre las tablas mensuales (`Import_Scope::tablas_mensuales()`). El mes que muestran por defecto las vistas de Gastos e Ingresos no entra nunca en el borrado en bloque.
+
+### 3.12 Pendiente (requiere decisión o herramientas externas)
 
 - [ ] **`fecha` en `auxiliar_cuentas` es VARCHAR(20)**: migrar a DATE exige confirmar el formato exacto que entrega la API SYSMAN y una migración de datos en producción. Planificar con respaldo previo.
 - [ ] **PHPCS (WordPress Coding Standards) + PHPStan en CI**: requiere `composer.json` y una pasada inicial de limpieza sobre el código legado para que el pipeline no nazca en rojo. El CI actual (lint + tests) es el primer paso.
@@ -126,7 +132,7 @@
 - [ ] **Homogeneizar JS** (jQuery en admin vs. vanilla en frontend) — refactor mayor, sin impacto funcional.
 - [ ] **Accesibilidad UI admin**: pasada de contraste/focus-visible con el skill `ui-ux-pro-max` sobre `admin.css` y los acordeones de Ejecución.
 - [ ] **Crear `assets/icon-128.png`** (ícono del plugin para el updater y la pantalla de plugins).
-- [ ] **Índice único por clave natural** en las cinco tablas, que haría imposible la duplicación por construcción. Requiere confirmar antes, con datos reales, que el origen no emite legítimamente dos filas con la misma clave (por ejemplo, un rubro con dos fuentes de financiación); un índice mal elegido descartaría datos válidos en silencio.
+- [ ] **Índice único por clave natural** en las cinco tablas, que haría imposible la duplicación por construcción. Requiere confirmar antes, con datos reales, que el origen no emite legítimamente dos filas con la misma clave (por ejemplo, un rubro con dos fuentes de financiación); un índice mal elegido descartaría datos válidos en silencio. **Descartado para el auxiliar** (v5.22.0): el origen entrega líneas idénticas en todas las columnas exportadas, así que ni siquiera un índice sobre todas ellas sería válido. Para identificarlas haría falta un número de línea que hoy la API no expone.
 - [ ] **Códigos repetidos en el plan de la vigencia actual**: el informe de sincronización los detecta y cuantifica, pero las vistas aún los suman repetidos. Corregirlo en las consultas (plan deduplicado por código) requiere confirmar con datos reales si un código puede repetirse legítimamente (por ejemplo, con dos dependencias).
 - [ ] **Asistente de voz**: revisar con el área jurídica el aviso de tratamiento de datos y la política de retención de conversaciones configurada en ElevenLabs.
 - [ ] **Reintentos ante fallos de la API** en `import_all()` (backoff simple); con las transacciones de v5.9.0 un fallo ya no destruye datos, solo pospone la actualización.

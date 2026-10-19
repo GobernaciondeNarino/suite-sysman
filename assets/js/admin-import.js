@@ -5,6 +5,12 @@
 (function ($) {
     'use strict';
 
+    const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+        'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const nombrePeriodo = (anio, mes) => (mes > 0 ? (MESES[mes] || mes) + ' de ' : 'año ') + anio;
+    const plural = (n, uno, varios) => Number(n).toLocaleString('es-CO') + ' ' + (Number(n) === 1 ? uno : varios);
+    const enumerar = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a.join(''));
+
     /* ========================================
        Import Manager
        ======================================== */
@@ -20,7 +26,9 @@
             $('#sysman-compania').on('change', () => this.toggleCustomCompania());
             $('#sysman-check-dupes').on('click', () => this.checkDuplicates());
             $('#sysman-dupes-result').on('click', '#sysman-repair-schema', () => this.repairSchema());
+            $('#sysman-dupes-result').on('click', '.sysman-dedupe', (e) => this.removeDuplicates($(e.currentTarget)));
             $('#sysman-check-sync').on('click', () => this.checkSync());
+            $('#sysman-sync-result').on('click', '.sysman-delete-months', (e) => this.deleteMonths($(e.currentTarget)));
         },
 
         toggleReportOptions() {
@@ -47,7 +55,7 @@
 
         /* Informe de integridad: filas frente a registros distintos. Si sobran
            filas, ese periodo se importó dos veces y las cifras salen infladas. */
-        checkDuplicates() {
+        checkDuplicates(aviso = '') {
             const btn = $('#sysman-check-dupes');
             const caja = $('#sysman-dupes-result');
 
@@ -68,8 +76,8 @@
                             + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
                         return;
                     }
-                    caja.html(this.renderEstructura(response.data.estructura)
-                        + this.renderDuplicates(response.data.periodos || []));
+                    caja.html(aviso + this.renderEstructura(response.data.estructura)
+                        + this.renderDuplicates(response.data.periodos || [], response.data.anio));
                 },
                 error: () => {
                     caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>');
@@ -78,8 +86,98 @@
             });
         },
 
+        /* Borra las copias de importaciones anteriores de un periodo (o de todos
+           los marcados); las líneas que SYSMAN repite en un mismo informe se quedan. */
+        removeDuplicates(btn) {
+            const d = btn.data();
+            const copias = d.copias === 1
+                ? 'la copia de una importación anterior'
+                : 'las ' + Number(d.copias).toLocaleString('es-CO') + ' copias de importaciones anteriores';
+            const pregunta = '¿Eliminar ' + copias + ' '
+                + (d.tabla ? 'de ' + d.tabla + ' en ' + nombrePeriodo(d.anio, d.mes) : 'en ' + plural(d.periodos, 'periodo', 'periodos')) + '?';
+
+            if (!window.confirm(pregunta + '\n\nSolo se borran filas que tienen otra idéntica importada después; se conserva '
+                + 'la última importación, con las líneas que SYSMAN repite en un mismo informe. Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const texto = btn.text();
+            $('#sysman-dupes-result .sysman-dedupe').prop('disabled', true);
+            btn.text('Eliminando…');
+
+            $.post(sysmanAdmin.ajaxUrl, {
+                action: 'sysman_remove_duplicates',
+                nonce: sysmanAdmin.nonce,
+                tabla: d.tabla || '',
+                compania: d.compania || '',
+                anio: d.anio || 0,
+                mes: d.mes || 0,
+            })
+                .done((response) => {
+                    if (!response.success) {
+                        $('#sysman-dupes-result .sysman-dedupe').prop('disabled', false);
+                        btn.text(texto);
+                        window.alert(response.data && response.data.message ? response.data.message : 'Error');
+                        return;
+                    }
+                    this.checkDuplicates('<div class="notice notice-success inline"><p>Se '
+                        + (response.data.eliminadas === 1 ? 'eliminó ' : 'eliminaron ')
+                        + plural(response.data.eliminadas, 'copia', 'copias') + ' de importaciones anteriores.</p></div>');
+                })
+                .fail(() => {
+                    $('#sysman-dupes-result .sysman-dedupe').prop('disabled', false);
+                    btn.text(texto);
+                    window.alert('No se pudieron eliminar los duplicados.');
+                });
+        },
+
+        /* Borra meses importados: uno solo (data-mes) o todos los del año salvo
+           el que se conserva (data-conservar). */
+        deleteMonths(btn) {
+            const d = btn.data();
+            const lista = enumerar(String(d.meses).split(',').map((m) => MESES[Number(m)] || m));
+
+            if (!window.confirm('¿Eliminar los datos de ' + lista + ' de ' + d.anio + '?\n\n'
+                + (d.vistas ? 'Es el mes que muestran hoy las vistas de ' + d.vistas + ': pasarán a mostrar otro mes. ' : '')
+                + 'Se borran del plan presupuestal, la ejecución de gastos, el auxiliar y la ejecución de ingresos '
+                + '(la nómina es anual y no se toca). Esos meses dejarán de aparecer en el selector de periodo, y las vistas '
+                + 'o seguimientos fijados a ellos quedarán vacíos. Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const texto = btn.text();
+            $('#sysman-sync-result .sysman-delete-months').prop('disabled', true);
+            btn.text('Eliminando…');
+
+            $.post(sysmanAdmin.ajaxUrl, {
+                action: 'sysman_delete_months',
+                nonce: sysmanAdmin.nonce,
+                compania: d.compania,
+                anio: d.anio,
+                mes: d.mes || 0,
+                conservar: d.conservar || 0,
+            })
+                .done((response) => {
+                    if (!response.success) {
+                        $('#sysman-sync-result .sysman-delete-months').prop('disabled', false);
+                        btn.text(texto);
+                        window.alert(response.data && response.data.message ? response.data.message : 'Error');
+                        return;
+                    }
+                    const meses = enumerar((response.data.meses || []).map((m) => MESES[m] || m));
+                    this.checkSync('<div class="notice notice-success inline"><p>Se '
+                        + (response.data.eliminadas === 1 ? 'eliminó ' : 'eliminaron ') + plural(response.data.eliminadas, 'fila', 'filas')
+                        + (meses ? ' de ' + meses + ' de ' + d.anio : '') + '.</p></div>');
+                })
+                .fail(() => {
+                    $('#sysman-sync-result .sysman-delete-months').prop('disabled', false);
+                    btn.text(texto);
+                    window.alert('No se pudieron eliminar los meses.');
+                });
+        },
+
         /* Sincronización: meses por tabla y cruce plan ↔ ejecución ↔ auxiliar. */
-        checkSync() {
+        checkSync(aviso = '') {
             const btn = $('#sysman-check-sync');
             const caja = $('#sysman-sync-result');
 
@@ -99,7 +197,7 @@
                             + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
                         return;
                     }
-                    caja.html(this.renderSync(response.data));
+                    caja.html(aviso + this.renderSync(response.data));
                 })
                 .fail(() => caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>'))
                 .always(() => btn.prop('disabled', false));
@@ -151,17 +249,58 @@
                 return html + '<div class="notice notice-warning inline"><p>No hay datos importados.</p></div>';
             }
 
-            html += '<h4>Meses importados por tabla</h4><table class="widefat striped"><thead><tr><th>Periodo</th>'
+            // Se conserva el periodo revisado arriba y, aunque no coincida, el
+            // que muestran por defecto las vistas: el mes revisado puede estar
+            // a medio importar mientras las páginas publican el anterior.
+            const attr = (t) => esc(t).replace(/"/g, '&quot;');
+            const conservar = c ? c.periodo : null;
+            const enVistas = data.en_vistas || {};
+            const mismo = (a, b) => a && b && Number(a.anio) === Number(b.anio) && Number(a.mes) === Number(b.mes);
+            const vistasDe = (p) => Object.keys(enVistas).filter((k) => mismo(enVistas[k], p))
+                .map((k) => (k === 'gastos' ? 'Gastos' : 'Ingresos'));
+            const otros = conservar
+                ? cob.filter((p) => p.anio === conservar.anio && !mismo(p, conservar) && !vistasDe(p).length) : [];
+            const protegidos = conservar
+                ? cob.filter((p) => p.anio === conservar.anio && !mismo(p, conservar) && vistasDe(p).length) : [];
+            const botonMeses = (anio, meses, extra, texto, clase) => '<button type="button" class="button ' + clase + ' sysman-delete-months"'
+                + ' data-compania="' + attr(data.compania) + '" data-anio="' + attr(anio) + '" data-meses="' + attr(meses.join(',')) + '"'
+                + extra + '>' + texto + '</button>';
+
+            html += '<h4>Meses importados por tabla</h4>';
+            if (otros.length) {
+                html += '<div class="notice notice-warning inline"><p>Además de <strong>' + esc(nombrePeriodo(conservar.anio, conservar.mes))
+                    + '</strong> (el periodo revisado arriba) hay datos de ' + plural(otros.length, 'mes', 'meses') + ' más de '
+                    + esc(conservar.anio) + ': ' + enumerar(otros.map((p) => esc(MESES[p.mes] || p.mes))) + '. '
+                    + 'Las vistas consultan un solo mes a la vez, así que los demás solo hacen falta si alguien consulta ese corte. '
+                    + protegidos.map((p) => {
+                        const mes = String(MESES[p.mes] || p.mes);
+                        return esc(mes.charAt(0).toUpperCase() + mes.slice(1)) + ' no se incluye: es el mes que muestran hoy las vistas de '
+                            + vistasDe(p).join(' e ') + '. ';
+                    }).join('')
+                    + 'Para conservar otro mes, elíjalo en «Año» y «Mes» y vuelva a verificar.</p>'
+                    + '<p>' + botonMeses(conservar.anio, otros.map((p) => p.mes), ' data-conservar="' + attr(conservar.mes) + '"',
+                        'Eliminar los otros meses de ' + esc(conservar.anio), 'button-secondary') + '</p></div>';
+            }
+
+            html += '<table class="widefat striped"><thead><tr><th>Periodo</th>'
                 + Object.values(tablas).map((t) => '<th style="text-align:right;">' + t + '</th>').join('')
-                + '<th>Observaciones</th></tr></thead><tbody>';
+                + '<th>Observaciones</th><th>Acción</th></tr></thead><tbody>';
             cob.forEach((p) => {
-                html += '<tr' + (p.avisos.length ? ' style="background:#fcf8e3;"' : '') + '><td>' + esc(p.anio) + '-' + esc(p.mes) + '</td>'
+                const vistas = vistasDe(p);
+                const accion = mismo(p, conservar)
+                    ? '<em>Se conserva</em>'
+                    : (vistas.length ? '<em>En las vistas de ' + vistas.join(' e ') + '</em><br>' : '')
+                      + botonMeses(p.anio, [p.mes], ' data-mes="' + attr(p.mes) + '" data-vistas="' + attr(vistas.join(' e ')) + '"',
+                          'Eliminar', 'button-small');
+
+                html += '<tr' + (p.avisos.length ? ' style="background:#fcf8e3;"' : '') + '><td style="white-space:nowrap;">' + esc(p.anio) + '-' + esc(p.mes) + '</td>'
                     + Object.keys(tablas).map((k) => {
                         const t = p.tablas[k];
                         return '<td style="text-align:right;"' + (t ? ' title="Importado: ' + esc(t.ultima) + '"' : '') + '>'
                             + (t ? num(t.filas) : '—') + '</td>';
                     }).join('')
-                    + '<td>' + (p.avisos.length ? p.avisos.map(esc).join('<br>') : '—') + '</td></tr>';
+                    + '<td>' + (p.avisos.length ? p.avisos.map(esc).join('<br>') : '—') + '</td>'
+                    + '<td>' + accion + '</td></tr>';
             });
             return html + '</tbody></table>';
         },
@@ -249,27 +388,64 @@
             return html;
         },
 
-        renderDuplicates(periodos) {
+        renderDuplicates(periodos, anio) {
             if (!periodos.length) {
                 return '<div class="notice notice-warning inline"><p>No hay datos importados para ese año.</p></div>';
             }
 
             const conExceso = periodos.filter((p) => p.exceso > 0);
+            const conCopias = periodos.filter((p) => p.copias > 0);
             const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const attr = (t) => esc(t).replace(/"/g, '&quot;');
             const num = (n) => Number(n).toLocaleString('es-CO');
+            const suma = (lista, campo) => lista.reduce((total, p) => total + p[campo], 0);
+            const totalCopias = suma(conCopias, 'copias');
+            const totalRepetidas = suma(conExceso, 'repetidas');
+            const totalDistintas = Math.max(0, suma(conExceso, 'exceso') - totalCopias - totalRepetidas);
 
-            let html = conExceso.length
-                ? '<div class="notice notice-error inline"><p><strong>Se detectaron ' + conExceso.length
-                  + ' periodo(s) con filas de más.</strong> Reimporte cada uno marcando «Limpiar el periodo antes de importar».</p></div>'
-                : '<div class="notice notice-success inline"><p>Sin duplicados: cada fila representa un registro distinto.</p></div>';
+            let html = '';
+            if (!conExceso.length) {
+                html = '<div class="notice notice-success inline"><p>Sin duplicados: cada fila representa un registro distinto.</p></div>';
+            }
+            if (totalCopias > 0) {
+                html += '<div class="notice notice-error inline"><p><strong>' + plural(totalCopias, 'fila es copia', 'filas son copias')
+                    + ' de una importación anterior</strong> (' + plural(conCopias.length, 'periodo', 'periodos') + '): hay otra idéntica '
+                    + 'importada después, así que el periodo se cargó más de una vez y las cifras salen infladas. Al eliminar las copias '
+                    + 'se conserva la última importación.</p>'
+                    + '<p><button type="button" class="button button-primary sysman-dedupe" data-anio="' + attr(anio || 0) + '"'
+                    + ' data-copias="' + attr(totalCopias) + '" data-periodos="' + attr(conCopias.length) + '">'
+                    + (totalCopias === 1 ? 'Eliminar la copia' : 'Eliminar las ' + num(totalCopias) + ' copias') + '</button></p></div>';
+            }
+            if (totalRepetidas + totalDistintas > 0) {
+                html += '<div class="notice notice-warning inline"><p>'
+                    + (totalRepetidas > 0 ? plural(totalRepetidas, 'fila llegó repetida', 'filas llegaron repetidas')
+                        + ' dentro de una misma importación: así las entrega SYSMAN (por ejemplo, un comprobante con dos líneas iguales) '
+                        + 'y se conservan. ' : '')
+                    + (totalDistintas > 0 ? plural(totalDistintas, 'fila comparte', 'filas comparten') + ' la clave de otro registro pero '
+                        + (totalDistintas === 1 ? 'cambia' : 'cambian') + ' en algún valor. ' : '')
+                    + 'No se borran automáticamente porque pueden ser datos válidos; si cree que sobran, reimporte ese periodo marcando '
+                    + '«Limpiar el periodo antes de importar».</p></div>';
+            }
 
             html += '<table class="widefat striped" style="margin-top:12px;"><thead><tr>'
                 + '<th>Tabla</th><th>Compañía</th><th>Año</th><th>Mes</th>'
                 + '<th style="text-align:right;">Filas</th><th style="text-align:right;">Registros</th>'
-                + '<th style="text-align:right;">De más</th></tr></thead><tbody>';
+                + '<th style="text-align:right;">De más</th>'
+                + (conExceso.length
+                    ? '<th style="text-align:right;">Copias de importaciones anteriores</th>'
+                      + '<th style="text-align:right;">Repetidas en el origen</th><th>Acción</th>'
+                    : '')
+                + '</tr></thead><tbody>';
 
             periodos.forEach((p) => {
-                html += '<tr' + (p.exceso > 0 ? ' style="background:#fcf0f1;"' : '') + '>'
+                const fondo = p.copias > 0 ? '#fcf0f1' : (p.exceso > 0 ? '#fcf8e3' : '');
+                const boton = p.copias > 0
+                    ? '<button type="button" class="button button-small sysman-dedupe" data-tabla="' + attr(p.tabla) + '"'
+                      + ' data-compania="' + attr(p.compania) + '" data-anio="' + attr(p.anio) + '" data-mes="' + attr(p.mes) + '"'
+                      + ' data-copias="' + attr(p.copias) + '">Eliminar copias</button>'
+                    : '';
+
+                html += '<tr' + (fondo ? ' style="background:' + fondo + ';"' : '') + '>'
                     + '<td><code>' + esc(p.tabla) + '</code></td>'
                     + '<td>' + esc(p.compania) + '</td>'
                     + '<td>' + esc(p.anio) + '</td>'
@@ -277,6 +453,11 @@
                     + '<td style="text-align:right;">' + num(p.filas) + '</td>'
                     + '<td style="text-align:right;">' + num(p.unicas) + '</td>'
                     + '<td style="text-align:right;"><strong>' + (p.exceso > 0 ? num(p.exceso) : '0') + '</strong></td>'
+                    + (conExceso.length
+                        ? '<td style="text-align:right;">' + (p.exceso > 0 ? num(p.copias) : '—') + '</td>'
+                          + '<td style="text-align:right;">' + (p.exceso > 0 ? num(p.repetidas) : '—') + '</td>'
+                          + '<td>' + boton + '</td>'
+                        : '')
                     + '</tr>';
             });
 

@@ -23,6 +23,7 @@ SYSMAN Suite permite conectarse a la API del sistema presupuestal SYSMAN para ob
 - Una sola importacion a la vez (cerrojo): dos simultaneas duplicarian el periodo
 - Verificacion de integridad tras cada carga; si sobran filas, se revierte
 - Verificador de duplicados y limpieza del periodo desde la interfaz
+- Eliminacion de copias de importaciones anteriores y de meses sobrantes, sin tocar las lineas que SYSMAN repite ni el mes que publican las vistas
 - Logs detallados de cada importacion
 
 ### Modulo Ejecucion (Nuevo en v4.0.0)
@@ -295,6 +296,23 @@ sisman-suite/
 > (protegido con `.htaccess` + `index.php`), no dentro del plugin.
 
 ## Changelog
+
+### 5.22.0 — Eliminar duplicados y meses sobrantes desde la interfaz
+Los dos informes de *Importar Datos → Integridad de los datos* ya no solo avisan: permiten corregir lo que encuentran sin escribir SQL ni volver a consultar la API.
+
+**Duplicados** (botón *Verificar integridad*)
+- **«Eliminar copias»** en cada periodo marcado y **«Eliminar las N copias»** para todos a la vez. Se borra una fila solo si existe otra idéntica en todas sus columnas, salvo `id` y `fecha_importacion`, **importada al menos 5 segundos después**: viene de una importación anterior del mismo periodo. De cada grupo se conserva la última importación completa.
+- **Las líneas que SYSMAN repite no se tocan.** Verificado con datos reales del corte 2026-10: una sola importación limpia del auxiliar trae 5 líneas idénticas en todo lo que exporta la API (un CDP de $50.000.000 con dos líneas iguales, y su registro presupuestal igual). Son datos válidos y el informe las muestra aparte, como *repetidas en el origen*. Un borrado por «copia exacta» habría restado $149,8 millones en disponibilidades y registros presupuestales reales.
+- **El informe separa lo que encuentra**: copias de importaciones anteriores (se pueden eliminar; fila en rojo), repetidas en el origen (se conservan) y filas con la misma clave pero otro valor (pueden ser válidas: se resuelven reimportando con *Limpiar el periodo antes de importar*).
+
+**Meses** (botón *Verificar sincronización*)
+- **Botón «Eliminar» en cada mes** de la tabla *Meses importados por tabla* y **«Eliminar los otros meses de AAAA»** cuando hay datos de más de un mes del año. Se conserva el periodo revisado (el elegido en *Año* y *Mes*, o el último con datos).
+- **Nunca se borra en bloque el mes que publican las vistas.** Si el mes revisado está a medio importar (ejecución sin plan), las vistas de Gastos siguen mostrando el anterior: ese mes queda fuera del borrado masivo y se marca *En las vistas de Gastos*. Borrarlo exige pulsar su botón y confirmar un aviso explícito. El servidor aplica la misma regla aunque la petición llegue alterada.
+- Se borra de plan, ejecución de gastos, auxiliar y ejecución de ingresos. **Nómina es anual y no se toca**: su ámbito de borrado es el año entero.
+
+**Salvaguardas**: nonce y `manage_options` en ambas acciones; las dos toman el cerrojo de importación (no corren durante una importación, ni la importación durante ellas); confirmación con el detalle exacto antes de borrar; registro en el log; caché de las vistas invalidada.
+
+**Pruebas**: 255 aserciones (antes 240), más verificación de punta a punta en WordPress 7.1 sobre MariaDB 10.11 con datos reales de la API: copias de una importación anterior eliminadas, líneas repetidas en el origen intactas (11.459 filas del auxiliar), cerrojo rechazando la limpieza con una importación en curso, borrado de meses respetando el mes publicado y nómina intacta.
 
 ### 5.21.0 — Carpeta suite-sysman, integridad, sincronización e inteligencia artificial
 
