@@ -304,6 +304,13 @@ class Database {
         }
         $row_ph = '(' . implode( ',', $row_ph ) . ')';
 
+        // Un texto más largo que su columna hace fallar el INSERT en modo
+        // estricto (y con él la importación entera) o se corta en silencio en
+        // modo no estricto. Se recorta aquí y se deja constancia en el log.
+        $nombre_corto = 0 === strpos( $table_name, $wpdb->prefix ) ? substr( $table_name, strlen( $wpdb->prefix ) ) : $table_name;
+        $longitudes   = \SysmanSuite\Ejecucion\Schema::longitudes_varchar( $nombre_corto );
+        $recortados   = [];
+
         $wpdb->query( 'START TRANSACTION' );
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -332,6 +339,12 @@ class Database {
                         $data[ $db_col ] = in_array( $db_col, $numeric_cols, true )
                             ? floatval( $record[ $api_key ] )
                             : sanitize_text_field( (string) $record[ $api_key ] );
+
+                        if ( isset( $longitudes[ $db_col ] ) && is_string( $data[ $db_col ] )
+                            && mb_strlen( $data[ $db_col ] ) > $longitudes[ $db_col ] ) {
+                            $data[ $db_col ]       = mb_substr( $data[ $db_col ], 0, $longitudes[ $db_col ] );
+                            $recortados[ $db_col ] = ( $recortados[ $db_col ] ?? 0 ) + 1;
+                        }
                     }
                 }
 
@@ -391,6 +404,18 @@ class Database {
         }
 
         $wpdb->query( 'COMMIT' );
+
+        if ( ! empty( $recortados ) ) {
+            $this->logger->log(
+                "Aviso en {$table_name} ({$label}): textos más largos que su columna, recortados: "
+                . implode( ', ', array_map(
+                    static fn( $c, $n ) => "{$c} ({$n} filas, máx. {$longitudes[ $c ]})",
+                    array_keys( $recortados ),
+                    $recortados
+                ) ),
+                'warning'
+            );
+        }
 
         // Any import invalidates the Presupuesto module's cached aggregates.
         \SysmanSuite\Presupuesto\Repository::limpiar_cache();

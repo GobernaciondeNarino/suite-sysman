@@ -452,6 +452,78 @@ check( 'avance de ingresos: no habla de comprometer', ! str_contains( $avIng['pa
 check( 'avance de ingresos: concordancia masculina',
     ! str_contains( $avIng['parrafos'][0], 'entre unas y otras' ) );
 
+// ─── Integridad estructural: reconciliar el esquema ─────────────
+use SysmanSuite\Ejecucion\Schema;
+
+foreach ( array_keys( Schema::TABLAS ) as $nombreTabla ) {
+    $defT = Schema::definicion( $nombreTabla );
+    check( "Esquema {$nombreTabla}: el DDL se parsea en columnas e índices",
+        count( $defT['columnas'] ) > 5 && count( $defT['indices'] ) > 1
+        && ! isset( $defT['columnas']['PRIMARY'] ) && ! isset( $defT['columnas']['KEY'] ) );
+}
+
+$defPlan = Schema::definicion( 'sysman_plan_presupuestal' );
+check( 'Esquema: tipovigencia está en el DDL del plan',
+    0 === strpos( $defPlan['columnas']['tipovigencia'] ?? '', 'tipovigencia VARCHAR(64)' ) );
+check( 'Esquema: las columnas con dígitos se reconocen (apellido1/apellido2)',
+    isset( Schema::definicion( 'sysman_personal_nomina' )['columnas']['apellido1'], Schema::definicion( 'sysman_personal_nomina' )['columnas']['apellido2'] ) );
+check( 'Esquema: ingresos tiene índice por compañía y periodo',
+    isset( Schema::definicion( 'sysman_ejecucion_ingresos' )['indices']['idx_compania_anio_mes'] ) );
+check( 'Esquema: el auxiliar tiene índice para la cadena por rubro',
+    isset( Schema::definicion( 'sysman_auxiliar_cuentas' )['indices']['idx_rubro_periodo'] ) );
+
+// Una instalación antigua: el plan sin tipovigencia ni idx_lookup, con una columna heredada.
+$colsViejas = array_diff( array_keys( $defPlan['columnas'] ), [ 'tipovigencia' ] );
+$colsViejas[] = 'synced_at';
+$idxViejos  = array_merge( [ 'PRIMARY' ], array_diff( array_keys( $defPlan['indices'] ), [ 'idx_lookup' ] ) );
+$difPlan    = Schema::diferencias( 'sysman_plan_presupuestal', $colsViejas, $idxViejos );
+check( 'Esquema: detecta la columna que falta', [ 'tipovigencia' ] === array_keys( $difPlan['columnas_faltantes'] ) );
+check( 'Esquema: detecta el índice que falta', [ 'idx_lookup' ] === array_keys( $difPlan['indices_faltantes'] ) );
+check( 'Esquema: informa la columna sobrante sin proponer borrarla', [ 'synced_at' ] === $difPlan['columnas_sobrantes'] );
+check( 'Esquema: una tabla completa no tiene diferencias',
+    [] === Schema::diferencias( 'sysman_plan_presupuestal', array_keys( $defPlan['columnas'] ), array_merge( [ 'PRIMARY' ], array_keys( $defPlan['indices'] ) ) )['columnas_faltantes'] );
+check( 'Esquema: la comparación no distingue mayúsculas (Windows/macOS)',
+    [] === Schema::diferencias( 'sysman_plan_presupuestal', array_map( 'strtoupper', array_keys( $defPlan['columnas'] ) ), [] )['columnas_faltantes'] );
+
+check( 'Esquema: longitudes VARCHAR del DDL',
+    50 === ( Schema::longitudes_varchar( 'sysman_ejecucion_ingresos' )['cuenta'] ?? 0 )
+    && ! isset( Schema::longitudes_varchar( 'sysman_ejecucion_ingresos' )['apropiado'] ) );
+
+// reconciliar() sobre un $wpdb simulado: emite ALTER TABLE ADD solo para lo que falta.
+class Schema_Fake_Wpdb {
+    public string $prefix = 'wp_';
+    public string $last_error = '';
+    public array $alter = [];
+    public array $cols = [];
+    public array $idx = [];
+    public function prepare( $q, ...$a ) { return vsprintf( str_replace( '%s', "'%s'", $q ), $a ); }
+    public function get_var( $q ) {
+        return preg_match( "/SHOW TABLES LIKE '([^']+)'/", $q, $m ) && isset( $this->cols[ $m[1] ] ) ? $m[1] : null;
+    }
+    public function get_col( $q, $i = 0 ) {
+        preg_match( '/`([^`]+)`/', $q, $m );
+        return $this->cols[ $m[1] ] ?? [];
+    }
+    public function get_results( $q, $o = null ) {
+        preg_match( '/`([^`]+)`/', $q, $m );
+        return array_map( fn( $k ) => [ 'Key_name' => $k ], $this->idx[ $m[1] ] ?? [] );
+    }
+    public function query( $q ) { $this->alter[] = $q; return 1; }
+}
+$wpdbReal       = $GLOBALS['wpdb'] ?? null;
+$fakeEsq        = new Schema_Fake_Wpdb();
+$fakeEsq->cols['wp_sysman_plan_presupuestal'] = array_values( array_diff( array_keys( $defPlan['columnas'] ), [ 'tipovigencia' ] ) );
+$fakeEsq->idx['wp_sysman_plan_presupuestal']  = array_merge( [ 'PRIMARY' ], array_keys( $defPlan['indices'] ) );
+$GLOBALS['wpdb'] = $fakeEsq;
+$cambiosEsq      = Schema::reconciliar();
+$GLOBALS['wpdb'] = $wpdbReal;
+check( 'Esquema: reconciliar añade la columna faltante con su definición canónica',
+    1 === count( $fakeEsq->alter )
+    && false !== strpos( $fakeEsq->alter[0], "ALTER TABLE `wp_sysman_plan_presupuestal` ADD COLUMN tipovigencia VARCHAR(64) NOT NULL DEFAULT ''" ) );
+check( 'Esquema: reconciliar no toca las tablas que no existen', [ 'sysman_plan_presupuestal' ] === array_keys( $cambiosEsq ) );
+check( 'Esquema: reconciliar nunca emite DROP',
+    [] === array_filter( $fakeEsq->alter, fn( $q ) => false !== stripos( $q, 'DROP' ) ) );
+
 // ─── Carpeta canónica del plugin: suite-sysman ───────────────────
 // Sistema de archivos mínimo, sobre disco real, con la interfaz de WP_Filesystem.
 class Test_Filesystem {

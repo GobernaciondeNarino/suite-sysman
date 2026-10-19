@@ -135,6 +135,7 @@ define( 'SYSMAN_SUITE_VERSION', '0.0.0-test' );
 require_once dirname( __DIR__ ) . '/includes/class-helpers.php';
 require_once dirname( __DIR__ ) . '/includes/class-updater.php';
 require_once dirname( __DIR__ ) . '/includes/class-import-scope.php';
+require_once dirname( __DIR__ ) . '/includes/Ejecucion/Schema.php';
 require_once dirname( __DIR__ ) . '/includes/class-visualizer.php';
 require_once dirname( __DIR__ ) . '/includes/DatosAbiertos/DatosAbiertosModule.php';
 require_once dirname( __DIR__ ) . '/includes/Presupuesto/Repository.php';

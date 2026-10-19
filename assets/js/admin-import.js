@@ -19,6 +19,7 @@
             $('#sysman-report').on('change', () => this.toggleReportOptions());
             $('#sysman-compania').on('change', () => this.toggleCustomCompania());
             $('#sysman-check-dupes').on('click', () => this.checkDuplicates());
+            $('#sysman-dupes-result').on('click', '#sysman-repair-schema', () => this.repairSchema());
         },
 
         toggleReportOptions() {
@@ -66,13 +67,97 @@
                             + (response.data && response.data.message ? response.data.message : 'Error') + '</p></div>');
                         return;
                     }
-                    caja.html(this.renderDuplicates(response.data.periodos || []));
+                    caja.html(this.renderEstructura(response.data.estructura)
+                        + this.renderDuplicates(response.data.periodos || []));
                 },
                 error: () => {
                     caja.html('<div class="notice notice-error inline"><p>No se pudo verificar.</p></div>');
                 },
                 complete: () => btn.prop('disabled', false),
             });
+        },
+
+        /* Añade las columnas e índices que falten (nunca borra nada). */
+        repairSchema() {
+            const btn = $('#sysman-repair-schema');
+            btn.prop('disabled', true).text('Reparando…');
+
+            $.post(sysmanAdmin.ajaxUrl, { action: 'sysman_repair_schema', nonce: sysmanAdmin.nonce })
+                .done((response) => {
+                    if (!response.success) {
+                        btn.prop('disabled', false).text('Reparar estructura');
+                        window.alert(response.data && response.data.message ? response.data.message : 'Error');
+                        return;
+                    }
+                    $('#sysman-estructura').replaceWith(this.renderEstructura(response.data.estructura));
+                })
+                .fail(() => {
+                    btn.prop('disabled', false).text('Reparar estructura');
+                    window.alert('No se pudo reparar la estructura.');
+                });
+        },
+
+        renderEstructura(estructura) {
+            if (!estructura || !estructura.tablas) {
+                return '';
+            }
+            const esc = (t) => $('<div>').text(t === null || t === undefined ? '' : t).html();
+            const num = (n) => Number(n).toLocaleString('es-CO');
+            const lista = (a) => (a && a.length ? a.map((x) => '<code>' + esc(x) + '</code>').join(' ') : '—');
+
+            let reparable = false;
+            let problemas = 0;
+            let filas = '';
+
+            estructura.tablas.forEach((t) => {
+                if (!t.existe) {
+                    problemas++;
+                    filas += '<tr style="background:#fcf0f1;"><td><code>' + esc(t.tabla) + '</code></td>'
+                        + '<td colspan="6"><strong>La tabla no existe.</strong> Desactive y active el plugin para crearla.</td></tr>';
+                    return;
+                }
+                const faltan = t.columnas_faltantes.length + t.indices_faltantes.length;
+                const trunc = Object.keys(t.posible_truncado || {});
+                const mal = faltan > 0 || !t.transaccional || t.filas_invalidas > 0 || trunc.length > 0;
+                if (faltan > 0) { reparable = true; }
+                if (mal) { problemas++; }
+
+                filas += '<tr' + (mal ? ' style="background:#fcf0f1;"' : '') + '>'
+                    + '<td><code>' + esc(t.tabla) + '</code></td>'
+                    + '<td style="text-align:right;">' + num(t.filas) + '</td>'
+                    + '<td>' + esc(t.motor) + (t.transaccional ? '' : ' <strong>(sin transacciones)</strong>') + '</td>'
+                    + '<td>' + lista(t.columnas_faltantes) + '</td>'
+                    + '<td>' + lista(t.indices_faltantes) + '</td>'
+                    + '<td style="text-align:right;">' + num(t.filas_invalidas) + '</td>'
+                    + '<td>' + lista(trunc) + '</td>'
+                    + '</tr>';
+            });
+
+            let html = '<div id="sysman-estructura"><h3 style="margin-top:0;">Estructura de las tablas</h3>';
+
+            html += problemas
+                ? '<div class="notice notice-error inline"><p><strong>' + problemas + ' tabla(s) con observaciones.</strong> '
+                  + (reparable ? 'Faltan columnas o índices: el botón los añade sin tocar los datos.' : 'Revise el detalle.') + '</p>'
+                  + (reparable ? '<p><button type="button" id="sysman-repair-schema" class="button button-primary">Reparar estructura</button></p>' : '')
+                  + '</div>'
+                : '<div class="notice notice-success inline"><p>Estructura completa: todas las columnas e índices están en su lugar.</p></div>';
+
+            if (estructura.intercalacion_mixta) {
+                html += '<div class="notice notice-warning inline"><p>Las columnas de cruce entre tablas usan intercalaciones distintas ('
+                    + Object.keys(estructura.intercalaciones_cruce).map((k) => esc(k) + ': ' + esc(estructura.intercalaciones_cruce[k])).join(', ')
+                    + '). Los cruces serán lentos o fallarán; unifique la intercalación de las tablas.</p></div>';
+            }
+
+            html += '<table class="widefat striped" style="margin-top:12px;"><thead><tr>'
+                + '<th>Tabla</th><th style="text-align:right;">Filas</th><th>Motor</th>'
+                + '<th>Columnas faltantes</th><th>Índices faltantes</th>'
+                + '<th style="text-align:right;">Periodo inválido</th><th>Posible truncado</th></tr></thead><tbody>'
+                + filas + '</tbody></table>'
+                + '<p class="description">«Sin transacciones»: la importación no puede revertirse si falla a mitad; convierta la tabla a InnoDB. '
+                + '«Posible truncado»: el valor más largo llena el campo, puede que la API envíe textos más largos de lo que cabe.</p></div>'
+                + '<h3>Duplicados por periodo</h3>';
+
+            return html;
         },
 
         renderDuplicates(periodos) {

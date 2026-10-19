@@ -39,6 +39,7 @@ class Importer {
         add_action( 'wp_ajax_sysman_start_import', [ $this, 'ajax_start_import' ] );
         add_action( 'wp_ajax_sysman_import_status', [ $this, 'ajax_import_status' ] );
         add_action( 'wp_ajax_sysman_check_duplicates', [ $this, 'ajax_check_duplicates' ] );
+        add_action( 'wp_ajax_sysman_repair_schema', [ $this, 'ajax_repair_schema' ] );
     }
 
     /** Nombre de la opción que hace de cerrojo entre importaciones. */
@@ -520,8 +521,33 @@ class Importer {
         $anio = absint( $_POST['anio'] ?? 0 );
 
         wp_send_json_success( [
-            'anio'     => $anio,
-            'periodos' => $this->database->duplicate_report( $anio ),
+            'anio'       => $anio,
+            'periodos'   => $this->database->duplicate_report( $anio ),
+            'estructura' => \SysmanSuite\Ejecucion\Schema::integridad(),
+        ] );
+    }
+
+    /**
+     * AJAX: añade a las tablas las columnas e índices que les falten.
+     * Nunca borra columnas ni datos.
+     */
+    public function ajax_repair_schema(): void {
+        check_ajax_referer( 'sysman_import_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ] );
+        }
+
+        if ( ! $this->adquirir_bloqueo( 'estructura' ) ) {
+            wp_send_json_error( [ 'message' => 'Hay una importación en curso; repare la estructura cuando termine.' ] );
+        }
+
+        $cambios = \SysmanSuite\Ejecucion\Schema::reconciliar();
+        $this->liberar_bloqueo();
+
+        wp_send_json_success( [
+            'cambios'    => $cambios,
+            'estructura' => \SysmanSuite\Ejecucion\Schema::integridad(),
         ] );
     }
 

@@ -5,7 +5,26 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Schema {
 
-    const VERSION = '5.0.1';
+    const VERSION = '5.21.0';
+
+    /** Tabla (sin prefijo) => método que devuelve su DDL canónico. */
+    const TABLAS = [
+        'sysman_plan_presupuestal'  => 'plan_presupuestal_sql',
+        'sysman_auxiliar_cuentas'   => 'auxiliar_cuentas_sql',
+        'sysman_ejecucion_gastos'   => 'ejecucion_gastos_sql',
+        'sysman_personal_nomina'    => 'personal_nomina_sql',
+        'sysman_ejecucion_ingresos' => 'ejecucion_ingresos_sql',
+    ];
+
+    /**
+     * Columnas por las que se cruzan plan, ejecución y auxiliar de gastos
+     * (pp.codigo = eg.codigocuenta = ac.rubro). Deben compartir intercalación.
+     */
+    const COLUMNAS_CRUCE = [
+        'sysman_plan_presupuestal' => [ 'compania', 'codigo' ],
+        'sysman_ejecucion_gastos'  => [ 'compania', 'codigocuenta' ],
+        'sysman_auxiliar_cuentas'  => [ 'compania', 'rubro' ],
+    ];
 
     public static function run(): void {
         $current = get_option( 'gn_sisman_schema_version', '0' );
@@ -16,25 +35,22 @@ class Schema {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
 
-        $table_pp = $wpdb->prefix . 'sysman_plan_presupuestal';
-        $table_ac = $wpdb->prefix . 'sysman_auxiliar_cuentas';
-        $table_eg = $wpdb->prefix . 'sysman_ejecucion_gastos';
-
         // Create tables only if they don't exist (never DROP existing data)
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_pp ) ) !== $table_pp ) {
-            self::create_table_raw( $wpdb, self::plan_presupuestal_sql( $wpdb->prefix, $charset ) );
-        }
-
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_ac ) ) !== $table_ac ) {
-            self::create_table_raw( $wpdb, self::auxiliar_cuentas_sql( $wpdb->prefix, $charset ) );
-        }
-
-        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_eg ) ) !== $table_eg ) {
-            self::create_table_raw( $wpdb, self::ejecucion_gastos_sql( $wpdb->prefix, $charset ) );
+        foreach ( self::TABLAS as $nombre => $metodo ) {
+            $tabla = $wpdb->prefix . $nombre;
+            if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $tabla ) ) !== $tabla ) {
+                self::create_table_raw( $wpdb, self::$metodo( $wpdb->prefix, $charset ) );
+            }
         }
 
         // v5.0.0 migration: fix column name mismatches
         self::migrate_column_names( $wpdb );
+
+        // CREATE TABLE IF NOT EXISTS no toca una tabla que ya existe: las
+        // columnas e índices añadidos en versiones posteriores nunca llegarían
+        // a las instalaciones antiguas, y el importador descartaría en
+        // silencio los campos que no encuentra (p. ej. tipovigencia).
+        self::reconciliar();
 
         update_option( 'gn_sisman_schema_version', self::VERSION );
 
@@ -99,6 +115,226 @@ class Schema {
 
     private static function create_table_raw( $wpdb, string $sql ): void {
         $wpdb->query( $sql );
+    }
+
+    /**
+     * Columnas e índices que define el DDL canónico de una tabla.
+     *
+     * @return array{columnas: array<string,string>, indices: array<string,string>}
+     *         nombre => definición tal como va en el CREATE TABLE.
+     */
+    public static function definicion( string $nombre ): array {
+        $metodo = self::TABLAS[ $nombre ] ?? null;
+        if ( null === $metodo ) {
+            return [ 'columnas' => [], 'indices' => [] ];
+        }
+        return self::parsear_ddl( self::$metodo( '', '' ) );
+    }
+
+    /**
+     * Separa un CREATE TABLE en columnas e índices secundarios.
+     */
+    public static function parsear_ddl( string $ddl ): array {
+        $inicio = strpos( $ddl, '(' );
+        $fin    = strrpos( $ddl, ')' );
+        $cuerpo = ( false === $inicio || false === $fin ) ? '' : substr( $ddl, $inicio + 1, $fin - $inicio - 1 );
+
+        $columnas = [];
+        $indices  = [];
+        foreach ( preg_split( '/\R/', $cuerpo ) as $linea ) {
+            $linea = rtrim( trim( $linea ), ',' );
+            if ( '' === $linea || 0 === stripos( $linea, 'PRIMARY KEY' ) ) {
+                continue;
+            }
+            if ( preg_match( '/^(?:UNIQUE\s+)?KEY\s+(\w+)\s*\(/i', $linea, $m ) ) {
+                $indices[ $m[1] ] = $linea;
+                continue;
+            }
+            if ( preg_match( '/^(\w+)\s+/', $linea, $m ) ) {
+                $columnas[ $m[1] ] = $linea;
+            }
+        }
+
+        return [ 'columnas' => $columnas, 'indices' => $indices ];
+    }
+
+    /**
+     * Qué le falta a una tabla existente frente al DDL canónico.
+     *
+     * Solo se añade, nunca se borra: una columna de más (p. ej. un nombre
+     * antiguo) se informa, pero quitarla podría destruir datos.
+     *
+     * @param string[] $columnas_reales
+     * @param string[] $indices_reales
+     */
+    public static function diferencias( string $nombre, array $columnas_reales, array $indices_reales ): array {
+        $def = self::definicion( $nombre );
+
+        $reales_col = array_map( 'strtolower', $columnas_reales );
+        $reales_idx = array_map( 'strtolower', $indices_reales );
+
+        $faltan_col = array_diff_key( $def['columnas'], array_flip( $reales_col ) );
+        $faltan_idx = array_diff_key( $def['indices'], array_flip( $reales_idx ) );
+        $sobran_col = array_values( array_diff( $reales_col, array_keys( $def['columnas'] ) ) );
+
+        return [
+            'columnas_faltantes' => $faltan_col,
+            'indices_faltantes'  => $faltan_idx,
+            'columnas_sobrantes' => $sobran_col,
+        ];
+    }
+
+    /**
+     * Añade a las tablas existentes las columnas e índices que les falten.
+     *
+     * @return array<string, string[]> Cambios aplicados (o errores) por tabla.
+     */
+    public static function reconciliar(): array {
+        global $wpdb;
+
+        $cambios = [];
+        foreach ( array_keys( self::TABLAS ) as $nombre ) {
+            $tabla    = $wpdb->prefix . $nombre;
+            $columnas = self::get_columns( $wpdb, $tabla );
+            if ( empty( $columnas ) ) {
+                continue;
+            }
+
+            $dif = self::diferencias( $nombre, $columnas, self::get_indexes( $wpdb, $tabla ) );
+
+            foreach ( $dif['columnas_faltantes'] as $col => $definicion ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- DDL propio, no entrada de usuario.
+                $ok = $wpdb->query( "ALTER TABLE `{$tabla}` ADD COLUMN {$definicion}" );
+                $cambios[ $nombre ][] = false === $ok
+                    ? "ERROR columna {$col}: {$wpdb->last_error}"
+                    : "columna {$col}";
+            }
+            foreach ( $dif['indices_faltantes'] as $idx => $definicion ) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- DDL propio, no entrada de usuario.
+                $ok = $wpdb->query( "ALTER TABLE `{$tabla}` ADD {$definicion}" );
+                $cambios[ $nombre ][] = false === $ok
+                    ? "ERROR índice {$idx}: {$wpdb->last_error}"
+                    : "índice {$idx}";
+            }
+        }
+
+        if ( ! empty( $cambios ) && class_exists( '\SysmanSuite\Logger' ) ) {
+            ( new \SysmanSuite\Logger() )->log(
+                'Estructura de tablas actualizada: ' . wp_json_encode( $cambios, JSON_UNESCAPED_UNICODE ),
+                'info'
+            );
+        }
+
+        return $cambios;
+    }
+
+    /**
+     * Longitud máxima de cada columna VARCHAR del DDL canónico.
+     *
+     * @return array<string,int>
+     */
+    public static function longitudes_varchar( string $nombre ): array {
+        $longitudes = [];
+        foreach ( self::definicion( $nombre )['columnas'] as $col => $definicion ) {
+            if ( preg_match( '/^\w+\s+VARCHAR\((\d+)\)/i', $definicion, $m ) ) {
+                $longitudes[ $col ] = (int) $m[1];
+            }
+        }
+        return $longitudes;
+    }
+
+    /**
+     * Informe de integridad estructural de las cinco tablas.
+     *
+     * Por tabla: si existe, filas, motor (sin InnoDB no hay transacciones y la
+     * importación no puede revertir una duplicación), intercalación,
+     * columnas/índices que faltan o sobran, filas con periodo inválido y
+     * columnas cuyo valor más largo llena el campo (posible truncado).
+     * Además, columnas de cruce con intercalaciones distintas entre tablas:
+     * MySQL no usa el índice en ese JOIN o falla con «Illegal mix of collations».
+     */
+    public static function integridad(): array {
+        global $wpdb;
+
+        $tablas = [];
+        $cruces = [];
+
+        foreach ( array_keys( self::TABLAS ) as $nombre ) {
+            $tabla = $wpdb->prefix . $nombre;
+            $info  = [
+                'tabla'  => $nombre,
+                'existe' => false,
+            ];
+
+            $columnas = self::get_columns( $wpdb, $tabla );
+            if ( empty( $columnas ) ) {
+                $tablas[] = $info;
+                continue;
+            }
+
+            $estado = $wpdb->get_row( $wpdb->prepare( 'SHOW TABLE STATUS LIKE %s', $tabla ), ARRAY_A ) ?: [];
+            $dif    = self::diferencias( $nombre, $columnas, self::get_indexes( $wpdb, $tabla ) );
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $completas = isset( self::COLUMNAS_CRUCE[ $nombre ] )
+                ? ( $wpdb->get_results( "SHOW FULL COLUMNS FROM `{$tabla}`", ARRAY_A ) ?: [] )
+                : [];
+            foreach ( $completas as $c ) {
+                if ( in_array( $c['Field'], self::COLUMNAS_CRUCE[ $nombre ], true ) && ! empty( $c['Collation'] ) ) {
+                    $cruces[ "{$nombre}.{$c['Field']}" ] = $c['Collation'];
+                }
+            }
+
+            $tiene_mes = in_array( 'mes', $columnas, true );
+            $invalido  = $tiene_mes ? 'anio < 2000 OR mes < 1 OR mes > 12' : 'anio < 2000';
+
+            // Una sola pasada por la tabla para el valor más largo de cada VARCHAR.
+            $longitudes = array_intersect_key( self::longitudes_varchar( $nombre ), array_flip( $columnas ) );
+            $max_sql    = '';
+            foreach ( array_keys( $longitudes ) as $col ) {
+                $max_sql .= ", MAX(CHAR_LENGTH(`{$col}`)) AS `max_{$col}`";
+            }
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- columnas del DDL propio.
+            $agregado = $wpdb->get_row(
+                "SELECT COUNT(*) AS filas, SUM(CASE WHEN {$invalido} THEN 1 ELSE 0 END) AS invalidas{$max_sql} FROM `{$tabla}`",
+                ARRAY_A
+            ) ?: [];
+
+            $truncados = [];
+            foreach ( $longitudes as $col => $max ) {
+                $largo = (int) ( $agregado[ "max_{$col}" ] ?? 0 );
+                if ( $largo >= $max ) {
+                    $truncados[ $col ] = $max;
+                }
+            }
+
+            $motor = (string) ( $estado['Engine'] ?? '' );
+
+            $tablas[] = array_merge( $info, [
+                'existe'             => true,
+                'filas'              => (int) ( $agregado['filas'] ?? 0 ),
+                'motor'              => $motor,
+                'transaccional'      => 0 === strcasecmp( $motor, 'InnoDB' ),
+                'intercalacion'      => (string) ( $estado['Collation'] ?? '' ),
+                'columnas_faltantes' => array_keys( $dif['columnas_faltantes'] ),
+                'indices_faltantes'  => array_keys( $dif['indices_faltantes'] ),
+                'columnas_sobrantes' => $dif['columnas_sobrantes'],
+                'filas_invalidas'    => (int) ( $agregado['invalidas'] ?? 0 ),
+                'posible_truncado'   => $truncados,
+            ] );
+        }
+
+        return [
+            'tablas'                => $tablas,
+            'intercalaciones_cruce' => $cruces,
+            'intercalacion_mixta'   => count( array_unique( array_values( $cruces ) ) ) > 1,
+        ];
+    }
+
+    private static function get_indexes( $wpdb, string $table ): array {
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $filas = $wpdb->get_results( "SHOW INDEX FROM `{$table}`", ARRAY_A ) ?: [];
+        return array_values( array_unique( array_column( $filas, 'Key_name' ) ) );
     }
 
     public static function plan_presupuestal_sql( string $prefix, string $charset ): string {
@@ -178,7 +414,8 @@ class Schema {
             KEY idx_rubro (rubro(191)),
             KEY idx_tipocpte_rubro (tipocpte, rubro(191)),
             KEY idx_tipocpte_cmpte (tipocpte, cmpteafectado),
-            KEY idx_unique_lookup (compania, anio, mes, tipocpte, numero)
+            KEY idx_unique_lookup (compania, anio, mes, tipocpte, numero),
+            KEY idx_rubro_periodo (compania, anio, mes, rubro(100))
         ) {$charset};";
     }
 
@@ -255,7 +492,8 @@ class Schema {
             KEY idx_compania (compania),
             KEY idx_numerodcto (numerodcto),
             KEY idx_nombredelcargo (nombredelcargo(100)),
-            KEY idx_dependencia (dependencianombre(100))
+            KEY idx_dependencia (dependencianombre(100)),
+            KEY idx_compania_anio (compania, anio)
         ) {$charset};";
     }
 
@@ -285,7 +523,8 @@ class Schema {
             KEY idx_anio_mes (anio, mes),
             KEY idx_compania (compania),
             KEY idx_cuenta (cuenta),
-            KEY idx_codigo (codigo)
+            KEY idx_codigo (codigo),
+            KEY idx_compania_anio_mes (compania, anio, mes)
         ) {$charset};";
     }
 }
